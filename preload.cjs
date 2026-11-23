@@ -9,9 +9,14 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 // The sandboxed preload runs while the document is still loading, and
 // documentElement is null then. Reading it here throws, and a throw on this
 // line skips the bridge below, so the window draws the canned inbox.
+//
+// Windows draws its own buttons in the top-right corner instead
+// (main/window-buttons.mts), so the band above the pane stays there.
 if (process.platform !== 'darwin') {
   const markFlat = () => {
-    if (document.documentElement) document.documentElement.dataset.window = 'flat';
+    if (!document.documentElement) return;
+    document.documentElement.dataset.window = 'flat';
+    if (process.platform === 'win32') document.documentElement.dataset.windowButtons = 'right';
   };
   if (document.documentElement) markFlat();
   else document.addEventListener('DOMContentLoaded', markFlat);
@@ -86,6 +91,8 @@ contextBridge.exposeInMainWorld('zero', {
   teamAcceptInvite: (payload) => ipcRenderer.invoke('zero:team-accept-invite', payload),
   teamInvite: (payload) => ipcRenderer.invoke('zero:team-invite', payload),
   teamRename: (payload) => ipcRenderer.invoke('zero:team-rename', payload),
+  teamUpdateMe: (payload) => ipcRenderer.invoke('zero:team-update-me', payload),
+  teamSetLogo: (payload) => ipcRenderer.invoke('zero:team-logo', payload),
   teamRemoveMember: (payload) => ipcRenderer.invoke('zero:team-remove-member', payload),
   teamLeave: () => ipcRenderer.invoke('zero:team-leave'),
   teamCancelInvite: (payload) => ipcRenderer.invoke('zero:team-cancel-invite', payload),
@@ -132,6 +139,8 @@ contextBridge.exposeInMainWorld('zero', {
   teamMessageMate: (payload) => ipcRenderer.invoke('zero:team-message-mate', payload),
   teamGiveTask: (payload) => ipcRenderer.invoke('zero:team-give-task', payload),
   teamHandOn: (payload) => ipcRenderer.invoke('zero:team-hand-on', payload),
+  teamAsk: (payload) => ipcRenderer.invoke('zero:team-ask', payload),
+  teamHandBack: (payload) => ipcRenderer.invoke('zero:team-hand-back', payload),
   teamTaskBrief: (payload) => ipcRenderer.invoke('zero:team-task-brief', payload),
   rooms: (payload) => ipcRenderer.invoke('zero:rooms', payload),
   teammates: (payload) => ipcRenderer.invoke('zero:teammates', payload),
@@ -188,6 +197,8 @@ contextBridge.exposeInMainWorld('zero', {
   bootInfo: () => ipcRenderer.invoke('zero:boot-info'),
   // Which appearance the window's glass is drawn in (main/window-glass.mts).
   glassTone: (payload) => ipcRenderer.invoke('zero:glass-tone', payload),
+  // The Windows title bar buttons' glyphs, for a light or dark page (main/window-buttons.mts).
+  windowButtons: (payload) => ipcRenderer.invoke('zero:window-buttons', payload),
   // KEEPING AGENTBOX CURRENT (main/updater.mts). The state of it rides the
   // snapshot, so these two are only the verbs: look again now, and restart onto
   // the version that has already downloaded. Nothing here can start a download,
@@ -247,6 +258,7 @@ contextBridge.exposeInMainWorld('zero', {
   gitHubBrowserSignIn: () => ipcRenderer.invoke('zero:github-browser-sign-in'),
   gitHubCloudSignIn: (payload) => ipcRenderer.invoke('zero:github-cloud-sign-in', payload),
   signInAnswer: (payload) => ipcRenderer.invoke('zero:sign-in-answer', payload),
+  signInKeep: (payload) => ipcRenderer.invoke('zero:sign-in-keep', payload),
   cloudSendFile: (payload) => ipcRenderer.invoke('zero:cloud-send-file', payload),
   cloudSendCode: (payload) => ipcRenderer.invoke('zero:cloud-send-code', payload),
   cloudFileInfo: (payload) => ipcRenderer.invoke('zero:cloud-file-info', payload),
@@ -295,11 +307,15 @@ contextBridge.exposeInMainWorld('zero', {
   // something happened and can say nothing about what.
   // A number may ride with it (which setup step), and main keeps only a number.
   track: (name, count) => ipcRenderer.invoke('zero:track', { name, count }),
+  // How long this window's own thread held, a number and nothing else (renderer/src/window-holds.ts).
+  windowHeld: (ms) => ipcRenderer.invoke('zero:window-held', { ms }),
   onboardingArm: () => ipcRenderer.invoke('zero:onboarding-arm'),
   sessionTrace: (payload) => ipcRenderer.invoke('zero:session-trace', payload),
   // Everything that happened on one task, as the ledger lines it happened as.
   itemHistory: (payload) => ipcRenderer.invoke('zero:item-history', payload),
   openArtifact: (payload) => ipcRenderer.invoke('zero:open-artifact', payload),
+  // The apps the open mark's menu offers for a file.
+  openWith: (payload) => ipcRenderer.invoke('zero:open-with', payload),
   // The pictures in a folder a message names on its own line (main/folder-pictures.mts).
   folderPictures: (payload) => ipcRenderer.invoke('zero:folder-pictures', payload),
   // The document pane's own two: the text of a file it has open, and her edit

@@ -1,7 +1,9 @@
 import { ruleLabel, type RepeatShape as RepeatRuleValue } from '../../shared/repeats.mts';
 import { isShippedNote } from '../../shared/shipped-note.mts';
+import { closesTheTask, bareOption } from '../../shared/closes-the-task.mts';
 import { readMoment } from './when-words';
 import { localDate } from './local-dates';
+import { handedBackBy } from '../../shared/thread-asks.mts';
 // Time and grouping, Superhuman-style: terse, scannable, never a full date
 // where "3m" will do.
 
@@ -62,6 +64,7 @@ export interface ParsedOption {
 export function parseOptions(body?: string): ParsedOption[] {
   if (!body) return [];
   const lines = body.split('\n');
+  if (!lines.some(isOptionsHeading)) return headlessOptions(lines)?.options ?? [];
   let inOptions = false;
   const options: ParsedOption[] = [];
   for (const line of lines) {
@@ -80,6 +83,52 @@ export function parseOptions(body?: string): ParsedOption[] {
     }
   }
   return options;
+}
+
+const isOptionsHeading = (line: string) => /^#{1,4}\s/.test(line) && /option/i.test(line);
+
+// Agents do not always write the heading (a Codex run ended on a bare list,
+// w-40d7d7cf71). Without it, a numbered list counts as an offer only when it
+// closes the message, runs 1, 2, 3..., and either marks one choice recommended
+// or follows a paragraph that asks a question, so a list of steps stays prose.
+const ITEM = /^ {0,3}(\d+)[.)]\s+(.*)$/;
+const LEADING_MARK = /^(?:\*\*|__)?\[?recommended(?:\]|\s*[:\p{Pd}]|\*\*|__)\s*(?:\*\*|__)?\s*[:\p{Pd}]?\s*/iu;
+const TRAILING_MARK = /\s*(?:\p{Pd}\s*)?(?:\*\*|__)?[([]recommended\b[^)\]]*[)\]](?:\*\*|__)?\s*$|\s*\p{Pd}\s*(?:\*\*|__)?recommended(?:\*\*|__)?\s*$/iu;
+
+const QUESTION = /\?(?:\*\*|__|\*|_)?(?=\s|$)/;
+
+function asksRightBefore(lines: string[], start: number): boolean {
+  let i = start - 1;
+  while (i >= 0 && !lines[i].trim()) i--;
+  for (; i >= 0 && lines[i].trim(); i--) if (QUESTION.test(lines[i])) return true;
+  return false;
+}
+
+function headlessOptions(lines: string[]): { start: number; end: number; options: ParsedOption[] } | null {
+  let last = -1;
+  for (let i = lines.length - 1; i >= 0; i--) if (ITEM.test(lines[i])) { last = i; break; }
+  if (last < 0) return null;
+  const continues = (l: string) => !l.trim() || /^\s{2,}\S/.test(l);
+  let end = last + 1;
+  while (end < lines.length && continues(lines[end])) end++;
+  const after = lines.slice(end).filter((l) => l.trim());
+  if (after.length > 2 || after.some((l) => /^#{1,4}\s/.test(l))) return null;
+  let start = last;
+  for (let i = last - 1; i >= 0 && (ITEM.test(lines[i]) || continues(lines[i])); i--) if (ITEM.test(lines[i])) start = i;
+  const options: ParsedOption[] = [];
+  for (let i = start; i < end; i++) {
+    const m = lines[i].match(ITEM);
+    if (!m) continue;
+    const text = m[2].trim();
+    const bare = text.replace(LEADING_MARK, '');
+    const marked = bare !== text || TRAILING_MARK.test(text);
+    const words = marked ? `${bare.replace(TRAILING_MARK, '')} (recommended)` : text;
+    options.push({ n: Number(m[1]), text: words, recommended: marked });
+  }
+  if (options.length < 2 || options.some((o, i) => o.n !== i + 1)) return null;
+  if (!options.some((o) => o.recommended) && !asksRightBefore(lines, start)) return null;
+  while (end > start && !lines[end - 1].trim()) end--;
+  return { start, end, options };
 }
 
 // WHICH FIELD A PICK LIVES IN, and it is not always the body.
@@ -121,8 +170,14 @@ export function optionsFrom(item: HasFields): OptionsField {
 }
 
 export function itemOptions(item: HasFields): ParsedOption[] {
-  return parseOptions(item[optionsFrom(item)]);
+  const options = parseOptions(item[optionsFrom(item)]);
+  // A reviewer who asked for changes outranks what the agent recommended before they looked.
+  if (!changesAskedSince(item)) return options;
+  return options.map((o) => ({ ...o, text: o.text.replace(/\s*\(recommended\)\s*/i, ''), recommended: false }));
 }
+
+const changesAskedSince = (item: HasFields & { status?: string; answer?: string }) =>
+  !!handedBackBy(item as never) && / reviewed this and asked for changes\.(\n|$)/.test(item.answer ?? '');
 
 // With the options strip riding on the composer, the field's own "## Options"
 // section would say everything twice; drop the heading and its numbered items
@@ -131,6 +186,10 @@ export function itemOptions(item: HasFields): ParsedOption[] {
 // list where it was written, as the record of what was offered.
 export function stripOptionsSection(body: string): string {
   const lines = body.split('\n');
+  if (!lines.some(isOptionsHeading)) {
+    const list = headlessOptions(lines);
+    return list ? [...lines.slice(0, list.start), ...lines.slice(list.end)].join('\n') : body;
+  }
   const out: string[] = [];
   let inOptions = false;
   for (const line of lines) {
@@ -176,7 +235,10 @@ export function offerIsLive(item: HasFields & { answer?: string }): boolean {
   const later: OptionsField[] = field === 'body' ? ['result'] : ['result', 'note'];
   const afterTheShip = isShippedNote(item.note) && !options.some((o) => asksToShip(o.text));
   if (later.some((f) => f !== field && writtenAt(item, f) > offered && !(f === 'note' && afterTheShip))) return false;
+  // Answered where the chat started (main/chat-follow.mts).
+  if ((item.wrote?.saidOutside?.ts ?? 0) > offered) return false;
   if (!item.answer || item.answer === '(withdrawn)') return true;
+  // A teammate's words handed back answer them too: what is left is yours to say, not a pick.
   const spoke = item.wrote?.answer?.ts ?? 0;
   return offered > spoke;
 }
@@ -188,30 +250,14 @@ export function liveOption(item: HasFields & { answer?: string }, n: number): Pa
   return itemOptions(item).find((o) => o.n === n) ?? null;
 }
 
-// THE OPTION THAT CLOSES THE TASK (w-1df18b337a). Once a run has shipped, the
-// one honest next move is often to close the row, and agents are told to offer
-// exactly "Close this task". A pick is a reply, and a reply on a finished row
-// starts a run, so this is caught and done the way E does it instead. The words
-// alone or with a reason after them: "Ship it, then close the task" and "Close
-// this task, then file the follow-up" are still replies.
-const CLOSES = /^close (?:this|the) (?:task|thread)(?:$|\s*[,:;\p{Pd}](?!\s*(?:then|and|also)\b)|\s+(?:since|because|as|now that)\b)/iu;
-// "Keep it as sent and close this task" asks for no work either. Keeping something
-// in particular ("Keep the first layout and close this task") does.
-const KEEPS_AND_CLOSES = /^(?:keep|leave) (?:it|this|them|that)(?: as (?:is|sent|it is))?\s*,?\s+and close (?:this|the) (?:task|thread)$/i;
-// "Looks right, close this task" is a close too.
-const RIGHT_FIRST = /^(?:(?:that|it|this|all)\s+)?(?:looks\s+|is\s+)?(?:right|good|fine|great|perfect|correct)\s*[,.;:!]?\s+(?:and\s+|so\s+)?(?=close\b)/i;
-export function closesTheTask(option: string): boolean {
-  const words = bareOption(option).replace(RIGHT_FIRST, '');
-  return CLOSES.test(words) || KEEPS_AND_CLOSES.test(words);
-}
+// The option that closes the task lives in ../../shared/closes-the-task.mts.
+export { closesTheTask };
 
 // "Keep it on the branch" is the same, and leaves the work off main on purpose.
 const STAYS_ON_BRANCH = /^(?:keep|leave)\s+(?:(?:it|this|them|that|the (?:change|changes|work|commits?))\s+)?(?:on|in)\s+(?:(?:the|its|this|a)\s+)?branch(?:\s+for now)?$/i;
 export function leavesItOnTheBranch(option: string): boolean {
   return STAYS_ON_BRANCH.test(bareOption(option));
 }
-
-const bareOption = (option: string) => option.replace(/\s*\(recommended\)\s*/i, '').trim().replace(/[.!]+$/, '');
 
 // The option that IS the decision to ship: "Ship it", "Let it ship as built",
 // "Not now, just ship this", "Merge it". Leading words only: "re-ship", "before
@@ -332,7 +378,7 @@ export function parseRepeat(raw: string): RepeatParse {
     // "every day at half past nine" is a recurrence this cannot keep and must
     // say so. Without "at", the rest is the task itself and the hour defaults,
     // the way every day-shaped answer in parseWhen already does.
-    const at = rest.match(/^(?:(?:only|just)\s+)?at\s+(.+)$/);
+    const at = rest.match(/^(?:morning\s+)?(?:(?:only|just)\s+)?at\s+(.+)$/);
     return at ? shapeOf(opener[0], at[1]) : shapeOf(opener[0], '');
   }
 

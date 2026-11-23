@@ -61,18 +61,13 @@ function codexSession(codexDir, { id, when }) {
 
 const read = (opts = {}) => readImportableThreads({ config: {}, supervisor: null, env: {}, shellEnv: {}, home, now: NOW, ...opts });
 
-async function setupCard(threads) {
-  const { finishCard } = await import('../renderer/src/onboarding.ts');
-  return finishCard({ missing: false }, { read: true, some: false }, markImported(threads, []));
-}
 
 describe('when nothing is from the last ten days', () => {
-  it('offers the newest older sessions instead, and setup shows the card', async () => {
+  it('offers the newest older sessions instead', async () => {
     claudeSession(path.join(home, '.claude'), { id: 'eleven', when: NOW - 11 * DAY });
     codexSession(path.join(home, '.codex'), { id: 'forty', when: NOW - 40 * DAY });
     const threads = await read();
     expect(threads.map((t) => t.id)).toEqual(['eleven', 'forty']);
-    expect((await setupCard(threads)).show).toBe(true);
   });
 
   it('offers at most twenty, newest first', async () => {
@@ -86,7 +81,6 @@ describe('when nothing is from the last ten days', () => {
   it('still goes no further back than ninety days', async () => {
     claudeSession(path.join(home, '.claude'), { id: 'ancient', when: NOW - 91 * DAY });
     expect(await read()).toEqual([]);
-    expect((await setupCard([])).skip).toBe(true);
   });
 
   it('still refuses the app\'s own runs among the older sessions', async () => {

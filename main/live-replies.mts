@@ -4,6 +4,7 @@
 // neither an out-of-order response nor a rejected input reorders the history.
 import { NAME } from '../shared/product-name.mjs';
 import { TURN_CLOSED } from './claude-input.mts';
+import { isHandBack } from '../shared/thread-asks.mts';
 // WHAT A WORKER IS TOLD WHEN THEY TYPE AT IT WHILE IT IS STILL WORKING.
 //
 // The other half of `replyBrief` in supervisor.mts, which frames a reply handed
@@ -114,7 +115,7 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
     && status !== 'done' && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)';
   // Observe rejections immediately, including when an earlier reply is still
   // waiting. The ordered commit below rethrows them to their own caller.
-  const delivery: Promise<{ ok: boolean; error?: { code?: unknown } | null }> = Promise.resolve().then(() => {
+  const send = (): Promise<{ ok: boolean; error?: { code?: unknown } | null }> => Promise.resolve().then(() => {
     if (!live) return;
     if (permissionMode != null) throw Error('A running turn keeps its current permissions. Stop it before sending with a different permission mode.');
     if (answer.trimStart().startsWith('/') && !session.remoteIdle) throw Error('Wait for the current turn to finish before running a slash command.');
@@ -136,6 +137,31 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
     if (now) session.child!.interrupt?.()?.catch?.(() => {});
     return taken;
   }).then(() => ({ ok: true }), error => ({ ok: false, error }));
+  const heard = (item: ReplyItem) => {
+    supervisor._handledAnswers.add(supervisor._answerKey(item));
+    // Taken into this conversation, which a later stop does not undo.
+    supervisor._noteHeard?.(item, session!.sessionId);
+    session!.lastLiveReply = item;
+    supervisor._saveState();
+    if (session!.exitFailed) {
+      supervisor.redeliverAnswer(item, item.answer);
+      if (!session!.stoppedByUs) supervisor.deliverMidflightReply({ ...item, answer: null, wrote: {} }, null);
+    }
+  };
+  // A teammate's words are on the thread before the agent takes them, which
+  // can be minutes away. Not taken, they stay there unhandled for the next run.
+  if (from) {
+    const operation = previous.catch(() => {}).then(async () => {
+      const saved = await commit();
+      const item = saved ? { ...saved, product, id } : saved;
+      if (live && item) void send().then((accepted) => { if (accepted.ok) heard(item); });
+      return item;
+    });
+    sends.set(key, operation);
+    void operation.finally(() => { if (sends.get(key) === operation) sends.delete(key); }).catch(() => {});
+    return operation;
+  }
+  const delivery = send();
   const operation = previous.catch(() => {}).then(async () => {
     const accepted = await delivery;
     // TOO LATE FOR THIS TURN IS NOT A FAILED SEND. The session closed its
@@ -154,17 +180,7 @@ export function submitReply(supervisor: ReplySupervisor, payload: ReplyPayload, 
       throw error;
     }
     const item = saved ? { ...saved, product, id } : saved;
-    if (steered && item) {
-      supervisor._handledAnswers.add(supervisor._answerKey(item));
-      // Taken into this conversation, which a later stop does not undo.
-      supervisor._noteHeard?.(item, session.sessionId);
-      session.lastLiveReply = item;
-      supervisor._saveState();
-      if (session.exitFailed) {
-        supervisor.redeliverAnswer(item, item.answer);
-        if (!session.stoppedByUs) supervisor.deliverMidflightReply({ ...item, answer: null, wrote: {} }, null);
-      }
-    }
+    if (steered && item) heard(item);
     return item;
   });
   sends.set(key, operation);
@@ -196,15 +212,21 @@ export function queuedReplyText(item: QueuedItem, history: QueuedLine[], deliver
  const pending: { answer: string; from: string | null | undefined }[]=[];
  const latestTs=item.wrote?.answer?.ts;
  const settled=item.answeredThrough??0;
+ let before=false;
  for(let i=history.length-1;i>=0;i--){
   const line=history[i];
   if(line.heartbeat||line.release)continue;
-  if(line.patch?.result)break;
-  if(line.ts<=settled)break;
+  if(line.patch?.result||line.ts<=settled)before=true;
   const answer=line.patch?.answer;
   if(typeof answer!=='string'||!answer.trim())continue;
   if(answer==='(withdrawn)')break;
   const from=line.source==='system'?line.patch?.from?.name:null;
+  // A hand-back is held for the person, so one that came during the last run never reached the agent.
+  if(before){
+   if(line.source==='founder')break;
+   if(from&&isHandBack(answer))pending.unshift({answer,from});
+   continue;
+  }
   if(line.source!=='founder'&&!from)continue;
   const candidate={...item,answer,wrote:{...item.wrote,answer:{ts:line.ts}}};
   // The queue marks the newest reply at spawn. It is still part of this input.
@@ -232,8 +254,10 @@ export function framedPick(answer: string): string{
 }
 
 // A teammate's words, as a turn reads them. A hand-off from a teammate is work
-// to do, not the person's yes to anything.
+// to do, not the person's yes to anything. Two people can now steer one agent
+// (a help ask, shared/thread-asks.mts), so a clash is put to the person, never settled by the agent.
+export const WHEN_THEY_DISAGREE = 'If this disagrees with what the person asked, do not choose between them: say what each asked and ask the person which to follow.';
 export function framedTeammate<T>(name: string | null | undefined,text: T): T | string{
  if(!name)return text;
- return `${name}, a teammate (not the person), wrote this to you:\n\n${String(text).split('\n').map((l)=>`> ${l}`).join('\n')}`;
+ return `${name}, a teammate (not the person), wrote this to you:\n\n${String(text).split('\n').map((l)=>`> ${l}`).join('\n')}\n\n${WHEN_THEY_DISAGREE}`;
 }

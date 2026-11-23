@@ -244,7 +244,10 @@ export function unsentWords(total: number, elsewhere: number, kind: 'picture' | 
   return elsewhere >= total ? `${head}, on ${where}` : `${head}, ${elsewhere} on ${where}`;
 }
 
-export type NoteGoes = { to: 'agent'; now: boolean } | { to: 'person'; person: string } | { to: 'file' };
+/** The bar while Send all is on its way. */
+export const sendingWords = (total: number): string => `Sending ${total} ${total === 1 ? 'comment' : 'comments'} to your agent`;
+
+export type NoteGoes ={ to: 'agent'; now: boolean } | { to: 'person'; person: string } | { to: 'file' };
 
 /**
  * WHO A NOTE GOES TO follows whose thing it is on. A name in the words wins.
@@ -312,7 +315,11 @@ export function whoTalksOnFile(notes: readonly Pick<FileNote, 'file' | 'by' | 't
 }
 
 /** What the button says once the note it sent has saved: who it went to, or null for a comment kept on the file. */
-export const noteSentWords = (sendWords: string): string | null => (sendWords.startsWith('Send to ') ? `Sent to ${sendWords.slice('Send to '.length)}` : null);
+/** A note written while a teammate's review is on you goes with your reply, not on its own. */
+export const ADD_TO_YOUR_REPLY = 'Add to your reply';
+
+export const noteSentWords = (sendWords: string): string | null => (sendWords === ADD_TO_YOUR_REPLY ? 'Added to your reply'
+  : sendWords.startsWith('Send to ') ? `Sent to ${sendWords.slice('Send to '.length)}` : null);
 
 /**
  * Whether a key goes into the note box. The view takes every key while it is

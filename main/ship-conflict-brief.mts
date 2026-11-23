@@ -35,7 +35,7 @@ export function conflictedFilesIn(output: unknown) {
 
 function git(cwd: string, args: string[]) {
   return new Promise<GitResult>((resolve) => {
-    execFile('git', ['-C', cwd, ...args], { encoding: 'utf8', timeout: GIT_MS, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => {
+    execFile('git', ['-C', cwd, ...args], { encoding: 'utf8', timeout: GIT_MS, maxBuffer: 4 * 1024 * 1024, windowsHide: true }, (err, stdout) => {
       resolve({ ok: !err, code: err ? (typeof err.code === 'number' ? err.code : -1) : 0, out: String(stdout ?? '') });
     });
   });

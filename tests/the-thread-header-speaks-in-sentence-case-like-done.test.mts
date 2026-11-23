@@ -21,10 +21,16 @@ describe('Add people', () => {
   it('in the header it wears Done\'s box: the same height, line, corner and size', () => {
     const done = rule(read('renderer/src/threads/summary.css'), '.ts-done');
     const add = rule(team, '.crumb-aside .tm-add-people');
-    for (const part of ['height: 30px', 'border: 1px solid var(--line)', 'font-size: 13px', 'color: var(--text-dim)']) {
+    for (const part of ['font-size: 13px', 'color: var(--text-dim)']) {
       expect(done).toContain(part);
       expect(add).toContain(part);
     }
+    // In the corner row both are the Inbox bar's 32 with its stronger line (summary.css).
+    const corner = read('renderer/src/threads/summary.css').match(/\.ts-top \.crumb-aside \.tm-add-people \{([^}]*)\}/)?.[1] ?? '';
+    expect(done).toContain('height: 32px');
+    expect(done).toContain('border: 1px solid var(--line-strong)');
+    expect(corner).toContain('height: 32px');
+    expect(corner).toContain('border-color: var(--line-strong)');
     expect(read('renderer/src/soft-corners.css')).toMatch(/\.crumb-aside \.tm-add-people/);
   });
 });

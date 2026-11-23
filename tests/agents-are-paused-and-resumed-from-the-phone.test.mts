@@ -78,9 +78,9 @@ describe('the phone\'s commands', () => {
 
 describe('the Running page on the phone', () => {
   const src = fs.readFileSync(new URL('../mobile/src/ui/SettingsPages.tsx', import.meta.url), 'utf8');
-  it('has the pause and the resume', () => {
-    expect(src).toMatch(/'Unpause agents' : 'Pause agents'/);
-    expect(src).toMatch(/label="Resume interrupted agents"/);
-    expect(src).toContain("key: 'resumeStopped'");
+  // The desktop keeps them on ⌘K only (Settings.tsx, PAUSING IS A COMMAND), so the phone does too.
+  it('leaves the pause and the resume to the command bar', () => {
+    expect(src).not.toMatch(/'Unpause agents' : 'Pause agents'/);
+    expect(src).not.toMatch(/label="Resume interrupted agents"/);
   });
 });

@@ -39,7 +39,7 @@ const anchorsIn = (text) => {
   return targets;
 };
 
-const linksIn = (text) => [...text.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]);
+const linksIn = (text) => [...text.matchAll(/href="#([^"]+)"|\]\(#([^)\s]+)\)/g)].map((m) => m[1] ?? m[2]);
 
 describe('every in-page README link lands somewhere', () => {
   it('resolves all of them', () => {
@@ -80,5 +80,15 @@ describe('the anchor rule itself', () => {
   it('drops punctuation the way GitHub does', () => {
     expect(slug("What's sent, really?")).toBe('whats-sent-really');
     expect(slug('1. File the work')).toBe('1-file-the-work');
+  });
+
+  // The Install table links each computer to its section in markdown, which
+  // the html-only reading never saw.
+  it('reads a markdown link to a heading as well as an html one', () => {
+    expect(linksIn('<a href="#install">Get it</a> | [Windows](#install-on-windows) |')).toEqual(['install', 'install-on-windows']);
+  });
+
+  it('does not read a link to another page or a site as an in-page one', () => {
+    expect(linksIn('[steps](INSTALL.md#install-on-windows) [site](https://agentbox.ac/#top)')).toEqual([]);
   });
 });

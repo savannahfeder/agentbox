@@ -5,13 +5,13 @@
 // first project." and pressing Choose a folder opened a window titled "Where is
 // its code?" — the heading that screen carried until w-ec62ab6b38 redrew it.
 // The chooser is opened for any project, not only the first, so its title says
-// what it is for and nothing about which project.
+// what it is for and nothing about which project. (The old walk's folder
+// screen went on 2026-11-21; the chooser stays for every new project.)
 
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { COPY } from '../renderer/src/onboarding.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Without its comments, where the question it stopped asking is written up.
@@ -27,13 +27,9 @@ describe('the window the Choose a folder row opens', () => {
 
   it('no longer asks the question the screen stopped asking', () => {
     expect(ipc).not.toContain('Where is its code?');
-    expect(COPY.folderHead).toBe('Pick a folder for your first project.');
   });
 
-  it('and the title and the screen agree about what is being picked', () => {
-    // Both say folder, and neither says code: the words on the two surfaces
-    // are read one after the other, a second apart.
+  it('says folder, and not code, in its title', () => {
     expect(dialog).toMatch(/title: '[^']*folder'/);
-    expect(COPY.folderHead.toLowerCase()).toContain('folder');
   });
 });

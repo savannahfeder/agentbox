@@ -13,6 +13,7 @@ import { SERVICES } from '../../../shared/cloud-needs.mts';
 import { Name } from '../../../shared/product-name.mjs';
 import { keyLooksWrong } from '../key-asks';
 import './connections.css';
+import { closesOnPress } from '../press';
 
 function Mark({ id, name }: { id: string; name: string }) {
   const src = logoOf(id);
@@ -39,12 +40,15 @@ function State({ tile, now }: { tile: ConnectionTile; now: number }) {
 }
 
 export function Tile({ tile, now, onOpen }: { tile: ConnectionTile; now: number; onOpen: () => void }) {
-  const offers = !tile.connected && tile.access !== 'vendor_approval';
-  return <button type="button" className="cn-tile" aria-label={`Open ${tile.name}`} onClick={onOpen}>
+  const waits = !tile.connected && tile.access === 'vendor_approval';
+  const offers = !tile.connected && !waits;
+  // A tool nobody can connect yet is a dimmed one-line card; why is in its tooltip.
+  return <button type="button" className={`cn-tile${waits ? ' cn-tile-off' : ''}`} aria-label={`Open ${tile.name}`}
+    title={waits ? cardState(tile, now).words ?? undefined : undefined} onClick={onOpen}>
     <Mark id={tile.id} name={tile.name} />
     <span className="cn-tile-words">
       <span className="cn-tile-name">{tile.name}</span>
-      <State tile={tile} now={now} />
+      {!waits && <State tile={tile} now={now} />}
     </span>
     <People tile={tile} />
     {offers && <span className="cn-tile-go" aria-hidden="true">Connect</span>}
@@ -56,6 +60,8 @@ const Section = ({ title, children }: { title: string; children: ReactNode }) =>
   {children}
 </div>;
 
+const PlusGlyph = () => <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>;
+
 /** A sheet over the page that Escape and a press outside both close. */
 function SheetFrame({ label, onClose, children }: { label: string; onClose: () => void; children: ReactNode }) {
   useEffect(() => {
@@ -63,7 +69,7 @@ function SheetFrame({ label, onClose, children }: { label: string; onClose: () =
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
-  return <div className="modal-backdrop cn-backdrop" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+  return <div className="modal-backdrop cn-backdrop" {...closesOnPress(onClose)}>
     <div className="cn-sheet" role="dialog" aria-label={label}>{children}</div>
   </div>;
 }
@@ -416,7 +422,7 @@ export function ConnectionsPlace({ now, focus, onNotice, corner, cloudKeys = nul
   return <div className="cn-page">
     {corner && createPortal(<div className="cn-head">
       <label className="fp-find cn-find"><SearchIcon /><input aria-label="Search tools" placeholder="Search tools" value={query} onChange={(e) => setQuery(e.target.value)} /></label>
-      <button type="button" className="cn-button cn-add-open" onClick={() => setAdding(true)}>Add by address</button>
+      <button type="button" className="th-new cn-add-open" onClick={() => setAdding(true)}><PlusGlyph />Add by address</button>
     </div>, corner)}
     {cloud.length > 0 && <section className="cn-group">
       <h2>Saved for cloud threads</h2>

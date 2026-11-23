@@ -14,8 +14,8 @@ import { teamToday, groupsOf, shownDay, linesToStep, todayLine, GROUPS } from '.
 const NOW = new Date(2026, 9, 31, 15, 0).getTime();
 const at = (h) => new Date(2026, 9, 31, h, 0).getTime();
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
-const item = (o) => ({ product: 'lumen', status: 'open', labels: [], updatedAt: at(9), createdAt: at(8), title: o.id, ...o });
-const card = (o) => ({ visible: true, state: 'running', project: 'Lumen', blockedBy: [], blocks: [], people: null, priority: null, progress: null, updatedAt: at(10), ...o });
+const item = (o) => ({ product: 'lumen', status: 'open', labels: [], updatedAt: at(9), createdAt: at(8), title: o.id, ...(o.status === 'done' ? { result: 'Done.' } : {}), ...o });
+const card = (o) => ({ visible: true, state: 'running', project: 'Lumen', blockedBy: [], blocks: [], people: null, priority: null, progress: null, updatedAt: at(10), ...(o.state === 'done' ? { solution: 'Done.' } : {}), ...o });
 const base = {
   range: 'today', now: NOW, me: 'p-me', products: [{ slug: 'lumen', name: 'Lumen', team: {} }, { slug: 'direct-dev', name: 'Dev', team: { direct: true } }],
   decisions: [], mentions: [], people: [{ id: 'p-dev', name: 'Dev Patel' }], mates: [{ id: 't-cos', name: 'Chief of staff' }],

@@ -5,7 +5,7 @@ import { macAway, macSeenOf } from '../../../renderer/src/phone-rows';
 import type { PhoneRows } from '../../../renderer/src/phone-rows';
 import type { LedgerLine } from '../../../renderer/src/thread-history';
 import type { WorkItem } from '../../../renderer/src/types';
-import { PREVIEW_ATTACHED, PREVIEW_FILM_ATTACHED, PREVIEW_PLAN_ATTACHED, PREVIEW_SCRIPT_ATTACHED, PREVIEW_SITE_ATTACHED, previewLink } from './preview-files.mjs';
+import { PREVIEW_ATTACHED, PREVIEW_FIZZ_ATTACHED, PREVIEW_FILM_ATTACHED, PREVIEW_PLAN_ATTACHED, PREVIEW_SCRIPT_ATTACHED, PREVIEW_SITE_ATTACHED, previewLink } from './preview-files.mjs';
 
 const DEV = '0a1b2c3d4e5f';
 const MIN = 60_000;
@@ -30,7 +30,7 @@ export function previewRows(now = Date.now()): PhoneRows {
   const stuckAsk = 'Threads stuck on a Codex limit should land in Needs you.';
   const stuckNote = 'I found where a run that hits its limit is put back. Two ways to fix it:\n\n- Mark it stopped, so it shows in Needs you with the reason.\n- Retry on another account first, and only then show it.\n\n## Options\n1. Mark it stopped (recommended)\n2. Retry on another account first';
   const fizzAsk = 'Make fizz(15) return FizzBuzz and add a test.';
-  const fizzResult = 'fizz(15) now returns FizzBuzz, with a test for 3, 5 and 15. Committed as 9dfb76a; the working tree is clean.';
+  const fizzResult = 'fizz(15) now returns FizzBuzz, with tests for 15, 9 and 7. Committed as 9dfb76a; the working tree is clean.';
   const meterResult ='Shipped. Each account meter now ends with its reset time, like 6:19pm.\n\n## Options\n1. Close this task';
   const qualityNote = '**Sign-up fails on a slow connection.**\n\nOn a throttled connection the email step gives up after 10 seconds and the form clears what you typed. The fix keeps your words and waits 30 seconds.\n\n## Options\n1. Ship the fix (recommended)\n2. Show me the steps first';
   return {
@@ -69,7 +69,7 @@ export function previewRows(now = Date.now()): PhoneRows {
       thread('site', { id: 'w-5e6f7a8b9d', title: 'Make fizz(15) say FizzBuzz', status: 'open', priority: 0, engine: 'codex', body: fizzAsk, result: fizzResult, createdAt: at(30), updatedAt: at(3), wrote: { body: her(at(30)), result: agent(at(3)) } }, [
         { ts: at(30), source: 'founder', patch: { body: fizzAsk } },
         { ts: at(3), source: 'agent', patch: { result: fizzResult } },
-      ], { change: { plus: 13, minus: 1, files: [{ path: 'src/fizz.js', plus: 2, minus: 1 }, { path: 'test/fizz.test.js', plus: 11, minus: 0 }], committed: true, uncommitted: false, knowsYou: true } }),
+      ], { attached: PREVIEW_FIZZ_ATTACHED, change: { plus: 13, minus: 1, files: [{ path: 'src/fizz.js', plus: 2, minus: 1 }, { path: 'test/fizz.test.js', plus: 11, minus: 0 }], committed: true, uncommitted: false, knowsYou: true } }),
       thread('agentbox', { id: 'w-4d5e6f7a8b', title: 'Draw the sign-in screen', status: 'claimed', priority: 5, body: 'Draw five sign-in screens on the real app.', createdAt: at(40), updatedAt: at(2), wrote: { body: her(at(40)) } }, [
         { ts: at(40), source: 'founder', patch: { body: 'Draw five sign-in screens on the real app.' } },
       ], {
@@ -118,6 +118,8 @@ export function previewRows(now = Date.now()): PhoneRows {
         { ts: at(45), source: 'agent', patch: { body: 'Try sign-up the way a new user would, on a slow connection.' } },
         { ts: at(30), source: 'agent', patch: { status: 'blocked', note: qualityNote } },
       ]),
+      // A thread that run opened for an agent, which its chat lists (a-thread-an-ai-teammate-opens-shows-in-its-chat-on-the-phone).
+      thread('agentbox', { id: 'w-t4d5e6f7a8', parent: 'w-t2b3c4d5e6', labels: [], title: 'Retry sign-up once when the connection drops', status: 'open', priority: 5, body: 'Sign-up gives up on a slow connection. Retry it once before showing an error.', createdAt: at(28), updatedAt: at(28), wrote: { body: agent(at(28)) } }, []),
       thread('film', { id: 'w-t1a2b3c4d5', title: 'Cut the launch film to 60 seconds', labels: ['founder', 'teammate:t-launch0001'], status: 'claimed', priority: 5, body: 'Cut the launch film to 60 seconds. Open on the inbox.', createdAt: at(21), updatedAt: at(1), wrote: { body: agent(at(21)) } }, [
         { ts: at(21), source: 'agent', patch: { body: 'Cut the launch film to 60 seconds. Open on the inbox.' } },
       ], { attached: PREVIEW_FILM_ATTACHED, live: { since: at(20), at: STILL_GOING, where: 'mac', doing: [{ label: 'Trimmed the middle', startedAt: at(8) }, { label: 'Rendering the 60-second cut', startedAt: at(2) }] } }),
@@ -301,6 +303,7 @@ export function previewGroups(now = Date.now()) {
   const names: Record<string, string> = { preview: 'Ada Lovelace', 'p-2': 'Sam Rivera', 'p-3': 'Kai Ito', 'p-4': 'Maya Chen', 'p-5': 'Lee Park' };
   return {
     rpc(name: string, args: Record<string, string>) {
+      if (name === 'i_have_multiplayer') return true;
       if (name === 'my_rooms') return rooms;
       if (name === 'room_people') return members[args.r] ?? [];
       if (name === 'room_names') return (members[args.r] ?? []).map((id) => ({ person_id: id, name: profiles.find((p) => p.person_id === id)?.display_name ?? names[id], avatar_url: null, has_card: true }));

@@ -30,8 +30,8 @@ const rules = (css, sel) => {
   return out.join('\n');
 };
 
-it('the backdrop closes the box on a click and the box itself does not', () => {
-  expect(palette).toMatch(/palette-backdrop[^"`]*[`"]\}? onClick=\{onClose\}/);
+it('the backdrop closes the box on a press and the box itself does not', () => {
+  expect(palette).toMatch(/palette-backdrop[^"`]*[`"]\}? \{\.\.\.closesOnPress\(onClose\)\}/);
   expect(palette).toMatch(/className=\{`modal palette[^}]*\}[^>]*onClick=\{\(e\) => e\.stopPropagation\(\)\}/);
 });
 

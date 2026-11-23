@@ -60,6 +60,7 @@ export const PARITY = {
   'palette:import-agents': { desktopOnly: 'it reads Claude Code and Codex chats off the computer\'s disk' },
   'palette:tutorial': { desktopOnly: 'the tutorial runs on the computer only' },
   'palette:first-run': { desktopOnly: 'it sets up the computer' },
+  'palette:demo': { desktopOnly: 'it opens a second copy of the app on the computer' },
   'palette:keyhints': { desktopOnly: KEYS },
   'palette:rank-*': { phone: P, find: 'Rank ${p.name} first' },
   'palette:group-*': { phone: P, find: 'group-${g.id}' },
@@ -77,7 +78,7 @@ export const PARITY = {
   'palette:theme-sky-*': { missing: 'the sky themes behind the desktop\'s Home and Inbox (an Alpha feature); the phone has neither the skies nor Home' },
 
   // A thread
-  'thread:done': { phone: MENU, find: 'label="Close this thread"' },
+  'thread:done': { phone: THREAD, find: 'accessibilityLabel="Mark done"' },
   'thread:snooze': { phone: MENU, find: 'onLater(row.ts, row.label)' },
   'thread:unsnooze': { phone: MENU, find: 'if (row.now) onBack()' },
   'thread:read': { phone: 'mobile/src/lib/unread.ts', find: 'export function markSeen' },
@@ -106,13 +107,16 @@ export const PARITY = {
   'thread:see-private': { missing: 'the computer takes it; the phone copy of a thread does not say who can see it' },
   'thread:pin': { phone: MENU, find: "'Pin thread'" },
   'thread:rename': { phone: MENU, find: 'label="Rename"' },
-  'thread:summary': { phone: THREAD, find: 'function Summary(' },
-  'thread:code': { missing: 'the code change carried in the phone copy' },
+  'thread:code': { phone: 'mobile/src/ui/ThreadParts.tsx', find: "pathname: '/change'" },
   'thread:place': { phone: OFFERS, find: "'Keep on your computer'" },
   'thread:end-repeat': { phone: MENU, find: 'label="Stop repeating"' },
   'thread:add-people': { missing: 'adding people to a thread' },
   'thread:route-*': { missing: 'routing a thread to an agent or to you' },
   'thread:give-*': { missing: 'giving a thread to a teammate' },
+  'thread:ask-review-*': { desktopOnly: 'it opens the ask sheet of the desktop thread menu; the phone cannot ask a teammate yet, as with giving above' },
+  'thread:take-back': { desktopOnly: 'it takes back a thread handed over, which the phone cannot hand over yet, as with giving above' },
+  'thread:ask-help-*': { desktopOnly: 'it opens the ask sheet of the desktop thread menu; the phone cannot ask a teammate yet, as with giving above' },
+  'thread:answer-*': { desktopOnly: 'it presses the answer buttons on a teammate\'s shared thread, a page the phone does not open' },
   'thread:run-now': { phone: MENU, find: 'label="Run now"' },
   'thread:priority-*': { phone: MENU, find: 'label="Priority"' },
   'thread:model-*': { phone: 'mobile/src/ui/Pickers.tsx', find: '<SheetHead>Agent</SheetHead>', still: 'the model and agent ride a reply; the desktop also sets them without one' },
@@ -176,4 +180,4 @@ export const PARITY = {
 };
 
 // 26 from 25 once, on 2026-11-09: the skies reached the desktop on main before this check did.
-export const STILL_TO_DO = 26;
+export const STILL_TO_DO = 25;

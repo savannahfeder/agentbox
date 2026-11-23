@@ -47,7 +47,7 @@ export async function installedAgent(engine:string,config:HarnessConfig):Promise
  const settings=harness.updateSettings({home});
  const env=harness.launchEnv(bin,terminalEnv());
  // Version inspection must not itself auto-update anything.
- const {stdout}=await exec(bin,['--version'],{timeout:8000,maxBuffer:16384,env:{...env,DISABLE_AUTOUPDATER:'1'}});
+ const {stdout}=await exec(bin,['--version'],{timeout:8000,maxBuffer:16384,env:{...env,DISABLE_AUTOUPDATER:'1'},windowsHide:true});
  const version=stdout.match(/\b\d+\.\d+\.\d+(?:-[\w.-]+)?\b/)?.[0];
  const channel=settings.autoUpdatesChannel==='stable'?'stable':'latest';
  return {engine,bin,real:fs.realpathSync(bin),home,version,channel,disabled:settings.env?.DISABLE_UPDATES==='1'||process.env.DISABLE_UPDATES==='1'};

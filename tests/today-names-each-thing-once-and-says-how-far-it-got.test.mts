@@ -10,7 +10,7 @@ import path from 'node:path';
 import { teamToday } from '../renderer/src/team/today.ts';
 
 const now = new Date('2026-10-31T18:00:00').getTime();
-const row = (id, over = {}) => ({ id, product: 'c', title: id, status: 'open', updatedAt: now - 1000, labels: [], ...over });
+const row = (id, over = {}) => ({ id, product: 'c', title: id, status: 'open', updatedAt: now - 1000, labels: [], ...(over.status === 'done' ? { result: 'Done.' } : {}), ...over });
 const day = (over) => teamToday({ range: 'today', now, me: 'me', items: [], products: [{ slug: 'c', name: 'Company' }], cards: [], decisions: [], needs: [], people: [], mates: [], mateOf: () => null, ...over });
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 
@@ -20,7 +20,7 @@ describe('rows that say nothing', () => {
     expect(d.people[0].finished.map((l) => l.item.id)).toEqual(['w-2']);
   });
   it('on a teammate\'s card too', () => {
-    const card = (title) => ({ personId: 'dev', threadId: title, title, state: 'done', visible: true, updatedAt: now - 1, blockedBy: [] });
+    const card = (title) => ({ personId: 'dev', threadId: title, title, state: 'done', solution: 'Done.', visible: true, updatedAt: now - 1, blockedBy: [] });
     expect(day({ people: [{ id: 'dev', name: 'Dev' }], cards: [card('Set up its job')] }).people).toEqual([]);
     expect(day({ people: [{ id: 'dev', name: 'Dev' }], cards: [card('Set up CI for the app')] }).people[0].finished).toHaveLength(1);
   });

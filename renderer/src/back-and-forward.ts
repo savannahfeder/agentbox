@@ -1,97 +1,113 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { View } from './types';
 
-/** A place the arrows can take you back to. Pages the trail does not know
- *  (search, Today) are not recorded rather than recorded wrongly. */
+/** A place on the inbox page the arrows can take you back to. */
 export type Stop =
-  | { at: 'home' }
+  /** The list, in the tab it was on. */
   | { at: 'list'; view: View }
   | { at: 'thread'; product: string; id: string }
-  | { at: 'files'; project: string | null }
-  | { at: 'connections' }
-  | { at: 'settings'; pane: string | null }
-  /** The Team page: 'team' is the Standup, `mate:<id>` and `person:<id>` a member's page. */
-  | { at: 'team'; place: string }
+  /** A chat opened from Needs you, which is drawn in the inbox like a thread. */
   | { at: 'group'; id: string }
-  | { at: 'teammate'; id: string }
   /** A teammate's thread, which is a card from their Mac rather than one of your rows. */
   | { at: 'card'; person: string; thread: string };
 
+/** `at` is the place on screen, or the last one counted while a new one settles. */
 export type Trail = { stops: Stop[]; at: number };
 
 export const EMPTY_TRAIL: Trail = { stops: [], at: -1 };
 export const TRAIL_LIMIT = 50;
 
 export function sameStop(a: Stop, b: Stop): boolean {
-  if (a.at !== b.at) return false;
   if (a.at === 'list' && b.at === 'list') return a.view === b.view;
   if (a.at === 'thread' && b.at === 'thread') return a.product === b.product && a.id === b.id;
-  if (a.at === 'files' && b.at === 'files') return a.project === b.project;
-  if (a.at === 'team' && b.at === 'team') return a.place === b.place;
   if (a.at === 'group' && b.at === 'group') return a.id === b.id;
-  if (a.at === 'teammate' && b.at === 'teammate') return a.id === b.id;
   if (a.at === 'card' && b.at === 'card') return a.person === b.person && a.thread === b.thread;
-  // Settings is one place: its pages are where you are inside it.
-  return true;
+  return false;
 }
 
-/** What is on screen, in the order one covers another. */
+/** The list is one place whichever tab it is on. */
+export const samePlace = (a: Stop, b: Stop): boolean => (a.at === 'list' && b.at === 'list') || sameStop(a, b);
+
+/** What is on screen, as far as the arrows care. */
 export type Screen = {
-  settings: { pane: string | null } | null;
+  /** One of your threads, opened on the inbox. */
   thread: { product: string; id: string } | null;
+  /** A teammate's thread, opened from your inbox. */
   card: { person: string; thread: string } | null;
-  home: boolean;
-  files: { project: string | null } | null;
-  connections: boolean;
+  /** A chat opened from Needs you. */
   group: string | null;
-  teammate: string | null;
-  teamPlace: string | null;
-  /** A page the trail does not know. */
-  unrecorded: boolean;
-  view: View;
+  /** The tab of the list, while nothing is open over it. */
+  list: View | null;
 };
 
+/** The arrows walk the inbox page, so they are drawn only there. */
+export const onInboxPage = (s: Screen): boolean => !!s.thread || !!s.card || !!s.group || !!s.list;
+
 export function stopOnScreen(s: Screen): Stop | null {
-  if (s.settings) return { at: 'settings', pane: s.settings.pane };
   if (s.thread) return { at: 'thread', product: s.thread.product, id: s.thread.id };
   if (s.card) return { at: 'card', person: s.card.person, thread: s.card.thread };
-  if (s.home) return { at: 'home' };
-  if (s.files) return { at: 'files', project: s.files.project };
-  if (s.connections) return { at: 'connections' };
   if (s.group) return { at: 'group', id: s.group };
-  if (s.teammate) return { at: 'teammate', id: s.teammate };
-  if (s.teamPlace) return { at: 'team', place: s.teamPlace };
-  if (s.unrecorded) return null;
-  return { at: 'list', view: s.view };
+  if (s.list) return { at: 'list', view: s.list };
+  return null;
 }
 
+/**
+ * A place you went to. A thread is kept once, where you were in it last, so
+ * two threads opened in turn are two steps back rather than a back and forth
+ * for ever. A tab picked on the list is where you are on it, not a step.
+ */
 export function arrive(trail: Trail, stop: Stop): Trail {
   const here = trail.stops[trail.at];
-  if (here && sameStop(here, stop)) {
-    if (stop.at !== 'settings' || (here.at === 'settings' && here.pane === stop.pane)) return trail;
-    const stops = trail.stops.slice();
-    stops[trail.at] = stop;
-    return { stops, at: trail.at };
-  }
-  const stops = [...trail.stops.slice(0, trail.at + 1), stop].slice(-TRAIL_LIMIT);
+  if (here && sameStop(here, stop)) return trail;
+  if (here?.at === 'list' && stop.at === 'list') return land(trail, stop);
+  // The place ahead, opened again by hand, keeps the way forward.
+  const ahead = trail.stops[trail.at + 1];
+  if (ahead && samePlace(ahead, stop)) return land({ stops: trail.stops, at: trail.at + 1 }, stop);
+  const kept = trail.stops.slice(0, trail.at + 1).filter((s) => s.at === 'list' || !sameStop(s, stop));
+  // A thread taken out from between two lists leaves one visit to the list.
+  const joined = kept.filter((s, i) => !(s.at === 'list' && kept[i + 1]?.at === 'list'));
+  const stops = [...joined, stop].slice(-TRAIL_LIMIT);
   return { stops, at: stops.length - 1 };
 }
 
-function step(trail: Trail, by: 1 | -1, exists: (s: Stop) => boolean): { trail: Trail; stop: Stop } | null {
-  for (let i = trail.at + by; i >= 0 && i < trail.stops.length; i += by) {
-    if (exists(trail.stops[i])) return { trail: { stops: trail.stops, at: i }, stop: trail.stops[i] };
+/** A step showed `stop` rather than the place it was going to, so that is the place it is on. */
+export function land(trail: Trail, stop: Stop): Trail {
+  const here = trail.stops[trail.at];
+  if (!here || sameStop(here, stop)) return trail;
+  const stops = trail.stops.slice();
+  stops[trail.at] = stop;
+  return { stops, at: trail.at };
+}
+
+/** The trail once `s` has stayed on screen. `step` is a back or forward on its
+ *  way to `to`, and `reached` says whether its place was shown. */
+export function settle(trail: Trail, s: Stop, step: { to: Stop; reached: boolean } | null): Trail {
+  if (!step) return arrive(trail, s);
+  if (!step.reached) return land(trail, s);
+  return sameStop(step.to, s) ? trail : arrive(trail, s);
+}
+
+function step(trail: Trail, by: 1 | -1, here: Stop | null, exists: (s: Stop) => boolean): { trail: Trail; stop: Stop } | null {
+  const standing = !!here && trail.at >= 0 && samePlace(trail.stops[trail.at], here);
+  // A place not counted yet drops what is ahead once it is.
+  if (by > 0 && here && !standing) return null;
+  // From a place not counted yet, back goes first to where you were.
+  for (let i = by < 0 && !standing ? trail.at : trail.at + by; i >= 0 && i < trail.stops.length; i += by) {
+    const s = trail.stops[i];
+    if (exists(s) && !(here && samePlace(s, here))) return { trail: { stops: trail.stops, at: i }, stop: s };
   }
   return null;
 }
 
-export const stepBack = (trail: Trail, exists: (s: Stop) => boolean = () => true) => step(trail, -1, exists);
-export const stepForward = (trail: Trail, exists: (s: Stop) => boolean = () => true) => step(trail, 1, exists);
+/** `here` is the place on screen. */
+export const stepBack = (trail: Trail, here: Stop | null, exists: (s: Stop) => boolean = () => true) => step(trail, -1, here, exists);
+export const stepForward = (trail: Trail, here: Stop | null, exists: (s: Stop) => boolean = () => true) => step(trail, 1, here, exists);
 
 export type ThreadRef = { product: string; id: string };
 
-/** The last thread you stood on, once you have stood on `stop`. Kept apart
- *  from the trail: back moves the trail's place to before the thread you
- *  just left, and that thread is still the last one you were in. */
+/** The last thread of yours you stood on, once you have stood on `stop`. Kept
+ *  apart from the trail, whose place can be a teammate's thread, which has no
+ *  row in your list to wash. */
 export function lastThreadAfter(last: ThreadRef | null, stop: Stop): ThreadRef | null {
   return stop.at === 'thread' ? { product: stop.product, id: stop.id } : last;
 }
@@ -102,9 +118,9 @@ const stopKey = (s: Stop | null) => (s ? JSON.stringify(s) : '');
 export const SETTLE_MS = 300;
 
 /**
- * Hands on each place once it has stayed `wait` ms. Closing a thread passes
- * through the list on its way to the next one, and that is not somewhere you
- * were.
+ * Hands on each place once it has stayed `wait` ms, so one that flashed past
+ * on the way to the next (the list, as E closes threads one after another) is
+ * not somewhere you were.
  */
 export function settledPlaces(onSettle: (s: Stop) => void, wait = SETTLE_MS) {
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -116,56 +132,64 @@ export function settledPlaces(onSettle: (s: Stop) => void, wait = SETTLE_MS) {
 }
 
 /**
- * Records each place `here` names and walks back and forward through them
- * with ⌘[ and ⌘] (Ctrl off a Mac) and a mouse's side buttons. `go` opens a
- * stop; `exists` says whether one can still be opened.
+ * Records each place `here` names on the inbox page and walks back and
+ * forward through them with ⌘[ and ⌘] (Ctrl off a Mac) and a mouse's side
+ * buttons. `go` opens a stop; `exists` says whether one can still be opened.
  */
-export function useBackAndForward({ on, here, go, exists }: {
+export function useBackAndForward({ on, inbox, here, go, exists }: {
+  /** On a computer. */
   on: boolean;
+  /** On the inbox page, the one place the arrows walk. */
+  inbox: boolean;
   here: Stop | null;
   go: (stop: Stop) => void;
   exists: (stop: Stop) => boolean;
 }) {
+  const walking = on && inbox;
   const [trail, setTrail] = useState<Trail>(EMPTY_TRAIL);
   const [lastThread, setLastThread] = useState<ThreadRef | null>(null);
   const trailRef = useRef(trail);
   trailRef.current = trail;
   // The place a step is on its way to, so arriving there is not recorded as a
-  // new visit (which would drop everything ahead of it).
-  const travelling = useRef<Stop | null>(null);
-  const live = useRef({ go, exists });
-  live.current = { go, exists };
+  // new visit, which would drop everything ahead of it.
+  const stepping = useRef<{ to: Stop; reached: boolean } | null>(null);
+  const live = useRef({ go, exists, here, walking });
+  live.current = { go, exists, here, walking };
 
   const recorder = useRef<ReturnType<typeof settledPlaces> | null>(null);
   if (!recorder.current) {
     recorder.current = settledPlaces((s) => {
       setLastThread((was) => lastThreadAfter(was, s));
-      const going = travelling.current;
-      travelling.current = null;
-      if (going && sameStop(going, s)) return;
-      setTrail((t) => arrive(t, s));
+      const step = stepping.current;
+      stepping.current = null;
+      setTrail((t) => settle(t, s, step));
     });
   }
   useEffect(() => () => recorder.current?.stop(), []);
 
   const key = stopKey(here);
   useEffect(() => {
-    if (!on || !here) { recorder.current?.stop(); return; }
+    if (!walking || !here) { recorder.current?.stop(); stepping.current = null; return; }
+    const step = stepping.current;
+    if (step && !step.reached && sameStop(step.to, here)) step.reached = true;
     recorder.current?.see(here);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [on, key]);
+  }, [walking, key]);
 
   const travel = useCallback((by: 1 | -1) => {
-    const exists = live.current.exists;
-    const next = by < 0 ? stepBack(trailRef.current, exists) : stepForward(trailRef.current, exists);
+    const { walking, here, exists, go } = live.current;
+    if (!walking) return;
+    const next = by < 0 ? stepBack(trailRef.current, here, exists) : stepForward(trailRef.current, here, exists);
     if (!next) return;
-    travelling.current = next.stop;
+    stepping.current = { to: next.stop, reached: false };
     setTrail(next.trail);
-    live.current.go(next.stop);
+    go(next.stop);
   }, []);
   const back = useCallback(() => travel(-1), [travel]);
   const forward = useCallback(() => travel(1), [travel]);
 
+  // Held on every page, since in a browser ⌘[ and the side buttons are the
+  // tab's own Back, which leaves the app.
   useEffect(() => {
     if (!on) return;
     const onKey = (e: KeyboardEvent) => {
@@ -189,8 +213,8 @@ export function useBackAndForward({ on, here, go, exists }: {
   return {
     back,
     forward,
-    backTo: on ? stepBack(trail, exists)?.stop ?? null : null,
-    forwardTo: on ? stepForward(trail, exists)?.stop ?? null : null,
-    lastThread: on ? lastThread : null,
+    backTo: walking ? stepBack(trail, here, exists)?.stop ?? null : null,
+    forwardTo: walking ? stepForward(trail, here, exists)?.stop ?? null : null,
+    lastThread: walking ? lastThread : null,
   };
 }

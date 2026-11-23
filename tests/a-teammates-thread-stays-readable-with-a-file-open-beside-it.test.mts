@@ -9,30 +9,32 @@
 // window (@media max-width 1100px), and opening a file narrows the page, not
 // the window.
 //
-// Pinned: the page measures itself, its two columns become one inside that
-// measure, and no rule for it is left keyed to the window.
+// 2026-11-21 (w-8a8eac7620): the page is drawn in the thread page's own
+// column, which measures itself (narrow-conversation.css); there is no second
+// column, since About became the summary at the top, and the corner is
+// Message and the ⋯ menu, with no long words left to break.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 
-const css = fs.readFileSync(new URL('../renderer/src/threads/pages.css', import.meta.url), 'utf8');
-const block = (open) => { const at = css.indexOf(open); return at < 0 ? '' : css.slice(at, css.indexOf('\n}', at)); };
+const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
+const css = read('renderer/src/threads/pages.css');
+const page = read('renderer/src/threads/TeammateThread.tsx');
 
 describe("a teammate's thread page", () => {
-  it('measures its own width', () => {
-    expect(css).toMatch(/\.tp-page \{[^}]*container: tp \/ inline-size/);
+  it('measures its own width, as the thread page it is drawn in does', () => {
+    expect(page).toContain('<div className="focus-pane tp-thread">');
+    expect(read('renderer/src/narrow-conversation.css')).toMatch(/\.focus-pane \{ container: talk \/ inline-size; \}/);
   });
 
-  it('becomes one column when it is narrow, whatever the window', () => {
-    const narrow = block('@container tp (max-width: 980px)');
-    expect(narrow).toMatch(/\.tp-grid \{ grid-template-columns: minmax\(0, 1fr\)/);
-    expect(narrow).toMatch(/\.tp-side \{ position: static/);
+  it('keeps one column, with nothing beside it to squeeze', () => {
+    expect(page).not.toMatch(/<aside/);
   });
 
-  it('lets its buttons wrap whole rather than break their words', () => {
-    expect(block('@container tp (max-width: 720px)')).toMatch(/\.tp-acts > \* \{ white-space: nowrap/);
+  it('keeps only Message and the ⋯ menu in its corner', () => {
+    expect(page).toMatch(/<span className="ts-top tp-acts">\s*<MessagePerson person=\{person\} onMessage=\{onMessage\} \/>\s*<ThreadMenu /);
   });
 
   it('keys none of its layout to the window', () => {
-    for (const m of css.matchAll(/@media[^{]*\{([\s\S]*?)\n\}/g)) expect(m[1]).not.toMatch(/\.tp-(grid|side|bar|acts)\b/);
+    for (const m of css.matchAll(/@media[^{]*\{([\s\S]*?)\n\}/g)) expect(m[1]).not.toMatch(/\.tp-(grid|side|bar|acts|summary)\b/);
   });
 });

@@ -255,6 +255,11 @@ export function roomsMemory(cloud: MemoryCloud, personId: string, helpers: { con
         .slice(-n).reverse().map(copy);
     },
 
+    async myRoomMessages({ limit: n = 50 }: { limit?: number } = {}) {
+      return state(cloud).roomMessages.filter((m) => !m.deleted && m.by === personId && inRoom(m.roomId))
+        .slice(-n).reverse().map(copy);
+    },
+
     async sendRoomMessage(r: string, { body, inReplyTo = null, mentions = [] }: { body?: unknown; inReplyTo?: string | null; mentions?: string[] }) {
       const s = state(cloud);
       if (!inRoom(r)) refuse('write in a room you are not in');

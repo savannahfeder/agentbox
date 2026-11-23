@@ -14,7 +14,8 @@ const row = focus.slice(focus.indexOf('<div className="focus-actions">'), focus.
 
 describe('the foot of a thread', () => {
   it('names each press in sentence case', () => {
-    for (const w of ['Back to inbox', 'Let it run now', 'Start it now', 'Take me to it', 'Send back to agent']) expect(row).toContain(w);
+    // Send back to agent left this row on 2026-11-21 (tests/a-handed-back-thread-reads-like-any-other-thread).
+    for (const w of ['Back to inbox', 'Let it run now', 'Start it now', 'Take me to it']) expect(row).toContain(w);
     for (const w of ["'back to inbox'", "'let it run now'", '>send back to agent<']) expect(row).not.toContain(w);
   });
   it('says when beside the button, not inside it', () => {

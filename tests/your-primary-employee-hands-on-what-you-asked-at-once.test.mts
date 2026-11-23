@@ -6,8 +6,10 @@
 // of them in your inbox, which is the opposite of what it is for. So a hand-off
 // from the primary goes straight to work when the run it came from was started
 // by your own words (you wrote to it, or Auto gave it your thread, or you
-// replied on it). On its own round, or from any other teammate, a hand-off
-// still waits. The app decides which, from the run; the model cannot claim it.
+// replied on it). On its own round a hand-off still waits. Since w-0e21f73f90
+// the same holds for every teammate, not only the primary
+// (a-hand-off-you-asked-a-teammate-for-starts-at-once). The app decides which,
+// from the run; the model cannot claim it.
 //
 // The same rule covers making a new teammate, which Grok Bot's primary does
 // ("suggest or create a focused Bot when a job should have a long-lived owner").
@@ -75,7 +77,7 @@ describe('through the store', () => {
   };
   const lastPass = () => team.chat().messages.filter((m) => m.kind === 'pass').at(-1);
 
-  it('marks a pass yours only when the primary passes from a run your words started', () => {
+  it('marks a pass yours when it comes from a run your words started', () => {
     const chief = team.create({ name: 'Chief of staff' });
     const video = team.create({ name: 'Video producer' });
     writeTeammate(team.dir(), chief.id, { primary: true }, Date.now());
@@ -87,7 +89,7 @@ describe('through the store', () => {
     expect(lastPass().yours).toBeUndefined();
     runOf(video, { yours: true });
     core.teamPass({ to: 'Chief of staff', title: 'Back to you', details: '' });
-    expect(lastPass().yours).toBeUndefined();
+    expect(lastPass().yours).toBe(true);
   });
 
   it('a reply of yours on the primary\'s run counts as your words', () => {

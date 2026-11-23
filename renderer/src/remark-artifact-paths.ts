@@ -4,7 +4,7 @@
 import { keepConnectionLinks } from './connections/connections-shown';
 import { threadOfHref } from './ticket-references';
 
-export { CODE_PATH, isMediaPath, linkArtifactPaths, productPath, remarkArtifactPaths, type Options } from './artifact-paths';
+export { CODE_PATH, accountFilePath, isMediaPath, linkArtifactPaths, productPath, remarkArtifactPaths, shortPath, type Options } from './artifact-paths';
 
 // Local file links are handled by the app's click handler, never navigated to
 // by the browser. Keep all of markdown's other protocol restrictions.
@@ -13,5 +13,5 @@ export function artifactUrlTransform(url: string): string {
   // link component reads to draw it as a mention (w-7b9cb8636a).
   if (/^(file:\/\/|agentbox-agent:)/i.test(url)) return url;
   // A thread, as agents write it, becomes its id, which a page opens as a thread.
-  return (/^agentbox:\/\/work-items\//i.test(url) && threadOfHref(url)) || keepConnectionLinks(url);
+  return (/^agentbox:\/\/work-items?\//i.test(url) && threadOfHref(url)) || keepConnectionLinks(url);
 }

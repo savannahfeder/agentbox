@@ -29,6 +29,24 @@
 import { type Look } from './skins';
 import { type ThemeChoice } from './theme';
 import { DONE } from './done-word';
+import { agoShort } from './home/home-model';
+import { localDate } from './local-dates';
+import type { ThreadStateWord } from './types';
+import { threadState, type CardItem } from '../../shared/thread-cards.mts';
+
+/* ------------------------------- threads --------------------------------- */
+
+export type ThreadResult = { sub: string; hint: string; state: ThreadStateWord };
+
+/** A thread ⌘K found: the line it was found by, where it is and how old, and which list it sits in. */
+export function threadResult(
+  item: CardItem & { updatedAt?: number; createdAt: number },
+  { summary, project, now, state }: { summary: string; project: string; now: number; state: ThreadStateWord | null },
+): ThreadResult {
+  const at = item.updatedAt ?? item.createdAt;
+  const age = now - at < 86_400_000 ? agoShort(at, now) : localDate(at, { month: 'short', day: 'numeric' });
+  return { sub: summary, hint: `${project} · ${age}`, state: state ?? threadState(item, now) };
+}
 
 /* ------------------------------- matching -------------------------------- */
 
@@ -37,8 +55,9 @@ import { DONE } from './done-word';
 // Keeping those two jobs in separate fields is the point: the hint is UI copy
 // and has to read well, and a search that depends on copy reading a certain way
 // breaks the next time someone improves the sentence.
-/** `onlyWith`: a word the query must name (two letters of it will do) before the row is offered at all. */
-export type Searchable = { label: string; keywords?: string; onlyWith?: string };
+/** `onlyWith`: a word the query must name (two letters of it will do) before the row is offered at all.
+ *  `unlisted`: left out of the list before anything is typed, too. */
+export type Searchable = { label: string; keywords?: string; onlyWith?: string; unlisted?: boolean };
 
 // EVERY WORD OF THE QUERY MUST LAND, in any order, anywhere in the label or the
 // keywords. She types "dark mode", which as one substring appears in no label in
@@ -48,7 +67,7 @@ export type Searchable = { label: string; keywords?: string; onlyWith?: string }
 // her return key, which is the bug palette-keys.ts was written for.
 export function matchesQuery(query: string, row: Searchable): boolean {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (!words.length) return true;
+  if (!words.length) return !row.unlisted;
   const must = row.onlyWith?.toLowerCase();
   if (must && !words.some((w) => w.length >= 2 && (must.startsWith(w) || w.startsWith(must)))) return false;
   const hay = `${row.label} ${row.keywords ?? ''}`.toLowerCase();
@@ -100,6 +119,16 @@ export function pageRows({ team }: { team: boolean }): PageRow[] {
   ];
 }
 
+/** What a newcomer's first ⌘K lists: the things the walkthrough is about, and the way out of it.
+ *  Priority: Urgent is there only with a thread selected, and its last tip names it. */
+const WALK_ROWS = ['new-thread', 'priority-urgent', 'view-home', 'view-inbox', 'view-progress', 'end-tutorial'];
+
+/** The walkthrough's list: those rows in that order, and everything else a word away. */
+export function walkRows<T extends { id: string; unlisted?: boolean }>(rows: readonly T[]): T[] {
+  const listed = WALK_ROWS.flatMap((id) => rows.filter((r) => r.id === id));
+  return [...listed, ...rows.filter((r) => !WALK_ROWS.includes(r.id)).map((r) => ({ ...r, unlisted: true }))];
+}
+
 // Then a row whose name starts with what was typed: "go to" is Go to Inbox,
 // not a row that matched because "logo" holds "go".
 export function rankMatches<T extends { id: string; label?: string }>(query: string, rows: T[]): T[] {
@@ -122,6 +151,15 @@ export function escapeClosesThePalette(
   };
   win.addEventListener('keydown', key, true);
   return () => win.removeEventListener('keydown', key, true);
+}
+
+// A file opened big hears every key before the app does, so it asks these
+// before taking one that belongs to ⌘K opened over it.
+export const paletteIsOpen = (doc: { querySelector: (s: string) => unknown }): boolean => !!doc.querySelector('.palette-backdrop');
+
+export function pressedInThePalette(target: unknown): boolean {
+  const closest = (target as { closest?: (s: string) => unknown } | null)?.closest;
+  return typeof closest === 'function' && !!closest.call(target, '.palette-backdrop');
 }
 
 /* ---------------------------- the appearance rows ------------------------ */

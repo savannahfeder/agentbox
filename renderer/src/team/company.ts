@@ -6,6 +6,7 @@ import { blockedWords, clockWords, dayDeadline } from '../../../shared/team-task
 import { inMyInbox, isGivenTask, isShared, heldByAPerson, lastSpeaker, runnerOf, taskGiver } from '../../../shared/team-rules.mts';
 import { dayAndTime } from '../format';
 import { shownTitle } from '../../../shared/thread-title.mts';
+import { handedFrom } from '../../../shared/thread-link.mts';
 
 export const firstName = (person: Person | undefined | null) => (person?.name || person?.email || 'Someone').split(/\s+/)[0];
 
@@ -25,7 +26,9 @@ export function taskWords(item: WorkItem, product: Product | undefined | null, m
   const name = nameOf(other ?? '');
   if (item.status === 'done') {
     const at = item.wrote?.status?.ts ?? item.updatedAt;
-    return inNeedsYou ? { word: `${nameOf(item.wrote?.status?.by ?? other ?? '')} marked it done`, unread: true, other, at } : { word: 'Done', unread: false, other, at };
+    const by = item.wrote?.status?.by ?? other ?? '';
+    const word = askDoneWord(item, holding, name, by === me ? 'You' : nameOf(by)) ?? (inNeedsYou ? `${nameOf(by)} marked it done` : 'Done');
+    return { word, unread: inNeedsYou, other, at };
   }
   // The chat, not the newest write: a task rewritten with the same words shows nothing new.
   const said = item.talk?.chat?.[item.talk.chat.length - 1];
@@ -34,8 +37,41 @@ export function taskWords(item: WorkItem, product: Product | undefined | null, m
   if (wroteBack) return { word: `${name} wrote back`, unread: true, other, at };
   const blocked = blockedWords(item, { items: lookup.items ?? [], cards: lookup.cards ?? [], me, nameOf });
   if (blocked) return { word: blocked.word, unread: false, other, at, held: true, title: blocked.title };
-  if (holding) return { word: inMyInbox(item, product, me) ? `From ${name}` : 'You have this', unread: false, other, at };
-  return { word: `With ${name}`, unread: false, other, at };
+  // An ask says what it asks, so a review reads as one in the list (round four of the team test).
+  const asks = item.ask?.kind;
+  // Handed back stays handed back, whatever a thank-you since did to the status (shared/thread-asks.mts).
+  if (asks && item.verdict) return { word: holding ? 'You handed it back' : `${name} handed it back`, unread: false, other, at };
+  // A thread handed over is not just a message from them: it is now yours.
+  const handed = !asks && !!handedFrom(item.body, taskGiver(item));
+  if (holding) return { word: inMyInbox(item, product, me) ? (asks ? `${name} asks for ${asks === 'help' ? 'help' : 'a review'}` : handed ? `${name} handed it to you` : `From ${name}`) : 'You have this', unread: false, other, at };
+  return { word: asks ? `${name} is ${asks === 'help' ? 'helping' : 'reviewing'}` : `With ${name}`, unread: false, other, at };
+}
+
+/** How a finished ask ended, or null for a plain task: the verdict, or that the asker took it back. */
+function askDoneWord(item: WorkItem, holding: boolean, name: string, closer: string): string | null {
+  // A thread handed over and closed by whoever handed it: they took it back.
+  if (!item.ask) return handedFrom(item.body, taskGiver(item)) && item.wrote?.status?.by === taskGiver(item) ? `${closer} took it back` : null;
+  const v = item.verdict;
+  if (v) {
+    if (holding) return 'You handed it back';
+    return v === 'yes' ? `${name} says it looks good` : v === 'changes' ? `${name} asked for changes` : `${name} handed it back`;
+  }
+  // Closed without an answer: whoever asked took it back.
+  if (item.wrote?.status?.by && item.wrote.status.by === taskGiver(item)) return `${closer} took it back`;
+  return null;
+}
+
+/** Where a task you gave stands for the person holding it, in Tasks you gave: an ask says which, and what came back. */
+export function givenStage(i: WorkItem, seen: number): string {
+  const kind = i.ask?.kind === 'review' ? 'Review' : i.ask?.kind === 'help' ? 'Help' : null;
+  const holder = i.assignee ?? '';
+  // A reply in one of the task's own threads counts too (round four: it said Seen after Dana replied).
+  const replied = !!holder && (lastSpeaker(i) === holder || (i.talk?.chat ?? []).some((c) => c.by === holder));
+  const stage = i.ask && i.verdict ? (i.verdict === 'yes' ? 'Looks good' : i.verdict === 'changes' ? 'Needs changes' : 'Handed back')
+    : i.status === 'done' ? 'Done'
+      : replied ? 'Replied'
+        : seen >= (i.createdAt ?? 0) ? 'Seen' : 'Not opened';
+  return kind ? `${kind} · ${stage}` : stage;
 }
 
 /** A task's card carries no words. If it is between you and them this Mac has its

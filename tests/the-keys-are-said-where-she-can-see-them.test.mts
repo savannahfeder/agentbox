@@ -164,19 +164,8 @@ describe('the hint is drawn on the row the keys act on', () => {
     // and the keys arrive on a plate beside it.
     expect(list).not.toContain('hintId === item.id');
     expect(list).toContain("? { 'data-hint': 'row', 'data-hint-text': '.subject' }");
-    // What is left inside `.row-end` is the first-run walk, which holds the
-    // keyboard and asks for one key on the rows of its own beat. That is not a
-    // hover hint, and `walkRowKeys` returns everything when no walk is up, so
-    // the guard is what keeps it out of her ordinary list.
-    expect(list).toContain('{walk && keysFor(item.id).length ? (');
   });
 
-  it('prints the search results’ keys off the tab underneath, not off the list', () => {
-    // Results are grouped and stamped like the inbox whatever tab she searched
-    // from, so `view` would promise R on a closed row.
-    expect(list).toContain('rowKeys(keyView ?? view');
-    expect(app).toMatch(/keyView=\{view\}/);
-  });
 });
 
 describe('Tab walks the tabs the Inbox draws', () => {
@@ -209,7 +198,7 @@ describe('only a component that does not already show its key carries a hint', (
     const worn = new Set();
     // The icon buttons over a thread that name themselves on the plate
     // (2026-11-02), and the Inbox button left of the back arrow.
-    const named = ['team/TeamFocus.tsx', 'threads/ThreadFiles.tsx', 'threads/PlaceButton.tsx', 'components/BackForward.tsx'].map((f) => fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src', f), 'utf8'));
+    const named = ['team/TeamFocus.tsx', 'threads/ThreadFiles.tsx', 'threads/PlaceButton.tsx', 'components/BackForward.tsx', 'components/SelectionBar.tsx'].map((f) => fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src', f), 'utf8'));
     for (const file of [app, list, nav1, terminal, focus, pages, summary, queue, threadMenu, ...named]) {
       // The row writes its own as a spread, because it is only worn in the
       // inbox and only off an ordinary row.

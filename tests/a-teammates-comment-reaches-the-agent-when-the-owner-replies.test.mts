@@ -101,6 +101,17 @@ describe('the transcript an agent reads', () => {
     expect(brief).toContain(HERO);
     expect(brief).toContain('Theo Park, a teammate (not the founder)');
   });
+
+  // "What happens when two teammates give the same agent conflicting instructions?" (a reply to the launch post, 2026-11-19).
+  it('tells the agent to put a clash between the founder and a teammate to the founder, only when a teammate wrote', async () => {
+    const item = await threadWithComment();
+    store.answerItem('website', item.id, { answer: REPLY });
+    const brief = supervisor().buildBrief(store.readItem('website', item.id), product, { continuation: true });
+    expect(brief).toContain('If what they asked disagrees with what the founder asked, do not choose');
+    const alone = store.composeItem('website', { title: 'Nobody else here', body: 'Make the hero bigger.' });
+    store.answerItem('website', alone.id, { answer: 'And bolder.' });
+    expect(supervisor().buildBrief(store.readItem('website', alone.id), product, { continuation: true })).not.toContain('do not choose');
+  });
 });
 
 describe('through the team sync', () => {

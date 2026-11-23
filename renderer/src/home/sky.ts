@@ -1,6 +1,9 @@
 // The dithered sky drawn behind Home and the Inbox.
 // Square dots on a grid, four levels per channel, ordered by an 8x8 Bayer
 // matrix: a bright streak with a glow on its upper side and sparse grain.
+// A sky with `mountains` draws the website's ranges instead (./mountains.ts).
+
+import { drawMountains, type Mountains } from './mountains';
 
 export type Rgb = [number, number, number];
 export type Palette = { core: Rgb; hot: Rgb; halo: Rgb; ember: Rgb };
@@ -23,6 +26,11 @@ export type SkyArt = {
   /** Light only: on the empty Inbox the ink is drawn at this strength, and fainter behind the words. */
   emptySoft?: number;
   glow?: Glow[];
+  mountains?: Mountains;
+  /** The card's colour fades to this at its foot, behind the mountains. */
+  foot?: string;
+  /** Birds fly over the mountains in this ink (./birds.ts). */
+  birds?: Rgb;
 };
 
 export type SkyId = string;
@@ -51,22 +59,19 @@ const light = (palette: Palette, glow: Glow[], over: Partial<SkyArt> = {}): SkyA
   bg: '#ffffff', light: true, lightBg: [255, 255, 255], dim: 1, grain: 0.03, lightStrength: 1, lightDepth: 165, ...over,
 });
 
-// Aubergine (design w-bd2cd91875/7): deep plum ink with a violet seam. No glow and no
-// grey grain, which read pastel and fake; the streak is tight like the dark one's.
-const AUBERGINE = light(
-  { core: [90, 30, 130], hot: [140, 50, 220], halo: [60, 35, 110], ember: [80, 25, 100] }, [],
-  { ink: true, grain: 0, coreW: 0.024, hotW: 0.006, haloW: 0.11, lightDepth: 120 });
-
 // The card is white and the sky fades into it, the way dark fades to black.
-// `frame` tints the window around the card so the white stands off it.
+// `frame` is the window around the card: plain Light's own ground, with the
+// card's hairline setting the white off it.
+const ORANGE_RANGES: Mountains['inks'] = [[238, 96, 24], [240, 112, 46], [242, 128, 70], [244, 146, 96]];
+
 const LIGHT_SKIES: Sky[] = [
-  { id: 'sage', name: 'Light green sky', dark: false, frame: '#e3e8e5', art: light(
+  // The website's hero (design w-9687db6270/light-theme-1-mountains-home). The frame stays near grey: a warm one read as tinted.
+  { id: 'mountains', name: 'Light orange mountains', dark: false, frame: '#f3f2f0', art: {
+    ...light({ core: [238, 96, 24], hot: [250, 170, 110], halo: [236, 160, 120], ember: [200, 80, 28] }, []),
+    mountains: { inks: ORANGE_RANGES, alpha: 0.44, lift: 1.06, quiet: { x: 0.5, y: 0.7, rx: 0.3, ry: 0.17 } }, foot: '#fbfaf8', birds: [238, 96, 24] } },
+  { id: 'sage', name: 'Light green sky', dark: false, frame: '#f8f8fa', art: light(
     { core: [40, 160, 125], hot: [170, 215, 120], halo: [70, 135, 190], ember: [40, 120, 100] },
     [['rgba(90,150,200,0.30)', 280, 90, -130], ['rgba(80,185,150,0.40)', 120, 50, -10], ['rgba(190,225,140,0.55)', 34, 18, 0]]) },
-  // Deep plum dots sink every grey word on a white card, so the empty Inbox draws them soft.
-  { id: 'dusk-light', name: 'Light purple sky', dark: false, inbox: true, frame: '#eae9ec', art: { ...AUBERGINE, emptySoft: 0.45 },
-    // On a whole page the inbox's tight streak read as a line through it (design 20): Home's dots fill the page above it.
-    home: { ...AUBERGINE, coreW: 0.03, haloW: 0.3, below: 0.25 } },
 ];
 
 /** Every sky theme, in the order Settings and Command-K show them. */
@@ -79,13 +84,13 @@ export function skyTheme(id: string | null | undefined): Sky | null {
 /** Stored when plain Light or Dark is picked, so the default sky never covers that choice. */
 export const PLAIN = 'none';
 
-/** The sky worn: the one picked, none for a plain look picked, and otherwise orange in the dark and green in the light. */
+/** The sky worn: the one picked, none for a plain look picked, and otherwise the orange sky in the dark and the orange mountains in the light. */
 export function shownSkyId(saved: string | null, dark: boolean): SkyId | null {
   if (saved === PLAIN) return null;
-  return skyTheme(saved)?.id ?? (dark ? 'ember' : 'sage');
+  return skyTheme(saved)?.id ?? (dark ? 'ember' : 'mountains');
 }
 
-/** The look step's choice that follows the Mac: it saves no sky, so shownSkyId wears orange in the dark and green in the light. */
+/** The look step's choice that follows the Mac: it saves no sky, so shownSkyId wears the dark or light default. */
 export const MATCH_SKY = 'match';
 
 const BAYER = [0, 32, 8, 40, 2, 34, 10, 42, 48, 16, 56, 24, 50, 18, 58, 26, 12, 44, 4, 36, 14, 46, 6, 38, 60, 28, 52, 20, 62, 30, 54, 22, 3, 35, 11, 43, 1, 33, 9, 41, 51, 19, 59, 27, 49, 17, 57, 25, 15, 47, 7, 39, 13, 45, 5, 37, 63, 31, 55, 23, 61, 29, 53, 21];
@@ -117,6 +122,7 @@ export function lineStrength(x: number, y: number, quiet: Box | null | undefined
  *  fully in by `from + span`, dropping out in the ordered pattern above that. */
 /** `curveTop` lays the streak out in the card below that line instead of the whole card. */
 export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dpr = 2, curveTop = 0, quiet = null }: { from: number; span: number; dpr?: number; curveTop?: number; quiet?: Box | null }) {
+  if (art.mountains) { drawMountains(canvas, art.mountains, { dpr, ground: art.bg, foot: art.foot }); return; }
   const W = canvas.clientWidth, H = canvas.clientHeight;
   if (!W || !H) return;
   canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
@@ -211,4 +217,27 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
       g.fillRect(x, y, dot, dot);
     }
   }
+}
+
+const drawn = new Map<string, HTMLCanvasElement>();
+const KEPT = 3;
+
+/** drawSky, copying a sky already drawn with the same art at the same size instead of drawing it again. */
+export function paintSky(canvas: HTMLCanvasElement, art: SkyArt, opts: Parameters<typeof drawSky>[2]) {
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  if (!W || !H) return;
+  const key = JSON.stringify([art, W, H, opts]);
+  const kept = drawn.get(key);
+  if (kept) {
+    canvas.width = kept.width; canvas.height = kept.height;
+    canvas.getContext('2d')?.drawImage(kept, 0, 0);
+    drawn.delete(key); drawn.set(key, kept);
+    return;
+  }
+  drawSky(canvas, art, opts);
+  const copy = document.createElement('canvas');
+  copy.width = canvas.width; copy.height = canvas.height;
+  copy.getContext('2d')?.drawImage(canvas, 0, 0);
+  drawn.set(key, copy);
+  for (const old of drawn.keys()) { if (drawn.size <= KEPT) break; drawn.delete(old); }
 }

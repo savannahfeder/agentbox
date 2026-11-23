@@ -22,6 +22,7 @@ import type { RunContext, TeammateContext } from './teammates.mts';
 import type { OutFile, OutLine, TeamView, ViewCard, ViewFolder } from '../../shared/teammate-reach.mts';
 import type { WorkItem } from '../../shared/work-items.mts';
 import type { FileNote, MarkEntry, ThreadLine } from '../../shared/artifact-marks.mts';
+import { versionsInFolder } from './documents.mts';
 import type { DocumentView } from './documents.mts';
 
 const TEXT_MOST = 8000;
@@ -228,16 +229,37 @@ export function documentVersion({ product, versionOf, path: rel = null, content 
   const home = ownItem && own ? own : product;
   const folder = ownItem ? `designs/${ownItem}` : 'designs';
   const dir = resolveProduct(home).dir;
-  const next = nextVersionFor(name, ext, { known, taken: (n) => fs.existsSync(path.join(dir, folder, n)) });
+  const from = asked ? namedElsewhere(resolveProduct(product).dir, asked, folder) : null;
+  const newestBeside = from ? path.basename(versionsInFolder(resolveProduct(product).dir, from).at(-1) ?? name) : name;
+  const next = nextVersionFor(newestBeside, ext, { known, taken: (n) => fs.existsSync(path.join(dir, folder, n)) });
   const at = `${folder}/${next}`;
   const base = baseName(name);
-  const kept = keepWhatOthersWrote(known, content);
+  const kept = keepWhatOthersWrote(known, content) ?? (from ? keepWhatIsBeside(resolveProduct(product).dir, from, content) : null);
   return {
     product: home, path: at, of: base, title: base.replace(/\.[^.]+$/, ''),
     ...(kept ? { content: kept.content, merged: kept.merged } : {}),
     note: `Saved [${next}](${at}) as the next version of ${known.path ? `[${base}](${known.path})` : base}.`
       + (kept ? ` It kept the edit someone made in ${kept.merged} as well as your own changes.` : ''),
   };
+}
+
+/**
+ * Where the file `asked` names sits, when that is another thread's folder:
+ * its path as given, or else the thread folder under designs/ holding a file
+ * of that exact name, the one whose versions run highest if several do.
+ */
+function namedElsewhere(dir: string, asked: string, ownFolder: string): string | null {
+  const given = path.isAbsolute(asked) ? path.relative(dir, asked) : asked.replace(/^\.\//, '');
+  const outside = (rel: string) => !rel || rel.startsWith('..') || path.isAbsolute(rel) || path.posix.dirname(rel) === ownFolder;
+  if (given.includes('/')) {
+    const rel = path.posix.normalize(given.split(path.sep).join('/'));
+    return !outside(rel) && fs.existsSync(path.join(dir, rel)) ? rel : null;
+  }
+  let threads: string[] = [];
+  try { threads = fs.readdirSync(path.join(dir, 'designs'), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name); } catch { return null; }
+  const found = threads.map((t) => `designs/${t}/${given}`).filter((rel) => !outside(rel) && fs.existsSync(path.join(dir, rel)));
+  const top = (rel: string) => versionsInFolder(dir, rel).length;
+  return found.sort((a, b) => top(b) - top(a))[0] ?? null;
 }
 
 // Beside the product's documents, out of every listing (they skip dot folders).
@@ -290,10 +312,30 @@ function keepWhatOthersWrote(known: KnownFile, content: string | null): { conten
   if (itsOwn && (wrote == null || wrote === headText)) return null;
   const dir = known.dir;
   const older = known.chain.slice(0, -1).map((v) => readVersion(dir, v));
+  return mergeOverNewest(head, headText, wrote != null ? [...older, wrote] : older, content);
+}
+
+/**
+ * The same, for the versions beside the file `versionOf` names in another
+ * thread's folder, which this thread's history does not hold: a brief can name
+ * an old version's path while the person's later saves sit next to it.
+ */
+function keepWhatIsBeside(dir: string, rel: string | null, content: string | null): { content: string; merged: string } | null {
+  if (typeof content !== 'string' || !rel || reviewKind(rel) !== 'markdown') return null;
+  const all = versionsInFolder(dir, rel);
+  if (all.length < 2) return null;
+  const head = { name: path.basename(all.at(-1)!), path: all.at(-1)! };
+  const headText = readVersion(dir, head);
+  if (headText == null || headText === content) return null;
+  return mergeOverNewest(head, headText, all.slice(0, -1).map((p) => readVersion(dir, { path: p })), content);
+}
+
+/** `content` merged over `headText` from the older version it is fewest lines from; null when it was written from the newest. */
+function mergeOverNewest(head: { name: string; path: string }, headText: string, older: (string | null)[], content: string): { content: string; merged: string } | null {
   let baseText: string | null = null;
   // Nearer the newest than any older version: written from it, so nothing of theirs is missing.
   let gap = lineGap(headText, content);
-  for (const was of wrote != null ? [...older, wrote] : older) {
+  for (const was of older) {
     if (was == null) continue;
     // The newest of equals: a later version of the same words is the likelier copy.
     const far = lineGap(was, content);

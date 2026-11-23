@@ -25,7 +25,9 @@ const { learnShellDataDirs } = await import('../main/shell-path.mts');
 const { startFreezeRecorder } = await import('../main/freeze-recorder.mts');
 const { readHubAddress } = await import('../main/hub-address.mts');
 const { watchNewChatsFor } = await import('../main/new-chats-watch.mts');
+const { followChatsFor } = await import('../main/chat-follow.mts');
 const { osOpenDialog } = await import('../main/os-folder-window.mts');
+const { browserLauncher } = await import('../main/open-in-browser.mts');
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const appDir = path.dirname(here);
@@ -95,6 +97,7 @@ startFreezeRecorder({
 // entry is the same inbox, so a launch that asks for no agents must not start
 // them here either.
 let newChatsWatch = null;
+let chatFollow = null;
 if (!process.env.ZERO_NO_SUPERVISOR) {
   // Whoever was signed in to the team last time is signed in again.
   booted.team?.start().then(() => booted.supervisor.wake?.()).catch((err) => console.warn(`team: ${err.message}`));
@@ -104,6 +107,8 @@ if (!process.env.ZERO_NO_SUPERVISOR) {
   booted.supervisor.start();
   // The chats setup's "Keep bringing in new chats" tick asks for.
   newChatsWatch = watchNewChatsFor({ store: booted.store, config: booted.config, supervisor: booted.supervisor });
+  // A chat brought in follows where it started (main/chat-follow.mts).
+  chatFollow = followChatsFor({ store: booted.store, config: booted.config, supervisor: booted.supervisor });
 }
 const token = newToken();
 const server = createServer({
@@ -144,6 +149,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, () => {
     console.log('\n  Stopping.');
     newChatsWatch?.stop();
+    chatFollow?.stop();
     booted.host.app.quit();
     // The quit count and whatever is still queued, or a copy opened once is
     // never heard from. `shutdown` rather than `flush`, because flush does not
@@ -155,11 +161,9 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
 }
 
 function open(url) {
-  const cmd = process.platform === 'darwin' ? 'open'
-    : process.platform === 'win32' ? 'start'
-    : 'xdg-open';
+  const { cmd, args } = browserLauncher(url);
   try {
-    spawn(cmd, [url], { detached: true, stdio: 'ignore', shell: process.platform === 'win32' }).unref();
+    spawn(cmd, args, { detached: true, stdio: 'ignore' }).unref();
   } catch {
     // A machine with no browser to open is a normal way to run this. The url is
     // already printed above, which is all anybody needs.

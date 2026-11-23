@@ -25,6 +25,7 @@ const ORDERED_ITEM_RE = /^(\s*)\d+\.\s+(.*)$/;
 const TASK_TEXT_RE = /^\[( |x|X)\](?:\s+(.*))?$/;
 const QUOTE_RE = /^>\s?(.*)$/;
 const FENCE_RE = /^```(\w*)\s*$/;
+const CLOSE_FENCE_RE = /^```\s*$/;
 const RULE_RE = /^(-{3,}|\*{3,}|_{3,})\s*$/;
 const TABLE_ROW_RE = /^\s*\|(.+)\|\s*$/;
 const TABLE_SEP_RE = /^\s*\|(\s*:?-{2,}:?\s*\|)+\s*$/;
@@ -195,14 +196,28 @@ function collectListBlock(lines: string[], from: number, advance: (next: number)
       if (j < lines.length && (matchItem(next) || (/^\s{2,}\S/.test(next) && items.length))) { i = j; continue; }
       break;
     }
-    if (/^\s{2,}\S/.test(line) && items.length) { items[items.length - 1].extra.push(line.trim()); i++; continue; }
+    if (/^\s{2,}\S/.test(line) && items.length) {
+      const extra = items[items.length - 1].extra;
+      extra.push(line.trim());
+      i++;
+      // Fenced code keeps its lines whole: blank ones, bullets, and indent past the fence's own.
+      if (FENCE_RE.test(line.trim())) {
+        const indent = line.length - line.trimStart().length;
+        while (i < lines.length && !CLOSE_FENCE_RE.test(lines[i].trim())) {
+          extra.push(lines[i].replace(new RegExp(`^ {0,${indent}}`), ''));
+          i++;
+        }
+        if (i < lines.length) { extra.push(lines[i].trim()); i++; }
+      }
+      continue;
+    }
     break;
   }
   advance(i);
   return items;
 }
 
-// An item's own lines as paragraphs, with any pipe table among them as a table.
+// An item's own lines as paragraphs, with any pipe table or fenced code among them as itself.
 // The bullet's own line always stays a paragraph, because the editor's list
 // item must open with one.
 function itemBlocks(lines: string[]): PmNode[] {
@@ -215,6 +230,16 @@ function itemBlocks(lines: string[]): PmNode[] {
     text = [];
   };
   for (let i = 0; i < lines.length;) {
+    const fence = i > 0 ? lines[i].match(FENCE_RE) : null;
+    if (fence) {
+      flush();
+      const body: string[] = [];
+      i++;
+      while (i < lines.length && !CLOSE_FENCE_RE.test(lines[i])) { body.push(lines[i]); i++; }
+      i++;
+      out.push({ type: 'codeBlock', attrs: { language: fence[1] || null }, content: body.length ? [{ type: 'text', text: body.join('\n') }] : undefined });
+      continue;
+    }
     if (i > 0 && startsTable(lines, i)) {
       flush();
       const { node, next } = readTable(lines, i);
@@ -546,6 +571,13 @@ function listMd(node: PmNode, indent: string): string {
       } else if (child.type === 'table') {
         if (!opened) open('');
         for (const row of tableMd(child)) lines.push(cont + row);
+      } else if (child.type === 'codeBlock') {
+        if (!opened) open('');
+        const code = (child.content || []).map((t: PmNode) => t.text || '').join('');
+        const fence = fenceFor(code);
+        lines.push(cont + fence + (child.attrs?.language || ''));
+        for (const l of code.split('\n')) lines.push(l ? cont + l : '');
+        lines.push(cont + fence);
       } else {
         for (const part of inlineMd(child.content).split('\n')) {
           if (!opened) open(part);

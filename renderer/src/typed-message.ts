@@ -19,7 +19,9 @@ export type TypedPart = { text: string } | { embed: string };
 const PICTURE = /^!\[[^\]\n]*\]\([^)\s]+\)$/;
 const ATTACHED_FILE = /^\[[^\]\n]*\]\((?:attachments\/[^)\s]+|phone-files\/[0-9a-f]{64}\.[a-z0-9]{1,8})\)$/;
 
-const isEmbed = (line: string) => PICTURE.test(line.trim()) || ATTACHED_FILE.test(line.trim());
+// A line that is only a thread's link, as the app writes one into a brief (main/team threadLink).
+const THREAD_WEB_LINK = /^\[[^\]\n]+\]\(https?:\/\/[^)\s]+\/t\/[^/)\s]+\/w-[a-f0-9]{10}\)$/;
+const isEmbed = (line: string) => PICTURE.test(line.trim()) || ATTACHED_FILE.test(line.trim()) || THREAD_WEB_LINK.test(line.trim());
 const QUOTE_MARK = /^\s*(?:>\s?)+/;
 const ATTACHED_PICTURE = /(?<!`)!\[[^\]\n]*\]\((?:\.\/)?attachments\/[^)\s]+\)(?!`)/g;
 

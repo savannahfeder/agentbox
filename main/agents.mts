@@ -13,6 +13,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
 import { findTranscript, transcriptSearch } from './transcript-search.mts';
+import { foldHistoryOffThread } from './chat-reader.mts';
 import {
   WORK_CHARS, agentKey, changedFile, commandWork, fullSubject, isBookkeeping, saidCount, sameInstant, threadWindow, workSubject, workVerb,
 } from '../shared/agents.mts';
@@ -159,7 +160,7 @@ const PROJECTS_DIR = () => path.join(os.homedir(), '.claude', 'projects');
 async function processTable() {
   const table = new Map<number, ProcessRow>();
   const { stdout: out } = await run('/bin/ps', ['-Ao', 'pid=,ppid=,lstart=,command='], {
-    encoding: 'utf8', maxBuffer: 16 << 20, timeout: 5000,
+    encoding: 'utf8', maxBuffer: 16 << 20, timeout: 5000, windowsHide: true,
   });
   for (const line of out.split('\n')) {
     // pid ppid <lstart: Www Mmm dd hh:mm:ss yyyy = 5 fields> command...
@@ -204,6 +205,7 @@ async function fromCli(claudeBin: string | null | undefined): Promise<SessionRec
       // So the CLI does not think it is a child of this session, and never
       // inherits an API key.
       env: scrubbed(process.env),
+      windowsHide: true,
     });
     const parsed = JSON.parse(stdout);
     return Array.isArray(parsed) ? parsed : [];
@@ -230,9 +232,12 @@ function scrubbed(env: NodeJS.ProcessEnv) {
 // session last did anything (not when its process started), its `ai-title`,
 // the `last-prompt`, the files its tool calls touched, and the human turns.
 // The opening human turn can sit hundreds of KB in, behind pasted images, so
-// the whole file is read once and after that only the bytes appended since.
-// No model sees any of it.
+// the first read takes the file's start and its end (a session running
+// hundreds of subagents writes GB), and after that only the bytes appended
+// since. No model sees any of it.
 const CHUNK_BYTES = 4 << 20;
+const FIRST_HEAD_BYTES = 8 << 20;
+const FIRST_TAIL_BYTES = 16 << 20;
 const historyCache = new Map<string, HistoryEntry>(); // sessionId -> { file, size, mtimeMs, offset, ...facts }
 
 // Tools whose file paths count as touched. The card prints at most six, and
@@ -368,14 +373,31 @@ function fold(file: string, acc: Facts, from: number, size: number) {
   return at - Buffer.byteLength(rest);
 }
 
-function readHistory(sessionId: string, cwd: string | undefined) {
+/** What a fold is asked to read: the transcript from `from`, into the facts so far. */
+export interface HistoryFold { file: string; size: number; from: number; first: boolean; acc: Facts }
+
+/** Reads a transcript's facts from `from` to `size`; a first read of a large one takes its start and its end. */
+export function foldHistory({ file, size, from, first, acc }: HistoryFold): { offset: number; acc: Facts } {
+  if (first && size > FIRST_HEAD_BYTES + FIRST_TAIL_BYTES) {
+    fold(file, acc, 0, FIRST_HEAD_BYTES);
+    // What the end says is the session now; a reply or a file from the start is not.
+    Object.assign(acc, { lastSaid: '', saidAt: 0, saidOpen: false, touched: [] });
+    from = size - FIRST_TAIL_BYTES;
+  }
+  return { offset: fold(file, acc, from, size), acc };
+}
+
+type HistoryRead = Facts & { transcript: string | null };
+
+/** The answer already known for a session, or the fold that would bring it up to date. */
+function historyAsk(sessionId: string, cwd: string | undefined): { known: HistoryRead } | { stat: fs.Stats; ask: HistoryFold } {
   const file = transcriptPath(sessionId, cwd);
-  if (!file) return { ...NOTHING, transcript: null };
+  if (!file) return { known: { ...NOTHING, transcript: null } };
   let stat: fs.Stats;
-  try { stat = fs.statSync(file); } catch { return { ...NOTHING, transcript: null }; }
+  try { stat = fs.statSync(file); } catch { return { known: { ...NOTHING, transcript: null } }; }
   const hit = historyCache.get(sessionId);
   if (hit && hit.file === file && hit.size === stat.size && hit.mtimeMs === stat.mtimeMs) {
-    return { ...hit, transcript: file };
+    return { known: { ...hit, transcript: file } };
   }
 
   // Carry on from the last read unless the file shrank. A smaller file was
@@ -396,11 +418,26 @@ function readHistory(sessionId: string, cwd: string | undefined) {
       asked: [...hit.asked],
     }
     : { ...NOTHING, touched: [], asked: [] };
-  const offset = fold(file, acc, resume ? hit.offset : 0, stat.size);
+  return { stat, ask: { file, size: stat.size, from: resume ? hit.offset : 0, first: !resume, acc } };
+}
 
-  const entry = { file, size: stat.size, mtimeMs: stat.mtimeMs, offset, ...acc };
+function historyKept(sessionId: string, stat: fs.Stats, ask: HistoryFold, { offset, acc }: { offset: number; acc: Facts }): HistoryRead {
+  const entry = { file: ask.file, size: stat.size, mtimeMs: stat.mtimeMs, offset, ...acc };
   historyCache.set(sessionId, entry);
-  return { ...entry, transcript: file };
+  return { ...entry, transcript: ask.file };
+}
+
+function readHistory(sessionId: string, cwd: string | undefined): HistoryRead {
+  const got = historyAsk(sessionId, cwd);
+  return 'known' in got ? got.known : historyKept(sessionId, got.stat, got.ask, foldHistory(got.ask));
+}
+
+/** The same read with the transcript folded in the chat reader's thread
+ *  (main/chat-reader.mts): every running session on the Mac is read, and a
+ *  heavy user's first reads are hundreds of MB. */
+export async function readHistoryOffThread(sessionId: string, cwd: string | undefined): Promise<HistoryRead> {
+  const got = historyAsk(sessionId, cwd);
+  return 'known' in got ? got.known : historyKept(sessionId, got.stat, got.ask, await foldHistoryOffThread(got.ask));
 }
 
 // Exported for tests/one-inbox-no-agents-tab.test.mts. The fields it reads are
@@ -437,8 +474,33 @@ export function listAgents(opts: RefreshOptions = {}) {
   return cache.agents;
 }
 
-export async function refresh(opts?: RefreshOptions): Promise<Agent[]> {
+// `claude agents --json` is a whole Claude Code launch, so its answer is kept
+// while the Claude Code processes it was asked about are the same ones.
+const CLI_KEPT_MS = 60_000;
+let cliKept: { at: number; seen: string; records: SessionRecord[] } | null = null;
+
+/** Claude Code itself, as a program or as its npm script; not a hook or skill that only has `.claude` in its path. */
+const CLAUDE_CODE = /^(\S*\/)?claude(\s|$)|claude-code\/cli\.m?js/;
+
+async function cliRecordsFor(table: Map<number, ProcessRow>, claudeBin: string | null | undefined) {
+  // None that `stillTheSame` could match, so no session either source names.
+  if (![...table.values()].some((p) => /claude/i.test(p.command))) { cliKept = null; return { records: [] as SessionRecord[], kept: false }; }
+  const sessions = [...table].filter(([, p]) => CLAUDE_CODE.test(p.command)).map(([pid, p]) => `${pid} ${p.started}`).sort().join('\n');
+  const seen = `${claudeBin}\n${sessions}`;
+  const now = Date.now();
+  if (cliKept && cliKept.seen === seen && now - cliKept.at < CLI_KEPT_MS) return { records: cliKept.records, kept: true };
+  const records = await fromCli(claudeBin);
+  cliKept = { at: now, seen, records };
+  return { records, kept: false };
+}
+
+/** `fresh` asks the CLI again even when its last answer is kept: a reply acts on what it says now. */
+export async function refresh(opts?: RefreshOptions, { fresh = false }: { fresh?: boolean } = {}): Promise<Agent[]> {
   if (opts) lastOpts = opts;
+  if (fresh) {
+    if (inFlight) await inFlight;
+    cliKept = null;
+  }
   const { zeroPid = process.pid, sessionIds = [], products = [], claudeBin = null } = opts ?? lastOpts;
   // One measurement at a time, so a burst of pushes does not queue a
   // `claude agents --json` each.
@@ -461,7 +523,8 @@ export async function refresh(opts?: RefreshOptions): Promise<Agent[]> {
 }
 
 async function measure({ zeroPid, sessionIds, products, claudeBin }: Required<RefreshOptions>): Promise<Agent[]> {
-  const [table, cliRecords] = await Promise.all([processTable(), fromCli(claudeBin)]);
+  const table = await processTable();
+  const cli = await cliRecordsFor(table, claudeBin);
   const zeroSessionIds = new Set(sessionIds.filter(Boolean));
 
   // A product owns an agent when the agent is working in that product's repo.
@@ -483,14 +546,19 @@ async function measure({ zeroPid, sessionIds, products, claudeBin }: Required<Re
       sources: [...(prev.sources ?? []), source],
     });
   };
-  for (const rec of fromStateFiles()) add(rec, 'state-file');
-  for (const rec of cliRecords) add(rec, 'cli');
+  const states = fromStateFiles();
+  for (const rec of states) add(rec, 'state-file');
+  // A kept answer is a minute old at most; a state file read now says more.
+  const inStates = new Set(states.map((r) => r.pid));
+  for (const rec of cli.records) if (!cli.kept || !inStates.has(rec.pid)) add(rec, 'cli');
 
   const agents: Agent[] = [];
-  for (const rec of byPid.values()) {
-    const { lastActiveAt, lastSaid, saidAt, about, lastAsked, touched, asked, transcript } = rec.sessionId
-      ? readHistory(rec.sessionId, rec.cwd)
-      : { ...NOTHING, transcript: null };
+  const records = [...byPid.values()];
+  const histories = await Promise.all(records.map((rec) => (rec.sessionId
+    ? readHistoryOffThread(rec.sessionId, rec.cwd)
+    : { ...NOTHING, transcript: null })));
+  for (const [i, rec] of records.entries()) {
+    const { lastActiveAt, lastSaid, saidAt, about, lastAsked, touched, asked, transcript } = histories[i];
     const owner = owners.get(path.resolve(rec.cwd ?? '/')) ?? null;
     agents.push({
       pid: rec.pid!,
@@ -545,6 +613,18 @@ export function fromTheApp(message: string) {
   ].join('\n');
 }
 
+// The same for a thread brought in from that session, which the reply carries on
+// (Supervisor#_goesToItsTerminal). Claude Code shows it as another session's
+// message, which it never takes as approval. Nothing here argues with that.
+export function carriedOnFromTheApp(message: string) {
+  return [
+    `${RELAY_MARK} the inbox your user reads, where this conversation is one of their threads.`,
+    'Their reply there:',
+    '',
+    message,
+  ].join('\n');
+}
+
 // The one write. A Claude Code session listens on a Unix socket for
 // newline-delimited JSON, in the shape the CLI prints when it binds one. An
 // auth line is needed only when the session published a key file,
@@ -554,11 +634,11 @@ export function fromTheApp(message: string) {
 // The socket does not acknowledge, so a result of ok means the message was
 // handed to a live, listening process, and `working` says the session was then
 // seen going to work. The movement check is best effort and never a gate.
-export async function reply(pid: number, text: unknown, { timeoutMs = 3000 }: { timeoutMs?: number } = {}) {
+export async function reply(pid: number, text: unknown, { timeoutMs = 3000, wrap = fromTheApp }: { timeoutMs?: number; wrap?: (message: string) => string } = {}) {
   const message = String(text ?? '').trim();
   if (!message) return { ok: false, reason: 'There was nothing to send.' };
 
-  const agent = (await refresh()).find((a) => a.pid === pid);
+  const agent = (await refresh(undefined, { fresh: true })).find((a) => a.pid === pid);
   if (!agent) return { ok: false, reason: 'That agent is no longer running.' };
   if (agent.waitingFor === 'permission prompt') {
     return { ok: false, reason: 'It is waiting on a permission box, which only its own window can answer.' };
@@ -569,7 +649,7 @@ export async function reply(pid: number, text: unknown, { timeoutMs = 3000 }: { 
     // The wire carries the wrapped message. Matching and recording below use
     // the user's own words, so `heldNotice` does not match on the shared
     // preamble.
-    await writeToSocket(agent.socket, fromTheApp(message), tokenFor(pid));
+    await writeToSocket(agent.socket, wrap(message), tokenFor(pid));
   } catch (err) {
     return { ok: false, reason: reasonFor(err as ErrnoLike) };
   }
@@ -642,7 +722,7 @@ const CPU_MOVED = 0.15;
 
 async function cpuSeconds(pid: number): Promise<number | null> {
   try {
-    const { stdout } = await run('/bin/ps', ['-o', 'time=', '-p', String(pid)], { encoding: 'utf8', timeout: 3000 });
+    const { stdout } = await run('/bin/ps', ['-o', 'time=', '-p', String(pid)], { encoding: 'utf8', timeout: 3000, windowsHide: true });
     const m = stdout.trim().match(/(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+(?:\.\d+)?)/);
     if (!m) return null;
     const [, d = 0, h = 0, mi, sec] = m;

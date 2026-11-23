@@ -9,7 +9,7 @@ import { Platform, Pressable, TextInput, View } from 'react-native';
 import { readRule, repeatPresets } from '../../../renderer/src/format';
 import { engineModelLabel } from '../../../renderer/src/models';
 import { ruleLabel } from '../../../shared/repeats.mts';
-import { priorityIdOf, priorityLabelOf, priorityValueOf } from '../../../renderer/src/priority';
+import { choiceLabelOf, priorityIdOf, priorityValueOf } from '../../../renderer/src/priority';
 import { agentChoices, autoOffered, laterHint, momentFromWords, mondayIsTomorrow, mondayMorning, projectSwatch, tomorrowMorning, type Harness } from '../../../renderer/src/threads/composer-rules';
 import { splitSlug } from '../../../renderer/src/phone-rows';
 import { AUTO_LABEL } from '../../../shared/auto-route.mts';
@@ -33,7 +33,7 @@ import { Pickable, PriorityBars, Sheet, SheetHead, SheetRow, SheetSep, T } from 
 import { ModelSheet, PrioritySheet, barsFor } from './Pickers';
 import { color, corner, font, size } from './theme';
 
-const Swatch = ({ slug }: { slug: string }) => <View style={{ width: 9, height: 9, backgroundColor: projectSwatch(slug) }} />;
+const Swatch = ({ slug }: { slug: string }) => <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: projectSwatch(slug) }} />;
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -175,17 +175,20 @@ export type NewThread = ReturnType<typeof useNewThread>;
 /** Send and its Send later caret. */
 export function SendButtons({ form }: { form: NewThread }) {
   const { canSend, talk, send, busy, setSheet } = form;
+  // The desktop's grey Send (thread-composer.css `--send-fill`, `--send-split`), read here because a theme change rewrites `color`.
+  const SEND_FILL = `${color.text}26`;
+  const SEND_SPLIT = `${color.bg}8c`;
   return (
     <View style={{ flexDirection: 'row', opacity: canSend ? 1 : 0.45 }}>
       <Pressable disabled={!canSend} onPress={() => (talk.on ? talk.send() : void send())} accessibilityRole="button" accessibilityLabel="Send"
-        style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: color.accent, borderTopLeftRadius: corner.small, borderBottomLeftRadius: corner.small, opacity: pressed ? 0.85 : 1 })}>
-        <T style={{ fontSize: 15, fontFamily: font.medium, color: '#fff' }}>{busy ? 'Sending…' : 'Send'}</T>
+        style={({ pressed }) => ({ height: 32, paddingHorizontal: 14, justifyContent: 'center', backgroundColor: SEND_FILL, borderTopLeftRadius: corner.small, borderBottomLeftRadius: corner.small, opacity: pressed ? 0.85 : 1 })}>
+        <T style={{ fontSize: 15, fontFamily: font.medium, color: color.text }}>{busy ? 'Sending…' : 'Send'}</T>
       </Pressable>
       {/* A message to a teammate goes now; it has no later. */}
       {!form.mate && (
         <Pressable disabled={!canSend} onPress={() => setSheet('later')} accessibilityRole="button" accessibilityLabel="Send later"
-          style={({ pressed }) => ({ width: 32, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: color.accent, borderLeftWidth: 1, borderLeftColor: 'rgba(26, 24, 23, 0.28)', borderTopRightRadius: corner.small, borderBottomRightRadius: corner.small, opacity: pressed ? 0.85 : 1 })}>
-          <Caret />
+          style={({ pressed }) => ({ width: 32, height: 32, alignItems: 'center', justifyContent: 'center', backgroundColor: SEND_FILL, borderLeftWidth: 1, borderLeftColor: SEND_SPLIT, borderTopRightRadius: corner.small, borderBottomRightRadius: corner.small, opacity: pressed ? 0.85 : 1 })}>
+          <Caret tint={color.text} />
         </Pressable>
       )}
     </View>
@@ -197,6 +200,8 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
   const { draft, box, talk, product, projectName, model, setSheet, agents, offered, engine, codex, mate, onAuto, toWord } = form;
   // A teammate keeps its own model and project; someone new needs only the project it works in.
   const toMate = !!mate && mate !== 'new';
+  // A kept draft opens with the cursor after its words, then the cursor is the person's again.
+  const [caret, setCaret] = useState<{ start: number; end: number } | undefined>(() => ({ start: draft.text.length, end: draft.text.length }));
   return (
     <>
       <Field label="To">
@@ -222,14 +227,15 @@ export function NewThreadFields({ form, inline = false, onFocus, onBlur }: { for
       {!mate && (
         <Field label="Priority">
           <Pressable onPress={() => setSheet('priority')} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <PriorityBars level={barsFor(priorityValueOf(draft.priority ?? 'medium'))} />
-            <T style={{ fontSize: 15 }}>{priorityLabelOf(draft.priority ?? 'medium')}</T>
+            <PriorityBars level={draft.priority ? barsFor(priorityValueOf(draft.priority)) : 0} />
+            <T style={{ fontSize: 15 }}>{choiceLabelOf(draft.priority ?? null)}</T>
           </Pressable>
         </Field>
       )}
       {/* Typing stops dictation with the words kept; tapping the box does not (web-speech.ts). */}
       <TextInput ref={box} multiline autoFocus={!inline} value={draft.text} placeholder={toMate ? `Message ${(mate as Teammate).name}` : 'What do you need done?'} placeholderTextColor={color.faint}
-        onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }} onFocus={onFocus} onBlur={onBlur}
+        onChangeText={(t) => { if (talk.active()) talk.leave(); draft.setText(t); }} onBlur={onBlur}
+        selection={caret} onFocus={() => { setTimeout(() => setCaret(undefined), 0); onFocus?.(); }}
         style={[{ flex: inline ? undefined : 1, minHeight: inline ? 120 : 160, padding: 16, fontFamily: font.regular, fontSize: 16, lineHeight: 24.8, color: color.text, textAlignVertical: 'top' }, Platform.OS === 'web' && ({ outlineStyle: 'none' } as object)]} />
     </>
   );
@@ -302,7 +308,8 @@ export function NewThreadSheets({ form, now }: { form: NewThread; now: number })
       </Sheet>
       <ModelSheet open={sheet === 'model'} close={() => setSheet(null)} model={model} effort={effort} engine={engine} codex={codex}
         pickModel={form.pickModel} pickEffort={form.pickEffort} />
-      <PrioritySheet open={sheet === 'priority'} close={() => setSheet(null)} value={priorityValueOf(draft.priority ?? 'medium')} pick={(v) => draft.setPriority(priorityIdOf(v))} />
+      <PrioritySheet open={sheet === 'priority'} close={() => setSheet(null)} value={draft.priority ? priorityValueOf(draft.priority) : null}
+        pick={(v) => draft.setPriority(priorityIdOf(v))} agentDecides={() => draft.setPriority(null)} />
       <AttachSheet open={sheet === 'attach'} close={() => setSheet(null)} add={(more) => draft.setFiles((f) => withPicked(f, more))} fail={setError} />
       <Sheet open={sheet === 'project'} close={() => setSheet(null)}>
         {form.groups.length <= 1 && <SheetHead>Project</SheetHead>}

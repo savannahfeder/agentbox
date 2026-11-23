@@ -44,7 +44,8 @@ function setup({ onTeam = true } = {}) {
     if (m) return subs.has(m[1]) ? json(200, subs.get(m[1])) : json(404, { error: { message: 'No such subscription' } });
     return json(404, { error: { message: 'not faked' } });
   };
-  const team = { id: 'team-1', createdAt: MADE, members: onTeam ? [A, B] : [], owners: [A] };
+  // Before a card, the trial is a week given by hand (the only one since 2026-11-21).
+  const team = { id: 'team-1', createdAt: MADE, freeUntil: TRIAL_ENDS, members: onTeam ? [A, B] : [], owners: [A] };
   const gw = createGateway({
     agentcore: { async invoke() { return { ok: true }; }, async stop() {} },
     links: { get: async (k: string) => `https://b/${k}`, put: async (k: string) => `https://b/${k}`, head: async (k: string) => `https://b/${k}` },
@@ -198,7 +199,7 @@ describe('what the screens say', () => {
     expect(PRO_PITCH.paid).toEqual({ label: 'Then', price: '$40', per: 'a month', line: '400 cloud hours a month' });
     expect(PRO_PITCH.terms).toBe('Cancel any time.');
     const split = fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8');
-    expect(split).toMatch(/PRO_PITCH\.trial/);
-    expect(split).toMatch(/PRO_PITCH\.paid/);
+    expect(split).toMatch(/offer\.trial/);
+    expect(split).toMatch(/offer\.paid/);
   });
 });

@@ -335,6 +335,21 @@ export const ENGINES = {
       ]),
     },
   }),
+
+  /**
+   * OpenCode is optional, as Codex is. Its installer puts the binary in
+   * `~/.opencode/bin`; a Homebrew or npm install is found by the shell.
+   */
+  opencode: engine({
+    bin: 'opencode',
+    name: 'OpenCode',
+    installUrl: 'https://opencode.ai/docs',
+    ownPaths: (home) => [path.join(home, '.opencode/bin/opencode')],
+    evidence: (home) => [
+      path.join(home, '.local/share/opencode'),  // its sessions and sign-ins
+      path.join(home, '.config/opencode'),
+    ],
+  }),
 };
 
 export type EngineKey = keyof typeof ENGINES;
@@ -466,6 +481,7 @@ export function shellRunner(env: NodeJS.ProcessEnv = process.env): ShellRun {
         // spawn blocks the whole app until the shell has exited (2026-10-16).
         killSignal: 'SIGKILL',
         env,
+        windowsHide: true,
       });
     } catch (e) {
       const failed = e as ShellFailure | null;
@@ -492,6 +508,7 @@ export function shellRunnerLater(env: NodeJS.ProcessEnv = process.env): ShellRun
   return (shell, [flags, command], timeout = 4000) => new Promise<string>((resolve, reject) => {
     const child = execFile(shell, [flags, `echo ${REACHED}; ${command}`], {
       encoding: 'utf8', timeout, killSignal: 'SIGKILL', maxBuffer: 1024 * 1024, env,
+      windowsHide: true,
     }, (err, stdout) => {
       if (!err) {
         const answer = afterReached(stdout);

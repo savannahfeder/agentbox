@@ -20,6 +20,14 @@
  *  first run can tell which agents already have a row and file nothing twice. */
 import { NAME } from '../shared/product-name.mjs';
 
+/** The most of a chat an imported row keeps, Claude Code's and Codex's alike:
+ *  the first message from its start, and the last reply from its end, which is
+ *  where the answer is. */
+export const FIRST_CHARS = 4000;
+export const SAID_CHARS = 8000;
+export const firstPart = (text: unknown) => String(text ?? '').slice(0, FIRST_CHARS);
+export const lastPart = (text: unknown) => String(text ?? '').slice(-SAID_CHARS);
+
 export interface ImportableAgent {
   name?: string;
   title?: string;
@@ -154,6 +162,14 @@ export const THREAD_LABEL = 'thread-import';
 export const CATCH_UP_LABEL = 'catch-up';
 export const CATCH_UP_TRIES = 3;
 export const catchUpDue = (item: LabelledItem | null | undefined): boolean => (item?.labels ?? []).includes(CATCH_UP_LABEL) && item?.status === 'open';
+/** Brought in by itself as it goes (main/new-chats-watch.mts). It stays in its agent's
+ *  own words: what a small model made of one was acted on. */
+export const AS_IT_GOES_LABEL = 'as-it-goes';
+/** Whether the write-up is also its answer: a chat picked at setup or on the card, the first time. */
+export const writesTheAnswer = (item: (LabelledItem & { wrote?: { problem?: unknown } }) | null | undefined): boolean =>
+  !item?.wrote?.problem && !(item?.labels ?? []).includes(AS_IT_GOES_LABEL);
+/** Nothing to act on until it is written up. */
+export const gettingReady = (item: (LabelledItem & { wrote?: { problem?: unknown } }) | null | undefined): boolean => catchUpDue(item) && writesTheAnswer(item);
 
 /**
  * And the one that says WHICH thread. The id is Claude Code's own session id,
@@ -201,10 +217,23 @@ export function howTheChatEnded(said: unknown): { waiting: boolean; ask: string 
   const lines = String(said ?? '').replace(/\r/g, '').split('\n').map((l) => l.trim()).filter(Boolean);
   let i = lines.length - 1;
   while (i >= 0 && CHOICE.test(lines[i])) i -= 1;
-  if (i < 0) return { ...NOT_WAITING };
-  const line = plainLine(lines[i].replace(CHOICE, ''));
-  if (!line.endsWith('?')) return { ...NOT_WAITING };
-  return { waiting: true, ask: shortAsk(line) };
+  if (i < 0) return lines.length ? lastAsks(lines) : { ...NOT_WAITING };
+  const asked = questionIn(lines[i]);
+  return asked ? { waiting: true, ask: shortAsk(asked) } : lastAsks(lines);
+}
+
+/** A line that ends on a question, or on one with a single sentence after it. */
+function questionIn(raw: string): string {
+  const line = plainLine(raw.replace(CHOICE, ''));
+  if (line.endsWith('?')) return line;
+  const sentences = line.split(/(?<=[.!?])\s+/);
+  return sentences.length > 1 && sentences.at(-2)!.endsWith('?') ? sentences.slice(0, -1).join(' ') : '';
+}
+
+// "3. Center it and drop the to-do. Should I do it?" ends a list as its last point.
+function lastAsks(lines: string[]) {
+  const last = plainLine(lines.at(-1)!.replace(CHOICE, ''));
+  return last.endsWith('?') ? { waiting: true, ask: shortAsk(last) } : { ...NOT_WAITING };
 }
 
 /**

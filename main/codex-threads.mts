@@ -24,14 +24,12 @@
 // table. It is not read: Electron ships no sqlite, the file is written live
 // under WAL, and the two plain files carry what the row needs.
 import fs from 'node:fs';
-import { Worker } from 'node:worker_threads';
 import os from 'node:os';
 import path from 'node:path';
 import { RECENT_DAYS, isScratchFolder, isTaskFolder, shortFolder, threadTitle } from './agent-sessions.mts';
 import { codexDataDirs } from './agent-homes.mts';
 import { WAS_SLUGS, nameSlug } from '../shared/product-name.mjs';
-import { howTheChatEnded } from '../shared/agent-import.mts';
-import { stripTypesFlags } from './strip-types.mts';
+import { firstPart, howTheChatEnded, lastPart } from '../shared/agent-import.mts';
 
 export const CODEX_RECENT_DAYS = RECENT_DAYS;
 
@@ -82,6 +80,10 @@ export interface Rollout extends RolloutMeta {
   prompt: string;
   last: string;
   herTurnLast: boolean;
+  herLast: string;
+  herLastAt: number;
+  saidAt: number;
+  turnOpen: boolean | null;
   turns: number;
   images: number;
   lastActive: number;
@@ -117,6 +119,13 @@ export interface CodexThread {
   live: boolean;
   waiting?: boolean;
   ask?: string;
+  /** The person wrote after Codex's last answer, what and when, and whether
+   *  Codex's turn is still open (main/chat-follow.mts). */
+  herTurnLast?: boolean;
+  herLast?: string;
+  herLastAt?: number;
+  saidAt?: number;
+  turnOpen?: boolean | null;
   lastSaid: string;
   firstSaid: string;
 }
@@ -144,18 +153,6 @@ interface CodexHomeRead {
   skipped: CodexSkipped;
 }
 
-interface OffThreadReply {
-  id: number;
-  ok: boolean;
-  value: CodexThreadsRead;
-  error?: string;
-}
-
-interface OffThreadWait {
-  resolve: (value: CodexThreadsRead) => void;
-  reject: (err: Error) => void;
-  timer: ReturnType<typeof setTimeout>;
-}
 /** The originator Codex records for a run this app started (CLIENT_INFO.name), now and before. */
 const OUR_ORIGINATORS = new Set([nameSlug, ...WAS_SLUGS]);
 /** `codex exec` and Codex as an MCP server: one-shot runs a program starts. */
@@ -309,23 +306,38 @@ export function readRollout(file: string): Rollout | null {
   return value;
 }
 
-function readRolloutAfresh(file: string): Rollout | null {
-  let text = '';
+/** A rollout's lines, and of one longer than two reads its first and its last
+ *  `MAX_BYTES`, with `CUT` where the rest was. */
+const CUT = '\0cut';
+function rolloutLines(file: string): string[] | null {
   try {
     const fd = fs.openSync(file, 'r');
     try {
-      const size = fs.fstatSync(fd).size;
-      const buf = Buffer.alloc(Math.min(size, MAX_BYTES));
-      fs.readSync(fd, buf, 0, buf.length, 0);
-      text = buf.toString('utf8');
+      const { size } = fs.fstatSync(fd);
+      const read = (from: number, to: number) => {
+        const buf = Buffer.alloc(to - from);
+        return buf.subarray(0, fs.readSync(fd, buf, 0, buf.length, from)).toString('utf8').split('\n');
+      };
+      if (size <= 2 * MAX_BYTES) return read(0, size);
+      return [...read(0, MAX_BYTES).slice(0, -1), CUT, ...read(size - MAX_BYTES, size).slice(1)];
     } finally { fs.closeSync(fd); }
   } catch { return null; }
-  const lines = text.split('\n');
+}
+
+function readRolloutAfresh(file: string): Rollout | null {
+  const lines = rolloutLines(file);
+  if (!lines) return null;
   let meta: RolloutMeta | null = null;
   let prompt = '';
   let last = '';
   // Whether the person wrote after Codex's last answer, so it is not waiting.
   let herTurnLast = false;
+  // What she last wrote and when, and whether Codex's turn on it is still open
+  // (task_started to task_complete; null in a rollout that marks no turns).
+  let herLast = '';
+  let herLastAt = 0;
+  let saidAt = 0;
+  let turnOpen: boolean | null = null;
   let turns = 0;
   let images = 0;
   let lastActive = 0;
@@ -333,6 +345,8 @@ function readRolloutAfresh(file: string): Rollout | null {
   // present, so a turn is counted once whichever line says it.
   let sawEventTurns = false;
   for (const line of lines) {
+    // Whatever turn was open here may have ended in the part not read.
+    if (line === CUT) { turnOpen = null; continue; }
     if (!line.trim()) continue;
     let j: RolloutLine;
     try { j = JSON.parse(line); } catch { continue; }
@@ -360,15 +374,17 @@ function readRolloutAfresh(file: string): Rollout | null {
     if (Number.isFinite(at) && at > lastActive) lastActive = at;
     const p = j.payload ?? {};
     if (j.type === 'event_msg') {
-      if (p.type === 'user_message') {
+      if (p.type === 'task_started') turnOpen = true;
+      else if (p.type === 'task_complete' || p.type === 'turn_complete' || p.type === 'turn_aborted') turnOpen = false;
+      else if (p.type === 'user_message') {
         const said = cleanPrompt(p.message);
         if (!prompt && said && !isInjected(said)) prompt = said;
-        if (said && !isInjected(said)) herTurnLast = true;
+        if (said && !isInjected(said)) { herTurnLast = true; herLast = said; herLastAt = Number.isFinite(at) ? at : herLastAt; }
         turns += 1;
         sawEventTurns = true;
       } else if (p.type === 'agent_message') {
         const said = cleanAnswer(p.message);
-        if (said) { last = said; herTurnLast = false; }
+        if (said) { last = said; herTurnLast = false; saidAt = Number.isFinite(at) ? at : saidAt; }
       }
       continue;
     }
@@ -383,16 +399,17 @@ function readRolloutAfresh(file: string): Rollout | null {
       if (!hers.length) continue; // a turn made of nothing but Codex's own preamble
       if (!prompt) prompt = hers.join('\n\n').trim();
       herTurnLast = true;
+      if (!sawEventTurns) { herLast = hers.join('\n\n').trim(); herLastAt = Number.isFinite(at) ? at : herLastAt; }
       if (!sawEventTurns) turns += 1;
     } else if (p.role === 'assistant') {
       const said = cleanAnswer(partsOf(p).filter((c) => c.type === 'output_text').map((c) => c.text ?? '').join('\n'));
-      if (said) { last = said; herTurnLast = false; }
+      if (said) { last = said; herTurnLast = false; saidAt = Number.isFinite(at) ? at : saidAt; }
     }
   }
   if (!meta || !meta.id) return null;
   let mtime = 0;
   try { mtime = fs.statSync(file).mtimeMs; } catch { mtime = 0; }
-  return { ...meta, prompt, last, herTurnLast, turns, images, lastActive, path: file, mtime };
+  return { ...meta, prompt: firstPart(prompt), last: lastPart(last), herTurnLast, herLast: firstPart(herLast), herLastAt, saidAt, turnOpen, turns, images, lastActive, path: file, mtime };
 }
 
 /**
@@ -472,50 +489,14 @@ function readOneCodexHome(codexDir: string, { home, days, now, cutoff, index, by
       prompt: r.prompt,
       last: r.last,
       live: isLive(r.mtime, now),
+      herTurnLast: r.herTurnLast,
+      herLast: r.herLast,
+      herLastAt: r.herLastAt,
+      saidAt: r.saidAt,
+      turnOpen: r.turnOpen,
       ...(r.herTurnLast ? { waiting: false, ask: '' } : howTheChatEnded(r.last)),
       lastSaid: r.last,
       firstSaid: r.prompt,
     });
   }
-}
-
-// THE SAME READ IN A THREAD OF ITS OWN, for the watch that runs every minute:
-// a first read of a large Codex folder takes seconds, and on the main process
-// that is seconds of the app not answering. One worker, kept for the life of
-// the app, so its transcripts stay remembered between reads. Where a worker
-// cannot start, the read runs here as before.
-const OFF_THREAD_DEADLINE_MS = 5 * 60_000;
-let worker: Worker | null = null;
-let asked = 0;
-const waiting = new Map<number, OffThreadWait>();
-export function readCodexThreadsOffThread(opts: CodexThreadsOptions = {}): Promise<CodexThreadsRead> {
-  try {
-    if (!worker) {
-      worker = new Worker(new URL('./codex-threads-worker.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] });
-      worker.unref();
-      worker.on('message', ({ id, ok, value, error }: OffThreadReply) => {
-        const w = waiting.get(id);
-        if (!w) return;
-        waiting.delete(id);
-        clearTimeout(w.timer);
-        if (ok) w.resolve(value); else w.reject(new Error(error));
-      });
-      const fail = (err: Error) => {
-        for (const w of waiting.values()) { clearTimeout(w.timer); w.reject(err); }
-        waiting.clear();
-        worker = null;
-      };
-      worker.on('error', fail);
-      worker.on('exit', () => fail(new Error('the Codex reader stopped')));
-    }
-  } catch {
-    return Promise.resolve().then(() => readCodexThreads(opts));
-  }
-  const id = (asked += 1);
-  return new Promise<CodexThreadsRead>((resolve, reject) => {
-    const timer = setTimeout(() => { waiting.delete(id); reject(new Error('the Codex reader did not answer in time')); }, OFF_THREAD_DEADLINE_MS);
-    timer.unref?.();
-    waiting.set(id, { resolve, reject, timer });
-    worker!.postMessage({ id, opts });
-  });
 }

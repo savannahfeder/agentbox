@@ -27,11 +27,12 @@
 // habit that put unshipped work there.
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { racedWithAnotherPush, notReadyToShip, runsEveryTest, startedWhenBusy } from './lib/ship-rules.mjs';
 import { deployAfterShip } from './lib/web-app-deploy.mjs';
+import { signedGit } from './lib/push-sign-in.mjs';
+import { pushPrivateFolder } from './lib/private-folder.mjs';
 
 // THE FOLDER IT SHIPS IS THE ONE IT RUNS IN. `npm run ship` runs in the
 // package root, so a person or agent in a worktree ships that worktree as
@@ -54,8 +55,12 @@ const began = Date.now();
 let shipEndsBy = began + 18 * 60_000;
 
 const say = (msg) => console.log(`ship: ${msg}`);
-const git = (...args) => gitOrThrow(args, { cwd: root });
-const gitSoft = (...args) => runGit(args, { cwd: root });
+// A repository nested in the task folder is a worker's to write, settings and
+// all, and git runs those when it looks inside one. `dirty` still sees a
+// nested repository's commit move; only reading its files is skipped.
+const OWN_SETTINGS_ONLY = ['-c', 'core.fsmonitor=false', '-c', 'diff.ignoreSubmodules=dirty'];
+const git = (...args) => gitOrThrow([...OWN_SETTINGS_ONLY, ...args], { cwd: root });
+const gitSoft = (...args) => runGit([...OWN_SETTINGS_ONLY, ...args], { cwd: root });
 // process.exit drops whatever a pipe has not yet taken, and the ship queue
 // reads this script through one: the end of the hook's output, where the
 // failing test is named, was what got dropped. Exits once both have drained.
@@ -70,40 +75,10 @@ const stop = (msg) => { console.error(`\nship: ${msg}\n`); return exit(1); };
 // environment of every process the user runs.
 const token = process.env.AGENTBOX_PUSH_SIGN_IN === 'stdin' ? fs.readFileSync(0, 'utf8').trim() : '';
 const site = process.env.AGENTBOX_PUSH_SITE || 'https://github.com';
-const quoted = (s) => `'${s.replaceAll("'", "'\\''")}'`;
-const helper = path.join(path.dirname(fileURLToPath(import.meta.url)), 'lib', 'push-credential.mjs');
-const withConfig = (env, pairs) => {
-  const n = Number(env.GIT_CONFIG_COUNT) || 0;
-  const out = { ...env, GIT_CONFIG_COUNT: String(n + pairs.length) };
-  pairs.forEach(([k, v], i) => { out[`GIT_CONFIG_KEY_${n + i}`] = k; out[`GIT_CONFIG_VALUE_${n + i}`] = v; });
-  return out;
-};
-
-/**
- * A git command that may need the sign-in. The token goes in a file with no
- * name, open on fd 3 of this command only; scripts/lib/push-credential.mjs
- * reads it there once and empties it. The empty helper clears any helper set
- * before it, so a stale keychain entry cannot answer first.
- */
-function signedIn(args, opts = {}) {
-  // git asks only a remote on the site, and a file nobody asked for stays full while the hook runs.
-  const url = token ? (gitSoft('remote', 'get-url', ...(args[0] === 'push' ? ['--push'] : []), PUBLIC).stdout ?? '').trim() : '';
-  if (!token || !url.startsWith(`${site}/`)) return runGit(args, { cwd: root, ...opts });
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ship-'));
-  const file = path.join(dir, 'sign-in');
-  const fd = fs.openSync(file, 'w+', 0o600);
-  try {
-    fs.unlinkSync(file);
-    fs.rmdirSync(dir);
-    fs.writeSync(fd, token, 0);
-    const env = withConfig(process.env, [[`credential.${site}.helper`, ''], [`credential.${site}.helper`, `!${quoted(process.execPath)} ${quoted(helper)}`]]);
-    return runGit(args, { cwd: root, ...opts, env, stdio: ['ignore', 'pipe', 'pipe', fd] });
-  } finally {
-    fs.closeSync(fd);
-  }
-}
+const signed = signedGit({ token, site });
+const signedIn = (args, opts = {}) => startedWhenBusy(() => signed(args, { cwd: root, remote: PUBLIC, pushing: args.includes('push'), ...opts }));
 const fetchPublic = () => {
-  const r = signedIn(['fetch', PUBLIC, '--quiet']);
+  const r = signedIn([...OWN_SETTINGS_ONLY, 'fetch', PUBLIC, '--quiet']);
   if (r.error) throw r.error;
   if (r.status !== 0) throw new Error(`git fetch ${PUBLIC} --quiet failed (${r.status}):\n${r.stderr ?? ''}`);
 };
@@ -121,6 +96,10 @@ const why = notReadyToShip({
   hasCommits: git('rev-list', '--count', `${PUBLIC}/main..HEAD`) !== '0',
 });
 if (why) await stop(why);
+
+const privately = pushPrivateFolder(root, { message: `Changes from ${branch}`, signIn: signed, trusted: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..') });
+if (privately.pushed) say(`pushed ${privately.commits} commit(s) in ${privately.path} to its own repository.`);
+else if (privately.why) say(`${privately.why}. Push it from there by hand.`);
 
 async function mergeWhatMoved() {
   if (git('rev-list', '--count', `HEAD..${PUBLIC}/main`) === '0') return;

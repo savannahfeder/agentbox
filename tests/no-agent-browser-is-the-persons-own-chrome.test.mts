@@ -13,11 +13,15 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { MAC_CHROME, hiddenBrowser, startableChrome } from '../shared/hidden-browser.mts';
-import { launchChrome } from '../.claude/skills/verify-agentbox/scripts/cdp.mjs';
 import { browsersToTry } from '../mcp/core/page.mts';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
+// The skills are a private checkout, absent on GitHub and in a public clone.
+const SKILLS = path.join(ROOT, '.claude/skills');
+const CDP = path.join(SKILLS, 'verify-agentbox/scripts/cdp.mjs');
+const cdp = fs.existsSync(CDP) ? await import(pathToFileURL(CDP).href) : null;
 const SKIP = new Set(['node_modules', '.git', 'tests', 'dist', 'scratch', 'worktrees', 'out', 'release']);
 
 function sources(dir, out = []) {
@@ -32,7 +36,7 @@ function sources(dir, out = []) {
 
 describe('which code may name Google Chrome as a browser to start', () => {
   const files = [...sources(path.join(ROOT, 'scripts')), ...sources(path.join(ROOT, 'mcp')), ...sources(path.join(ROOT, 'main')),
-    ...sources(path.join(ROOT, 'shared')), ...sources(path.join(ROOT, '.claude/skills'))];
+    ...sources(path.join(ROOT, 'shared')), ...(fs.existsSync(SKILLS) ? sources(SKILLS) : [])];
 
   it('is only the module that picks the hidden browser', () => {
     const naming = files.filter((f) => fs.readFileSync(f, 'utf8').includes('Google Chrome.app/Contents/MacOS/Google Chrome'));
@@ -69,11 +73,11 @@ describe('the browser a script starts on a Mac', () => {
   });
 });
 
-describe('the verify drive refusing Google Chrome', () => {
+describe.skipIf(!cdp)('the verify drive refusing Google Chrome', () => {
   it('starts nothing at all', async () => {
     let started = 0;
     const start = () => { started += 1; throw new Error('a browser was started'); };
-    await expect(launchChrome({ bin: MAC_CHROME, profile: '/nowhere', platform: 'darwin', start }))
+    await expect(cdp.launchChrome({ bin: MAC_CHROME, profile: '/nowhere', platform: 'darwin', start }))
       .rejects.toThrow(/npx playwright install chromium-headless-shell/);
     expect(started).toBe(0);
   });
