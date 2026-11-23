@@ -81,9 +81,11 @@ describe('the wiring a live check caught', () => {
 });
 
 describe('the giver\'s Done row', () => {
-  it('says who has it, not Done', () => {
+  it('says who has it, not Done', async () => {
+    const { handedOnWord } = await import('../renderer/src/threads/page-rules.ts');
+    expect(handedOnWord({ id: 'w-1', status: 'done', answer: 'Given to Theo Lee.' }, [], 'sam')).toBe('Handed to Theo');
     const pages = fs.readFileSync(new URL('../renderer/src/threads/Pages.tsx', import.meta.url), 'utf8');
-    expect(pages).toContain(': `Handed to ${handedOnName.split(/\\s+/)[0]}`;');
+    expect(pages).toContain('const handedWord = handedOnWord(item, team ? allItems ?? [] : null, team?.me ?? null);');
   });
 });
 
@@ -108,9 +110,12 @@ describe('the giver\'s thread while it is out', () => {
     expect(app).toContain('      if (handedOut.has(i.id)) return true;');
     expect(app).toContain("!sentAwayByMe(i, team?.me ?? null) && !handedOut.has(i.id))");
   });
-  it('says With Theo, then Theo finished it', () => {
-    expect(pages).toContain('`With ${handedOnName.split(/\\s+/)[0]}`');
-    expect(pages).toContain('`${handedOnName.split(/\\s+/)[0]} finished it`');
+  it('says With Theo, then Theo finished it', async () => {
+    const { handedOnWord } = await import('../renderer/src/threads/page-rules.ts');
+    const given = { id: 'w-1', status: 'done', answer: 'Given to Theo Lee.' };
+    expect(handedOnWord(given, [task()] as never, 'sam')).toBe('With Theo');
+    expect(handedOnWord(given, [task({ status: 'done', wrote: { status: { by: 'theo', ts: 9 } } })] as never, 'sam')).toBe('Theo finished it');
+    expect(pages).toContain('handedOnWord(');
   });
 });
 
