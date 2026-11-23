@@ -2,7 +2,7 @@
 // what threads made that nobody filed. Kept means in a folder, nothing else.
 import type { FileFolder, PlacedFile } from '../types';
 import { localDate } from '../local-dates';
-import { apartScratch, docBlocks, KIND_ONE, shownName, sortFiles } from './files-shown';
+import { apartScratch, docBlocks, filesBelow, KIND_ONE, shownName, sortFiles } from './files-shown';
 
 /** What a dragged tile carries, for whatever it lands on in Files. */
 export const FILE_DRAG = 'application/x-agentbox-file';
@@ -23,8 +23,28 @@ const partsOf = (s: string) => fold(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 export interface HomeSection { folder: FileFolder; files: PlacedFile[] }
 export interface Home { kept: HomeSection[]; empty: FileFolder[]; loose: PlacedFile[] }
 
-/** Two rows of four before Show all. */
-export const SHOWN_AT_FIRST = 8;
+/** Two rows of three, beside Recent, before a section's own page. */
+export const SHOWN_AT_FIRST = 6;
+
+/** The page of a project's files in no folder, where a folder's page would be. */
+export const NOT_IN_A_FOLDER = 'not-in-a-folder';
+
+export interface Crumb { name: string; project: string | null; folder: string | null }
+
+/** The places above this one, nearest last. */
+export function crumbsFor(folders: FileFolder[], project: string | null, folder: string | null): Crumb[] {
+  if (!project) return [];
+  const top: Crumb = { name: 'All files', project: null, folder: null };
+  if (!folder) return [top];
+  const here = folders.find((f) => f.id === folder);
+  const above = here?.parent ? folders.find((f) => f.id === here.parent) : null;
+  return [top, { name: project, project, folder: null }, ...(above ? [{ name: above.name, project, folder: above.id }] : [])];
+}
+
+/** A folder's page: everything in it and in the folders inside it, newest first. */
+export function folderFiles(files: PlacedFile[], folders: FileFolder[], project: string, folder: string): PlacedFile[] {
+  return sortFiles(apartScratch(filesBelow(files, folders, { project, folder })).files, 'recent');
+}
 
 export const isPinned = (f: Pick<FileFolder, 'name'>) => fold(f.name.trim()) === 'pinned';
 
@@ -46,6 +66,30 @@ export function homeOf(files: PlacedFile[], folders: FileFolder[], project: stri
     .sort((a, b) => Number(isPinned(b.folder)) - Number(isPinned(a.folder)) || b.files[0].at - a.files[0].at);
   const empty = tops.filter((f) => !byTop.has(f.id)).sort((a, b) => a.name.localeCompare(b.name));
   return { kept, empty, loose: sortFiles(loose, 'recent') };
+}
+
+export const RECENT_MOST = 10;
+export interface RecentFile { file: PlacedFile; folder: FileFolder | null }
+
+/** The files that changed last on these homes, newest first, each with the folder it shows in. */
+export function recentOf(homes: readonly Home[]): RecentFile[] {
+  const rows = new Map<string, RecentFile>();
+  for (const home of homes) {
+    for (const s of home.kept) for (const file of s.files) if (!rows.has(file.key)) rows.set(file.key, { file, folder: s.folder });
+    for (const file of home.loose) if (!rows.has(file.key)) rows.set(file.key, { file, folder: null });
+  }
+  return [...rows.values()].sort((a, b) => b.file.at - a.file.at).slice(0, RECENT_MOST);
+}
+
+export function recentByDay(rows: readonly RecentFile[], now: number): Array<{ day: string; rows: RecentFile[] }> {
+  const days: Array<{ day: string; rows: RecentFile[] }> = [];
+  for (const r of rows) {
+    const day = whenWords(r.file.at, now);
+    const last = days[days.length - 1];
+    if (last?.day === day) last.rows.push(r);
+    else days.push({ day, rows: [r] });
+  }
+  return days;
 }
 
 /** A pinned document that changed this week: the one thing on the page in the accent. */
@@ -78,8 +122,10 @@ export function tileLine(f: Pick<PlacedFile, 'kind' | 'sentIn'>): string {
   return f.sentIn.find((s) => s.kind !== 'chat' && s.title)?.title ?? (f.kind ? KIND_ONE[f.kind] : 'File');
 }
 
-export type Glyph = 'page' | 'table' | 'image' | 'film' | 'window' | 'slides' | 'code'
-  | 'tag' | 'compass' | 'people' | 'phone' | 'cloud' | 'binoculars' | 'chart' | 'palette' | 'chat' | 'box' | 'book' | 'shield' | 'chip' | 'layers' | 'mobile';
+export const GLYPH_NAMES = ['page', 'table', 'image', 'film', 'window', 'slides', 'code', 'tag', 'compass', 'people', 'phone', 'cloud',
+  'binoculars', 'chart', 'palette', 'chat', 'box', 'book', 'shield', 'chip', 'layers', 'mobile'] as const;
+export type Glyph = typeof GLYPH_NAMES[number];
+const isGlyph = (s: string | null | undefined): s is Glyph => !!s && (GLYPH_NAMES as readonly string[]).includes(s);
 
 // A word that starts a part of the name picks the drawing; anything else is drawn by its kind.
 const BY_WORD: [RegExp, Glyph][] = [
@@ -106,7 +152,11 @@ const byWord = (name: string): Glyph | null => {
   return BY_WORD.find(([word]) => parts.some((p) => word.test(p)))?.[1] ?? null;
 };
 
-/** Drawn by a word in its name, then by its folder's name, then by its kind. */
-export function glyphFor(f: Pick<PlacedFile, 'name' | 'title' | 'kind' | 'sentIn'>, folder: string | null = null): Glyph {
-  return byWord(shownName(f)) ?? (folder && !isPinned({ name: folder }) ? byWord(folder) : null) ?? BY_KIND[f.kind ?? ''] ?? 'page';
+/** The icon a person picked, then a word in its name or its document's title, then its folder's name, then its kind. */
+export function glyphFor(f: Pick<PlacedFile, 'name' | 'title' | 'kind' | 'sentIn' | 'icon'>, folder: string | null = null, docTitle: string | null = null): Glyph {
+  if (isGlyph(f.icon)) return f.icon;
+  return byWord(shownName(f)) ?? (docTitle ? byWord(docTitle) : null) ?? (folder && !isPinned({ name: folder }) ? byWord(folder) : null) ?? BY_KIND[f.kind ?? ''] ?? 'page';
 }
+
+/** A picture on this computer shows itself, unless a person picked it an icon. */
+export const markOf = (f: Pick<PlacedFile, 'kind' | 'opened' | 'icon'>): 'picture' | 'icon' => (f.kind === 'image' && f.opened && !isGlyph(f.icon) ? 'picture' : 'icon');

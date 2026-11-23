@@ -9,6 +9,7 @@
 // safe: no node imports.
 
 import { checkSetting, type SettingChange } from './phone-settings.mts';
+import { carriedOnIn, heldOutside } from './carried-on-outside.mts';
 
 // How much of one thread goes up. The latest of a thread is what she reads on
 // a phone; the whole of it stays on the Mac. `bytes` is measured in UTF-8, as
@@ -84,24 +85,36 @@ interface ChangeSeen {
   knowsYou?: unknown;
 }
 
+// The phone's pass asks for every carried thread's change each time, and a
+// saved change is the same object until its file is rewritten
+// (main/code-change.mts readChangeSummary): read for secrets once, by home.
+const phoneChanges = new WeakMap<object, Map<string, PhoneChange | null>>();
+
 /** A saved change (main/code-change.mts readChangeSummary) as the phone gets it, or null when it touched no files. */
 export function phoneChangeOf(summary: ChangeSeen | null | undefined, { home = null }: Ctx = {}): PhoneChange | null {
   if (!summary || typeof summary !== 'object' || !Array.isArray(summary.files)) return null;
+  let byHome = phoneChanges.get(summary);
+  if (!byHome) phoneChanges.set(summary, byHome = new Map());
+  const made = byHome.get(home ?? '');
+  if (made !== undefined) return made;
   const count = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.round(Number(v)) : 0);
   const flag = (v: unknown) => (typeof v === 'boolean' ? v : null);
-  const files = (summary.files as ({ path?: unknown; plus?: unknown; minus?: unknown } | null)[])
-    .filter((f) => f && typeof f.path === 'string' && f.path)
+  const named = (summary.files as ({ path?: unknown; plus?: unknown; minus?: unknown } | null)[])
+    .filter((f) => f && typeof f.path === 'string' && f.path);
+  // Only the paths that are kept: a generated change names thousands.
+  const files = named.slice(0, PHONE_CHANGE_FILES)
     .map((f) => ({ path: hideSecrets(f!.path, { home }), plus: count(f!.plus), minus: count(f!.minus) }));
-  if (!files.length) return null;
-  return {
+  const change: PhoneChange | null = files.length ? {
     plus: count(summary.plus),
     minus: count(summary.minus),
-    files: files.slice(0, PHONE_CHANGE_FILES),
-    ...(files.length > PHONE_CHANGE_FILES ? { more: files.length - PHONE_CHANGE_FILES } : {}),
+    files,
+    ...(named.length > PHONE_CHANGE_FILES ? { more: named.length - PHONE_CHANGE_FILES } : {}),
     committed: flag(summary.committed),
     uncommitted: flag(summary.uncommitted),
     knowsYou: flag(summary.knowsYou),
-  };
+  } : null;
+  byHome.set(home ?? '', change);
+  return change;
 }
 
 /** A row's fields as this file reads them, before they are picked. */
@@ -217,13 +230,15 @@ const ROW_FIELDS = [
   'fromPhone',
   // What the thread waits on, which puts it in Later (list-rules `waitsInLater`).
   'blockedBy', 'waitEnded',
+  // Carried on where it started, so In progress (shared/carried-on-outside.mts).
+  'carriedOn',
 ];
 // The fields a line in a thread's history may carry in its patch: what the
 // thread view draws as the conversation and its state changes.
 const LINE_FIELDS = [
   'title', 'label', 'body', 'kind', 'labels', 'priority', 'status', 'result',
   'note', 'answer', 'runAt', 'snoozedUntil', 'start', 'due', 'problem',
-  'progress', 'solution', 'inReplyTo',
+  'progress', 'solution', 'inReplyTo', 'saidOutside',
 ];
 const SOURCES: ReadonlySet<unknown> = new Set(['founder', 'agent', 'system']);
 
@@ -274,14 +289,45 @@ function hideNamed(text: string): string {
 const KEYLIKE = /\b(?=[A-Za-z0-9_-]{32,}\b)(?=[A-Za-z0-9_-]*[a-z])(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*[0-9])[A-Za-z0-9_-]{32,}\b/g;
 // A file's path is not a key, however long its name: a saved picture is a
 // random prefix joined to the file's own name, and hidden, its link leads nowhere.
-// Bounded so a long run with no extension costs little.
-const FILE_PATH = /[\w./~-]{0,300}\.(?:png|jpe?g|gif|webp|heic|svg|mp4|mov|webm|m4a|mp3|wav|pdf|txt|md|html?|csv|json|zip)(?![\w])/gi;
+// A path is up to PATH_REACH of the characters paths are written in, then an
+// ending. Found from the endings back, not as one pattern: that one was tried
+// forward and back from every character, and megabytes of hex froze the app.
+const PATH_REACH = 300;
+const PATH_ENDING = /\.(?:png|jpe?g|gif|webp|heic|svg|mp4|mov|webm|m4a|mp3|wav|pdf|txt|md|html?|csv|json|zip)(?![\w])/gi;
+const PATH_CHAR = new Uint8Array(128);
+for (const c of 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_./~-') PATH_CHAR[c.charCodeAt(0)] = 1;
+const pathChars = (text: string, from: number, to: number): boolean => {
+  for (let i = from; i < to; i += 1) if (PATH_CHAR[text.charCodeAt(i)] !== 1) return false;
+  return true;
+};
+/** Each file path in `text`, as [start, end): from as far back as the reach allows to the last ending within it. */
+export function filePathSpans(text: string): [number, number][] {
+  const spans: [number, number][] = [];
+  const endings = [...text.matchAll(PATH_ENDING)];
+  let from = 0;
+  for (let i = 0; i < endings.length;) {
+    const dot = endings[i]!.index;
+    const floor = Math.max(from, dot - PATH_REACH);
+    let start = dot;
+    while (start > floor && PATH_CHAR[text.charCodeAt(start - 1)] === 1) start -= 1;
+    let last = i;
+    let end = dot + endings[i]![0].length;
+    while (last + 1 < endings.length && endings[last + 1]!.index <= start + PATH_REACH && pathChars(text, end, endings[last + 1]!.index)) {
+      last += 1;
+      end = endings[last]!.index + endings[last]![0].length;
+    }
+    spans.push([start, end]);
+    from = end;
+    i = last + 1;
+  }
+  return spans;
+}
 function hideKeyLike(text: string): string {
   let out = '';
   let at = 0;
-  for (const m of text.matchAll(FILE_PATH)) {
-    out += text.slice(at, m.index).replace(KEYLIKE, '[hidden]') + m[0];
-    at = m.index + m[0].length;
+  for (const [start, end] of filePathSpans(text)) {
+    out += text.slice(at, start).replace(KEYLIKE, '[hidden]') + text.slice(start, end);
+    at = end;
   }
   return out + text.slice(at).replace(KEYLIKE, '[hidden]');
 }
@@ -409,6 +455,8 @@ export function threadSnapshot(
 ): ThreadSnapshot {
   const ctx = { home };
   const row: ThreadSnapshot['item'] = pick(item, ROW_FIELDS, limits.textChars, ctx);
+  const held = item?.claim as { holder?: string } | null | undefined;
+  if (heldOutside(item as Parameters<typeof heldOutside>[0])) row.carriedOn = carriedOnIn(held?.holder) ?? '';
   // Who wrote each field, which is how the screens tell her words from an
   // agent's: the source and the moment, nothing else of it.
   if (item?.wrote && typeof item.wrote === 'object') {

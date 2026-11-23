@@ -131,10 +131,12 @@ describe('the page and the viewer', () => {
     expect(viewer).toMatch(/const mentions = withYourReply \? \[\] : /);
   });
 
-  // The power test: two testers paused at Approve beside "Add to your reply", unsure whether it sent a
-  // review result of its own. In a review the reply is the answer, so the viewer offers no Approve.
-  it('offers no Approve on a picture while a review is open', () => {
-    expect(viewer).toContain('{offers.approve && !withYourReply && <button');
+  // Taken out on 2026-11-22: two testers paused at Approve beside "Add to your reply", unsure whether
+  // it sent a review result of its own. Back on 2026-11-23 (w-9767199d02): the hand-back now names the
+  // files you approved, and without Approve a reviewer could only write "B is the one I'm approving".
+  it('offers Approve on a picture while a review is open, since the hand-back names it', () => {
+    expect(viewer).toContain('{offers.approve && <button');
+    expect(viewer).not.toContain('offers.approve && !withYourReply');
   });
 
   it('says where a note went', () => {

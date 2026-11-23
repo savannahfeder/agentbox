@@ -103,13 +103,17 @@ function placeIn(project: CarryProject, real: string, fs: Fs): ProjectPlace | nu
  * may already see: otherwise "salaries.md" in a chat would find a file in a
  * private project and send it. Never another conversation's folder, and never
  * a file whose real place is outside the projects or behind a hidden folder.
+ *
+ * `fresh` lists every project's folders again, for a person who has just sent:
+ * the file may be seconds old. A look that repeats on a clock passes false.
  */
-export async function findFileToSend({ ref, meant = false, conversation, products, fs = fsDefault }: {
+export async function findFileToSend({ ref, meant = false, conversation, products, fs = fsDefault, fresh = true }: {
   ref: string;
   meant?: boolean;
   conversation?: { dir: string; people?: string[] | null } | null;
   products: CarryProject[];
   fs?: Fs;
+  fresh?: boolean;
 }): Promise<FoundToSend> {
   const raw = plainRef(ref);
   if (!isCarriedKind(raw)) return { none: 'missing' };
@@ -152,7 +156,7 @@ export async function findFileToSend({ ref, meant = false, conversation, product
   }
   let best: { real: string; place: { root: string; rel: string }; at: number } | null = null;
   for (const p of others.filter((x) => meant || everyoneMaySee(x))) {
-    const found = await resolveArtifact({ src: raw, product: p.slug, products: [{ ...p, team: undefined }], fs, fresh: true });
+    const found = await resolveArtifact({ src: raw, product: p.slug, products: [{ ...p, team: undefined }], fs, fresh });
     if (!found.ok) continue;
     const real = realOf(found.path, fs);
     const place = (real && placeIn(p, real, fs)) as ProjectPlace | null;

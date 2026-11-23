@@ -8,7 +8,7 @@
 // So this answers for ANY row, in or out of In progress, by asking live-line
 // first and falling back to the thread's own state word. One function, because
 // three surfaces were going to answer it three ways.
-import { catchUpDue } from '../../shared/agent-import.mts';
+import { gettingReady } from '../../shared/agent-import.mts';
 import { liveLine, shortWord, type LiveFacts } from './live-line';
 import { STATE_WORD, stateWordOf } from './threads/summary-rules';
 import { threadState } from '../../shared/thread-cards.mts';
@@ -60,6 +60,8 @@ export interface StatusFacts extends LiveFacts {
 // they wear different marks.
 const WAITING_ITS_TURN = new Set(['queued', 'next', 'shipping']);
 
+export const MEMORY_HELD_LINE = 'This computer is short of memory, so the agent\'s next command waits for heavier work to finish.';
+
 /** A row on Later: one word for everything that comes back at the time beside
  *  it. `null` is a repeating task with no run going. */
 export function laterCell(item: WorkItem | null, facts: StatusFacts = {}): StatusCell {
@@ -84,7 +86,7 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
     if (closedUnshipped(item)) return says('Not shipped', 'done', false, 'Closed without its work reaching main');
     return plain(stateWordOf(item, state), 'done');
   }
-  if (catchUpDue(item)) return says('Getting ready', 'queued', false, 'This chat is being summarized so you can answer it.');
+  if (gettingReady(item)) return says('Getting ready', 'queued', false, 'This chat is being summarized so you can answer it.');
   // Sent to Auto and not given to anyone yet (shared/auto-route.mts). Ahead of
   // Stopped: a thread that asks her is on the supervisor's stalled list, and no
   // agent died on it.
@@ -113,6 +115,9 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
   if (live?.state === 'working') {
     const cloud = facts.session?.where === 'cloud';
     const local = !cloud && away?.at === 'mac';
+    if (facts.session?.memoryHeldMs != null) {
+      return { word: 'Waiting for memory', mark: 'working', agent: true, live: true, cloud, title: MEMORY_HELD_LINE };
+    }
     return {
       word: local ? (away?.why === 'moving' ? 'Moving to cloud' : 'Working locally') : shortWord('working'), mark: 'working', agent: true, live: true, cloud,
       title: local ? titled(live.line) : live.line, ...(local ? { why } : {}),
@@ -139,7 +144,7 @@ export function statusCell(item: WorkItem, facts: StatusFacts = {}): StatusCell 
   }
   if (live) {
     const waiting = WAITING_ITS_TURN.has(live.state) && live.state !== 'shipping' && (away?.at === 'wait-cloud' || away?.at === 'wait-mac');
-    const cell = says(shortWord(live.state), WAITING_ITS_TURN.has(live.state) ? 'queued' : 'held', true, waiting ? titled(live.line) : live.line);
+    const cell = says(live.word ?? shortWord(live.state), WAITING_ITS_TURN.has(live.state) ? 'queued' : 'held', true, waiting ? titled(live.line) : live.line);
     return waiting ? { ...cell, why } : cell;
   }
   if (state === 'waiting' && shipped) return shipped;

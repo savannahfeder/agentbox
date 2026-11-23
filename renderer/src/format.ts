@@ -4,6 +4,7 @@ import { closesTheTask, bareOption } from '../../shared/closes-the-task.mts';
 import { readMoment } from './when-words';
 import { localDate } from './local-dates';
 import { handedBackBy } from '../../shared/thread-asks.mts';
+import { rememberedFor } from '../../shared/remembered.mts';
 // Time and grouping, Superhuman-style: terse, scannable, never a full date
 // where "3m" will do.
 
@@ -160,7 +161,10 @@ interface HasFields {
 
 const writtenAt = (item: HasFields, field: OptionsField) => item.wrote?.[field]?.ts ?? 0;
 
-export function optionsFrom(item: HasFields): OptionsField {
+// Asked of every thread each time a list is drawn, and a thread that changes
+// is a new object (tests/the-inbox-reads-each-threads-words-once).
+export const optionsFrom = rememberedFor(fieldOffering);
+function fieldOffering(item: HasFields): OptionsField {
   const inResult = parseOptions(item.result).length > 0;
   const inNote = parseOptions(item.note).length > 0;
   if (inResult && inNote) return writtenAt(item, 'note') > writtenAt(item, 'result') ? 'note' : 'result';
@@ -227,7 +231,8 @@ export function stripOptionsSection(body: string): string {
 // EXCEPT THE APP'S OWN "SHIPPED TO MAIN" NOTE (w-639fc3b3a5). A run that ships
 // writes its offer and then the ship queue writes that note, so it always comes
 // last. It answers an offer only when the offer asked whether to ship.
-export function offerIsLive(item: HasFields & { answer?: string }): boolean {
+export const offerIsLive = rememberedFor(offerStillOpen);
+function offerStillOpen(item: HasFields & { answer?: string }): boolean {
   const options = itemOptions(item);
   if (!options.length) return false;
   const field = optionsFrom(item);
@@ -235,6 +240,8 @@ export function offerIsLive(item: HasFields & { answer?: string }): boolean {
   const later: OptionsField[] = field === 'body' ? ['result'] : ['result', 'note'];
   const afterTheShip = isShippedNote(item.note) && !options.some((o) => asksToShip(o.text));
   if (later.some((f) => f !== field && writtenAt(item, f) > offered && !(f === 'note' && afterTheShip))) return false;
+  // Answered where the chat started (main/chat-follow.mts).
+  if ((item.wrote?.saidOutside?.ts ?? 0) > offered) return false;
   if (!item.answer || item.answer === '(withdrawn)') return true;
   // A teammate's words handed back answer them too: what is left is yours to say, not a pick.
   const spoke = item.wrote?.answer?.ts ?? 0;

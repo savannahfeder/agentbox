@@ -28,9 +28,12 @@ const row = (id, over = {}) => ({
   id, status: 'open', kind: 'task', labels: [], createdAt: NOW - 86_400_000, updatedAt: NOW - 86_400_000, ...over,
 });
 
-// The four real shapes from the screenshot's store, ids shortened.
-const engine = row('w-engine', { kind: 'refactor', parent: 'w-research' });
-const opencode = row('w-opencode', { kind: 'feature', parent: 'w-research' });
+// The four real shapes from the screenshot's store, ids shortened. The two
+// blockers are approved: one still waiting for a yes is not a wait that ends
+// by itself (a-thread-waiting-on-a-task-to-approve-is-in-needs-you).
+const approved = { answer: 'Approved. Run it.', wrote: { answer: { ts: NOW - 2000, source: 'founder' } } };
+const engine = row('w-engine', { kind: 'refactor', parent: 'w-research', ...approved });
+const opencode = row('w-opencode', { kind: 'feature', parent: 'w-research', ...approved });
 const parked = { wrote: { status: { ts: NOW - 1000, source: 'agent' } } };
 const hermes = row('w-hermes', { status: 'blocked', parent: 'w-research', blockedBy: ['w-engine', 'w-opencode'], result: 'Nothing new to do.', ...parked });
 const video = row('w-video', { status: 'blocked', kind: 'marketing', parent: 'w-research', blockedBy: ['w-opencode', 'w-hermes'], result: 'What do you want first?', ...parked });

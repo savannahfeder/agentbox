@@ -13,7 +13,7 @@ import { isProjectsOwnFile } from './store/paths.mts';
 import { approvalId, baseName, editedWords, familyName, familyOfName, filesInLines, marksOf, MAX_EDIT_BYTES, otherFilesInLines, otherKind, reviewKind, shownName, threadFiles, viewKind } from '../shared/artifact-marks.mts';
 import { saveNextVersion } from './file-version.mts';
 import { versionLine } from './version-line.mts';
-import { cleanFolderName, fileKeyIn, folderNamed, foldFolders, newFolderId, readFolderLog, writeFolderLog } from '../shared/file-folders.mts';
+import { cleanFolderName, fileKeyIn, folderLogStamp, folderNamed, foldFolders, newFolderId, readFolderLog, writeFolderLog } from '../shared/file-folders.mts';
 import { projectSeenBy } from '../shared/thread-cards.mts';
 import { shownTitle } from '../shared/thread-title.mts';
 import { FILE_HOME, isFileHome } from '../shared/file-home.mts';
@@ -167,6 +167,12 @@ async function untouched(src: string): Promise<boolean> {
   return (await fs.promises.readFile(src, 'utf8').catch(() => null)) === seed;
 }
 const FILES_FOR_AGENTS = 40;
+/** How long the folders made for agents answer while no folder or filing changes. */
+export const AGENTS_VIEW_KEPT_MS = 60_000;
+interface AgentFolder {
+  id: string; project: string | null; folder: string; inside?: string | null; more?: number;
+  files: { file: string; title?: string; path: string | null; versions: number; openComments: number; approved: boolean }[];
+}
 
 /**
  * Threads to files. A thread is `{ ref, title, project, lines }`, where `ref`
@@ -1049,15 +1055,24 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
 
   // Every change in the app asks for the list again. A list asked for while one
   // runs waits for it and reads once more, so they never pile up behind each other.
+  let agentsView: { log: string; held: CloudShelf; at: number; view: Promise<AgentFolder[]> } | null = null;
   let listing: Promise<FilesList> | null = null;
   let listAgain: Promise<FilesList> | null = null;
+  let lastMade: FilesList | null = null;
   function list(): Promise<FilesList> {
     if (!listing) {
-      listing = listOnce().finally(() => { listing = null; });
+      listing = listOnce().then((made) => { lastMade = made; return made; }).finally(() => { listing = null; });
       return listing;
     }
     listAgain ??= listing.catch(() => {}).then(() => { listAgain = null; return list(); });
     return listAgain;
+  }
+  /** The last list made, at once, for a page with nothing to draw yet; the fresh one arrives as a change. */
+  function listSoon(): Promise<FilesList> {
+    const had = lastMade;
+    if (!had) return list();
+    void list().then((fresh) => { if (JSON.stringify(fresh) !== JSON.stringify(had)) notify(); }, () => {});
+    return Promise.resolve(had);
   }
 
   async function listOnce(): Promise<FilesList> {
@@ -1111,8 +1126,9 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const shownIn = lib.folders.find((x) => x.id === (own ?? beside))?.project ?? project;
       const sizes = await sizesOf(f, roots);
       const title = lib.titleOf(f.key) ?? (filed ? lib.titleOf(filed.key) : null);
+      const icon = lib.iconOf(f.key) ?? (filed ? lib.iconOf(filed.key) : null);
       // A newest version in the cloud draws its poster, not an older version still here.
-      return { ...row, ...(title ? { title } : {}), project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: sizes.cloud ? null : await faceOf(f, products), ...sizes };
+      return { ...row, ...(title ? { title } : {}), ...(icon ? { icon } : {}), project: shownIn, folder: own ?? beside, ...(beside ? { folderFollows: true } : {}), opened: sizes.cloud ? null : await faceOf(f, products), ...sizes };
     })).then((all) => all.filter((f) => f.opened || f.cloud || (f.kind !== 'page' && f.kind !== 'code')));
     consider();
     const projects: string[] = [];
@@ -1160,6 +1176,7 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
 
   return {
     list,
+    listSoon,
 
     crossing,
 
@@ -1262,6 +1279,14 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       return { ok: true, title: clean };
     },
 
+    /** The icon a file's tile wears; empty gives it back the one Files picks. */
+    async setIcon({ key, icon, by = team?.state?.().me?.id ?? null }: { key: string; icon: string; by?: string | null }) {
+      const file = allFiles().find((f) => f.key === key);
+      if (!file) throw new Error('that file is gone');
+      writeFolderLog(logDir(), { op: 'icon', key, project: file.project, icon: String(icon).replace(/[^a-z-]/g, '').slice(0, 24), by, at: Date.now() });
+      return { ok: true };
+    },
+
     /** Copies of files from this computer, into the project's documents. A kind Files cannot show is left out and named. */
     async addFiles({ project, paths = [], folder = null, by = team?.state?.().me?.id ?? null }: { project: string; paths?: readonly string[]; folder?: string | null; by?: string | null }) {
       const { home, into } = whereNew(project, folder);
@@ -1296,10 +1321,21 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       return made;
     },
 
-    /** Folders and their files for an agent's team_read. A chat's file is left out: its owner decides who reads those. */
-    async forAgents() {
-      const { files, folders } = await this.list();
-      return folders.map((f) => {
+    /**
+     * Folders and their files for an agent's team_read. A chat's file is left out: its owner decides who reads those.
+     *
+     * The supervisor asks on every pass, and the list behind this looks every
+     * version of every thread's files up on disk. So it is made again when a
+     * folder or a filing changes, here or in the cloud, and otherwise once in
+     * AGENTS_VIEW_KEPT_MS: a thread's next file landing beside its others, or a
+     * file arriving without a word, shows that much later.
+     */
+    forAgents(): Promise<AgentFolder[]> {
+      crossSoon();
+      const log = folderLogStamp(logDir());
+      const had = agentsView;
+      if (had && had.log === log && had.held === held && Date.now() - had.at < AGENTS_VIEW_KEPT_MS) return had.view;
+      const view = list().then(({ files, folders }): AgentFolder[] => folders.map((f) => {
         const inside = files.filter((x) => x.folder === f.id && x.sentIn.some((s) => s.kind !== 'chat'));
         return {
           id: f.id, project: f.project, folder: f.name,
@@ -1309,7 +1345,11 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
           })),
           ...(inside.length > FILES_FOR_AGENTS ? { more: inside.length - FILES_FOR_AGENTS } : {}),
         };
-      });
+      }));
+      agentsView = { log, held, at: Date.now(), view };
+      // A list that failed is asked for again next time.
+      view.catch(() => { if (agentsView?.view === view) agentsView = null; });
+      return view;
     },
 
     /** The next version of a file, from any place that names it. `goes: 'sent'` is one still on its way to its owner. */
@@ -1503,7 +1543,10 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const waits: Promise<boolean>[] = [];
       const products = readable();
       const sharedIn = new Map<string | null, boolean>();
+      const line = lineNow();
       for (const whole of allFiles().filter((f) => f.chain.some((v) => v.copies.some((c) => c.thread.ref.product === product && c.thread.ref.id === id)))) {
+        // What the cloud holds is known by its hash: only such a file's versions are looked up on disk.
+        if (!line.hashesOf(whole.key).some((hash) => hash && keeper.off(hash))) continue;
         if (!sharedIn.has(whole.project)) sharedIn.set(whole.project, audienceOf(whole.project) !== 'private');
         const { chain } = await lineChain(whole, sharedIn.get(whole.project), products);
         for (const v of chain) if (v.hash && !v.opened && keeper.off(v.hash)) waits.push(keeper.bringBack(v.hash));

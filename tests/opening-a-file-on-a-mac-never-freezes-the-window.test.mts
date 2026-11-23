@@ -15,7 +15,10 @@ import path from 'node:path';
 import { openForThePerson, OPEN_MS } from '../main/opens-a-program.mts';
 
 type Call = [string, string[], { timeout: number }];
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'opens-'));
+// Resolved, because open is handed the checked real path and a Mac's temp folder is behind a link.
+const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'opens-')));
+// The Mac's own default app is not asked here: these are about how open is run.
+const noApp = async () => null;
 const file = (name: string, mode = 0o644) => { const p = path.join(dir, name); fs.writeFileSync(p, 'a,b\n1,2\n'); fs.chmodSync(p, mode); return p; };
 
 const electronShell = () => {
@@ -32,7 +35,7 @@ describe('a file opened on a Mac', () => {
     const shell = electronShell();
     const open = opener();
     const p = file('leads.csv');
-    expect(await openForThePerson(shell, p, { platform: 'darwin', run: open.run })).toBe('');
+    expect(await openForThePerson(shell, p, { platform: 'darwin', run: open.run, defaultApp: noApp })).toBe('');
     expect(open.calls).toEqual([['/usr/bin/open', [p], { timeout: OPEN_MS }]]);
     expect(shell.calls).toEqual([]);
   });
@@ -41,7 +44,7 @@ describe('a file opened on a Mac', () => {
     let started!: () => void;
     const open = opener(() => new Promise<void>((resolve) => { started = resolve; }));
     let done = false;
-    const opening = openForThePerson(electronShell(), file('slow.csv'), { platform: 'darwin', run: open.run }).then(() => { done = true; });
+    const opening = openForThePerson(electronShell(), file('slow.csv'), { platform: 'darwin', run: open.run, defaultApp: noApp }).then(() => { done = true; });
     await new Promise((r) => setImmediate(r));
     expect(open.calls).toHaveLength(1);
     expect(done).toBe(false);
@@ -57,15 +60,15 @@ describe('a file opened on a Mac', () => {
 
   it('says it failed when open refuses or runs out of time, as shell.openPath did', async () => {
     const refused = opener(async () => { throw new Error('No application knows how to open URL'); });
-    expect(await openForThePerson(electronShell(), file('x.unknownkind'), { platform: 'darwin', run: refused.run })).toBe('Failed to open path');
+    expect(await openForThePerson(electronShell(), file('x.unknownkind'), { platform: 'darwin', run: refused.run, defaultApp: noApp })).toBe('Failed to open path');
     const late = opener(async () => { throw Object.assign(new Error('timed out'), { killed: true, signal: 'SIGTERM' }); });
-    expect(await openForThePerson(electronShell(), file('late.csv'), { platform: 'darwin', run: late.run })).toBe('Failed to open path');
+    expect(await openForThePerson(electronShell(), file('late.csv'), { platform: 'darwin', run: late.run, defaultApp: noApp })).toBe('Failed to open path');
   });
 
   it('hands open a full path, so a name starting with a dash is never read as a flag', async () => {
     const open = opener();
     const p = file('-a');
-    await openForThePerson(electronShell(), path.relative(process.cwd(), p), { platform: 'darwin', run: open.run });
+    await openForThePerson(electronShell(), path.relative(process.cwd(), p), { platform: 'darwin', run: open.run, defaultApp: noApp });
     expect(open.calls[0][1]).toEqual([p]);
     expect(open.calls[0][1][0].startsWith('/')).toBe(true);
   });
@@ -74,14 +77,14 @@ describe('a file opened on a Mac', () => {
     const shell = electronShell();
     const open = opener();
     const p = file('notes.command', 0o755);
-    expect(await openForThePerson(shell, p, { platform: 'darwin', run: open.run })).toBe('');
+    expect(await openForThePerson(shell, p, { platform: 'darwin', run: open.run, defaultApp: noApp })).toBe('');
     expect(open.calls).toEqual([]);
     expect(shell.calls).toEqual([['finder', p]]);
   });
 
   it('opens nothing from a copy whose shell cannot open files, as before', async () => {
     const open = opener();
-    expect(await openForThePerson({ showItemInFolder: () => {} }, file('quiet.csv'), { platform: 'darwin', run: open.run })).toBe('');
+    expect(await openForThePerson({ showItemInFolder: () => {} }, file('quiet.csv'), { platform: 'darwin', run: open.run, defaultApp: noApp })).toBe('');
     expect(open.calls).toEqual([]);
   });
 });

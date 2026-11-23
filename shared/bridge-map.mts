@@ -222,6 +222,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   sessionTrace: 'zero:session-trace',
   itemHistory: 'zero:item-history',
   openArtifact: 'zero:open-artifact',
+  openWith: 'zero:open-with',
   folderPictures: 'zero:folder-pictures',
   readDoc: 'zero:read-doc',
   fileLink: 'zero:file-link',

@@ -92,6 +92,8 @@ export function installStrayLetters(win: Window = window, replay: Replay = copyK
     if (replayed.has(e)) return;
     const now = Date.now();
     const chord = e.metaKey || e.ctrlKey || e.altKey;
+    // A second Z while the first waits is the same press said twice, not a word.
+    if (held && !chord && (e.key === 'z' || e.key === 'Z') && !editable(e.target)) { e.stopImmediatePropagation(); e.preventDefault(); return; }
     if (held && !MODIFIERS.includes(e.key)) {
       clearTimeout(held);
       held = null;

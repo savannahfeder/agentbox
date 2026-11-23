@@ -116,35 +116,35 @@ describe('when it starts over', () => {
 
 describe('the reading beside it', () => {
   it('never counts seconds', () => {
-    expect(untilReset(0)).toBe('any moment');
-    expect(untilReset(41_000)).toBe('any moment');
-    expect(untilReset(59_999)).toBe('any moment');
+    expect(untilReset(0)).toBe('resets any moment');
+    expect(untilReset(41_000)).toBe('resets any moment');
+    expect(untilReset(59_999)).toBe('resets any moment');
   });
 
   it('reads in whole minutes, then in hours', () => {
-    expect(untilReset(60_000)).toBe('1m left');
-    expect(untilReset(92 * 60_000)).toBe('1h 32m left');
-    expect(untilReset(59 * 60_000)).toBe('59m left');
+    expect(untilReset(60_000)).toBe('resets in 1m');
+    expect(untilReset(92 * 60_000)).toBe('resets in 1h 32m');
+    expect(untilReset(59 * 60_000)).toBe('resets in 59m');
   });
 
   // The session limit never runs this long and the weekly ones always do. The
   // first version stopped at hours and read "71h 12m left" on a week, which is
   // a number a person has to do arithmetic on before it means anything.
   it('reads a weekly allowance in days rather than in seventy hours', () => {
-    expect(untilReset(71 * 3_600_000 + 12 * 60_000)).toBe('2d 23h left');
-    expect(untilReset(48 * 3_600_000)).toBe('2d left');
-    expect(untilReset(25 * 3_600_000)).toBe('1d 1h left');
-    expect(untilReset(23 * 3_600_000)).toBe('23h 0m left');
+    expect(untilReset(71 * 3_600_000 + 12 * 60_000)).toBe('resets in 2d 23h');
+    expect(untilReset(48 * 3_600_000)).toBe('resets in 2d');
+    expect(untilReset(25 * 3_600_000)).toBe('resets in 1d 1h');
+    expect(untilReset(23 * 3_600_000)).toBe('resets in 23h 0m');
   });
 
   it('never reads backwards from a limit that has already reset', () => {
-    expect(untilReset(-5 * 60_000)).toBe('any moment');
+    expect(untilReset(-5 * 60_000)).toBe('resets any moment');
   });
 });
 
 describe('what the pill says', () => {
-  it('is the percent used and the time left, which is what he asked for', () => {
-    expect(pillText(readUsage(REAL, NOW, ZONE), NOW)).toEqual({ used: '40%', when: '1h 32m left' });
+  it('is the percent used and when it resets, which is what he asked for', () => {
+    expect(pillText(readUsage(REAL, NOW, ZONE), NOW)).toEqual({ used: '40%', when: 'resets in 1h 32m' });
   });
 
   // A pill that says it does not know is worse than no pill, so nothing is drawn
@@ -177,9 +177,9 @@ describe('the whole sentence', () => {
   // cannot say it two ways.
   it('says all three, in her words', () => {
     expect(usageSentence(readUsage(REAL, NOW, ZONE), NOW)).toBe(
-      'This session: 40% used, 1h 32m left. '
-      + 'This week: 10% used, 2d 23h left. '
-      + 'This week, Fable: 5% used, 2d 23h left.',
+      'This session: 40% used, resets in 1h 32m. '
+      + 'This week: 10% used, resets in 2d 23h. '
+      + 'This week, Fable: 5% used, resets in 2d 23h.',
     );
   });
 

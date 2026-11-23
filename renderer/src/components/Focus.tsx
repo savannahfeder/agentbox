@@ -143,6 +143,7 @@ import { useKeepInWindow } from '../keep-in-window';
 import { escapeClosesMenu } from '../menu-escape';
 import { isUpdateRow } from '../update-row';
 import { TeamRouteStrip, teamHeld } from '../team/TeamFocus';
+import { SendBack } from '../team/SendBack';
 import { HandedLine } from '../team/HandedBy';
 import {
   PriorityPicker, priorityIdOf, priorityValueOf, type PriorityId,
@@ -1524,7 +1525,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         const value = String(children ?? '');
         if (!className && ticketReference(value)) return <code>{children}</code>;
         const source = !className && sourceReference(value);
-        if (source) return <ArtifactLink kind="code" product={product} src={source} fallback={resolveSrc(source)} onOpen={(click, from) => openHref(source, from, click)}>{mentionName(value)}</ArtifactLink>;
+        if (source) return <ArtifactLink kind="code" product={product} src={source} fallback={resolveSrc(source)} onOpen={(click, from) => openHref(source, from, click)}>{mentionName(shortPath(value.trim(), null, taskFolder(repoDir, item.id)) ?? value)}</ArtifactLink>;
         // Written out in full into this product's folder, or the thread's own,
         // counts as the short path it names, as a full path in a sentence does.
         const shown = value.trim();
@@ -2637,6 +2638,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               Unless they wrote options of their own, which are the better
               answers to their question and are drawn instead. */}
           {!stripShown && <TeamRouteStrip item={item} onHandToAgent={onHandToAgent} items={items} onOpenItem={onOpenItem} />}
+          {/* An agent thread started from a teammate's work: its new version goes back to them. */}
+          <SendBack item={item} items={items ?? []} />
           {/* THE OPTIONS ARE NOT DOWN HERE ANY MORE, EXCEPT IN FULL SCREEN
               (w-560647d4db). They are drawn in the pane, at the foot of the turn
               that offered them, and the note at that call site says why.

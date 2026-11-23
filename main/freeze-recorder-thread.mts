@@ -5,7 +5,9 @@
 // kept too, because a freeze can start before a rotation and end after it.
 import { Session } from 'node:inspector';
 import { parentPort, workerData } from 'node:worker_threads';
-import { freezeFrom, writeFreeze } from './freeze-recorder.mts';
+import fs from 'node:fs';
+import path from 'node:path';
+import { busyFrom, freezeFrom, writeBusy, writeFreeze, CPU_ASK } from './freeze-recorder.mts';
 import type { CpuProfile, FreezeLine } from './freeze-recorder.mts';
 
 interface FreezeWorkerData {
@@ -39,18 +41,64 @@ let previous: StoppedProfile | null = null; // { profile, offsetUs } of the last
 const seen: { fromUs: number; toUs: number }[] = [];     // freezes ended and not yet cut out of a profile
 let busy = false;
 
+// WHAT THE THREAD IS BUSY WITH WHEN IT IS NOT STUCK: the stretch just profiled,
+// written every quarter of an hour and whenever the ask file is there, so a
+// thread busy all day in pieces too short to be a freeze can be read too.
+const CPU_EVERY_MS = 15 * 60_000;
+let cpuAt = Date.now();
+function noteBusy(profiles: StoppedProfile[]) {
+  try {
+    const ask = path.join(dir, CPU_ASK);
+    const asked = fs.existsSync(ask);
+    if (!asked && Date.now() - cpuAt < CPU_EVERY_MS) return;
+    const read = busyFrom(profiles, { appDir });
+    // A turn right after a start or a freeze covers a moment: wait for a fuller one.
+    if (read.ms < rotateMs / 2) return;
+    cpuAt = Date.now();
+    // The ask goes first, so a line that cannot be written is not tried every turn.
+    if (asked) fs.rmSync(ask, { force: true });
+    writeBusy(dir, { at: new Date().toISOString(), ...read });
+  } catch { /* the freeze log matters more than this line */ }
+}
+
+// A profile starting while none runs walks the whole heap on the main thread
+// (625 ms at 900 MB), so the next one always starts before the last ends.
+// Only console profiles nest; Profiler.start does not.
+let title = '';
+let count = 0;
+const finished = new Map<string, (profile: CpuProfile) => void>();
+session.on('Profiler.consoleProfileFinished', ({ params }) => {
+  const { title: done, profile } = params as { title: string; profile: CpuProfile };
+  finished.get(done)?.(profile);
+  finished.delete(done);
+});
+const consoleCall = (call: string, of: string) => post('Runtime.evaluate', { expression: `console.${call}(${JSON.stringify(of)})`, silent: true });
+const END_WAIT_MS = 10_000;
+
 async function start() {
+  title = `freeze-recorder-${(count += 1)}`;
   const before = nowUs();
-  await post('Profiler.start');
+  await consoleCall('profile', title);
   running = { anchorUs: (before + nowUs()) / 2 };
 }
 
+async function end(of: string) {
+  const profile = new Promise<CpuProfile>((resolve, reject) => {
+    const timer = setTimeout(() => { finished.delete(of); reject(new Error(`the profile ${of} never came back`)); }, END_WAIT_MS);
+    finished.set(of, (p) => { clearTimeout(timer); resolve(p); });
+  });
+  await consoleCall('profileEnd', of);
+  return profile;
+}
+
 async function rotate() {
-  const { profile } = await post<{ profile: CpuProfile }>('Profiler.stop');
-  const stopped: StoppedProfile = { profile, offsetUs: profile.startTime - running!.anchorUs };
+  const [old, anchorUs] = [title, running!.anchorUs];
   await start();
+  const profile = await end(old);
+  const stopped: StoppedProfile = { profile, offsetUs: profile.startTime - anchorUs };
   const profiles = [previous, stopped].filter(Boolean) as StoppedProfile[];
   previous = stopped;
+  noteBusy(profiles);
   for (const f of seen.splice(0)) {
     const read = freezeFrom(profiles, { fromUs: f.fromUs, toUs: f.toUs, appDir });
     if (read.busy < BUSY_ENOUGH) continue;

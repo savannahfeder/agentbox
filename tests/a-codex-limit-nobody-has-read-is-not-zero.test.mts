@@ -79,7 +79,7 @@ describe('reading what the app-server reported', () => {
   it('reads the reset as an instant in seconds, not in milliseconds', () => {
     expect(codexLimits(HERS)[0].resetsAt).toBe(1788573509 * 1000);
     expect(usageSentence(codexLimits(HERS), NOW)).toBe(
-      'This session: 33% used, 2h 8m left. This week: 63% used, 2d 16h left.',
+      'This session: 33% used, resets in 2h 8m. This week: 63% used, resets in 2d 16h.',
     );
   });
 
@@ -103,7 +103,7 @@ describe('reading what the app-server reported', () => {
     // window, the weekly one: every window 10080 minutes and `secondary` never
     // populated. A whole week would have been drawn as an afternoon, on a day
     // it was at 100% used.
-    expect(usageSentence([window], NOW)).toBe('This week: 0% used, 7d left.');
+    expect(usageSentence([window], NOW)).toBe('This week: 0% used, resets in 7d.');
   });
 
   // NO CLAUDE CODE VOCABULARY OVER A CODEX READING. "This week, Fable" is a

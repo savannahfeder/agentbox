@@ -4,7 +4,7 @@ import {updateFixture} from './agent-update-fixture';
 // bridge; fixtures mode (?fixtures=1) serves canned data so the UI can be
 // developed, reviewed, and screenshotted without a live store or any agents.
 
-import type { Person, PictureIn, TeamBillingDetails } from './types';
+import type { AppsThatOpen, Person, PictureIn, TeamBillingDetails } from './types';
 import type { AccountUsageReading, AgentConversation, AgentUpdate, AgentUpdateAction, ArtifactMark, ConnectAnswer, ConnectAsk, ConnectionsList, ConnectionTile, CopyAct, CloudPlan, AnswerMode, CodexModeId, DemoOpened, FileFolderAct, FolderListing,FreshUser, PermissionMode, PhoneLink, PhoneRoute, ProductDashboard, ProjectSettings, RepeatRule, RepeatShape, RoomsResult, Settings, Snapshot, TeammatesResult, TeamCallResult, TeammateThreadWork, TerminalAction, TerminalAnswer, TerminalAsk, FoundInThreads, FileElsewhere, FileLine, FilesPlaceList, FilesPlaceView, FilesUploaded, FilesTrashed, FilesCloudStatus, TeamMessageFile, ThreadEditPatch, LiveRoomTicket, UpdateState, Usage, UsageLimit, WorkItem, WorkspaceSettings } from './types';
 import type { LedgerLine } from './thread-history';
 import type { NotePlace } from '../../shared/artifact-marks.mts';
@@ -65,6 +65,7 @@ import { withoutFileHomes } from '../../shared/file-home.mts';
 import { installBrowserBridge } from './browser-bridge';
 import { installCloudBridge } from './cloud-bridge';
 import { onASharedFilePage } from './shared-file/route';
+import { shownSnapshots } from './shown-snapshot';
 
 // The Mac's own page first; the phone with the Mac shut only on its own site.
 // A shared file's page is neither: it is for people with no app at all.
@@ -81,6 +82,8 @@ async function teamCall(fn: () => Promise<TeamCallResult>): Promise<TeamCallResu
 // The inbox and the open threads' agent logs as last answered, so each read
 // asks only for what changed since.
 const snapshots = snapshotReader();
+// A document's holder thread is the app's, so no list of threads draws it.
+const shown = shownSnapshots<Snapshot['items'][number], Snapshot>(withoutFileHomes);
 const traces = traceReader();
 // Which thread is on screen: only its agent's live detail is sent.
 let openThread: { product: string | null; id: string } | null = null;
@@ -214,6 +217,16 @@ if (params.get('codexaccounts') === 'two' && fixtureSettingsState.workspace.code
     { profile: 'codex-2', email: 'you@example.com', name: null, plan: 'Plus', accountId: null, signedIn: true, chosen: false },
   ];
 }
+// With ?engines=codex: &localonly is this Mac's one Codex login and none in the
+// cloud; &cloudday is that login at its week's limit (use with &cloudcodex).
+const CLOUDDAY_RESET = Date.now() + 2.5 * 86_400_000;
+if ((params.has('localonly') || params.has('cloudday')) && fixtureSettingsState.workspace.codex) {
+  const limited = params.has('cloudday') ? { atLimit: true, limitResetsAt: CLOUDDAY_RESET, limitAt: Date.now() - 600_000 } : {};
+  fixtureSettingsState.workspace.codex.accounts = [
+    { profile: 'default', email: 'you@example.com', name: null, plan: 'Plus', accountId: null, signedIn: true, chosen: true, ...limited },
+  ];
+  if (params.has('cloudday')) fixtureSettingsState.workspace.codex.trouble = 'Codex is at its usage limit, so its tasks are waiting. They start again on their own when it resets.';
+}
 if (params.has('codextrouble') && fixtureSettingsState.workspace.codex) {
   fixtureSettingsState.workspace.codex.trouble = `Codex sessions are dying on arrival, so its tasks are not moving. ${NAME} keeps trying.`;
 }
@@ -320,6 +333,14 @@ function fixtureAccountUsage(): AccountUsageReading[] {
 
 // &codexaccounts=two: the Plus login not in use has its own session and week.
 function fixtureCodexAccountUsage(): AccountUsageReading[] {
+  if (params.has('localonly') || params.has('cloudday')) {
+    const now = Date.now();
+    const full = params.has('cloudday');
+    const window = (span: 'session' | 'week', percent: number, resetsAt: number) => ({
+      span, qualifier: null, name: span === 'session' ? 'This session' : 'This week', percent, resetsText: null, resetsOn: null, resetsAt, zone: null,
+    });
+    return [{ profile: 'default', at: now - 120_000, limits: [window('session', full ? 0 : 18, now + 3 * 3_600_000), window('week', full ? 100 : 31, full ? CLOUDDAY_RESET : now + 4 * 86_400_000)] }];
+  }
   if (params.get('codexaccounts') !== 'two') return [];
   const now = Date.now();
   const window = (span: 'session' | 'week', percent: number, resetsAt: number) => ({
@@ -659,8 +680,6 @@ export const api = {
       }
       return codexOut(withEngines(base));
     }
-    // A document's holder thread is the app's, so no list of threads draws it.
-    const shown = (s: Snapshot) => ({ ...s, items: withoutFileHomes(s.items) });
     const got = snapshots.take(await window.zero!.snapshot({ ...snapshots.ask(), open: openThread }));
     if (got) return shown(got);
     // Built on a list this window no longer holds: a whole one, which take() never refuses.
@@ -931,10 +950,18 @@ export const api = {
 
   // Hand a file to the operating system, the way every link on a card already
   // does. The pane's first mark, and what a png or a pdf still does.
-  async openArtifactExternally(p: { product: string; src: string; thread?: string }): Promise<{ ok: boolean; error?: string }> {
+  // `app` opens it in one of the apps `appsThatOpen` listed; `reveal` shows it in Finder.
+  async openArtifactExternally(p: { product: string; src: string; thread?: string; app?: string; reveal?: boolean }): Promise<{ ok: boolean; error?: string }> {
     const zero = window.zero;
     if (!zero?.openArtifact) { window.open(p.src, '_blank'); return { ok: true }; }
-    return zero.openArtifact(p);
+    const { reveal, ...ask } = p;
+    return zero.openArtifact(reveal ? { ...ask, mode: 'reveal' } : ask);
+  },
+
+  // The open mark's menu. The phone's door has no such channel and throws, which reads as no list.
+  async appsThatOpen(p: { product: string; src: string; thread?: string }): Promise<AppsThatOpen> {
+    try { return (await window.zero?.openWith?.(p)) ?? { ok: false, apps: [] }; }
+    catch { return { ok: false, apps: [] }; }
   },
 
   // Everything that happened on one task: the raw ledger lines, which the
@@ -1005,7 +1032,7 @@ export const api = {
   // once instead of after it (main/claude-input.mts `interrupt`).
   // `inReplyTo` is the uid of the message a reply in a thread answers
   // (w-920461cbe6); main keeps it only in a conversation between people.
-  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean; reopenAs?: WasBeforeClose }): Promise<WorkItem | null> {
+  async answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: AnswerMode | null; engine?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean; reopenAs?: WasBeforeClose; reopen?: boolean }): Promise<WorkItem | null> {
     if (useFixtures) return null;
     return window.zero!.answer(p);
   },
@@ -1099,8 +1126,9 @@ export const api = {
   async connectionsCheck(p: { id: string }): Promise<ConnectionTile | null> { return (await window.zero?.connectionsCheck?.(p).catch(() => null)) ?? null; },
   async connectionsDisconnect(p: { id: string }): Promise<void> { await window.zero?.connectionsDisconnect?.(p); },
   async connectionsAccept(p: { id: string }): Promise<void> { await window.zero?.connectionsAccept?.(p); },
-  async filesPlace(): Promise<FilesPlaceList> {
-    return (await window.zero?.filesPlace?.().catch(() => null)) ?? { files: [], projects: [], folders: [] };
+  /** `soon`: the last list made, at once, for a page with nothing to draw yet. */
+  async filesPlace(opts?: { soon?: boolean }): Promise<FilesPlaceList> {
+    return (await window.zero?.filesPlace?.(opts).catch(() => null)) ?? { files: [], projects: [], folders: [] };
   },
   async filesPlaceFolder(p: FileFolderAct): Promise<{ ok: boolean; error?: string; folder?: string | null; ids?: string[] }> {
     if (!window.zero?.filesPlaceFolder) return { ok: false, error: `quit and reopen ${NAME} to use folders` };
