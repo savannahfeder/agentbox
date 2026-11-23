@@ -335,6 +335,21 @@ export const ENGINES = {
       ]),
     },
   }),
+
+  /**
+   * OpenCode is optional, as Codex is. Its installer puts the binary in
+   * `~/.opencode/bin`; a Homebrew or npm install is found by the shell.
+   */
+  opencode: engine({
+    bin: 'opencode',
+    name: 'OpenCode',
+    installUrl: 'https://opencode.ai/docs',
+    ownPaths: (home) => [path.join(home, '.opencode/bin/opencode')],
+    evidence: (home) => [
+      path.join(home, '.local/share/opencode'),  // its sessions and sign-ins
+      path.join(home, '.config/opencode'),
+    ],
+  }),
 };
 
 export type EngineKey = keyof typeof ENGINES;

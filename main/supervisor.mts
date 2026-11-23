@@ -163,7 +163,7 @@ import { effortLabel, isEffort, isEffortWord } from '../shared/effort-levels.mts
 import {
   engineFor, engineLabel, engineChoiceSince, engineChoiceOnRowIsStale,
   availableEngines, isEngine, modelForEngine, homeEngine,
-  ENGINE_CHOICE_ENABLED, DEFAULT_ENGINE, DEFAULT_CLAUDE_MODEL, ENGINE_IDS,
+  ENGINE_CHOICE_ENABLED, DEFAULT_ENGINE, DEFAULT_CLAUDE_MODEL, ENGINE_IDS, ENGINES,
 } from '../shared/engines.mts';
 import { createCodexAppServer } from './codex-app-server.mts';
 import { CLAUDE_MODELS } from '../shared/claude-models.generated.mts';
@@ -6642,7 +6642,7 @@ export class Supervisor {
    */
   _capacityFor(engine: string) {
     const which = engineOf(engine);
-    if (!this.engineChoices().some((e) => e.id === which)) return 0;
+    if (!this.enginesHere().some((e) => e.id === which)) return 0;
     const perLogin = this._slotsPerAccount(which) * this._liveProfilesFor(which).length;
     // A NUMBER FOR THE WHOLE COMPUTER IS RUN EXACTLY (w-ec27ff1a51). Shared out
     // a login at a time it rounds up, so 7 on two logins is four and four, and
@@ -7655,7 +7655,7 @@ export class Supervisor {
   _whyNoRoom(engine: string, item: WorkItem) {
     const which = engineOf(engine);
     if (this._localSlotFor(which)) return this._waitsForCloud(item, which) ? 'cloud' : 'memory';
-    if (!this.engineChoices().some((e) => e.id === which)) return 'engine';
+    if (!this.enginesHere().some((e) => e.id === which)) return 'engine';
     if (!this._liveProfilesFor(which).length) return 'login';
     if (which === DEFAULT_ENGINE && this._spawnBraked()) return 'brake';
     return 'slot';
@@ -10367,7 +10367,7 @@ export class Supervisor {
   // it did. It is here for the two resume paths only: a session belongs to the
   // harness that wrote it, and a thread id handed to the wrong CLI dies on
   // arrival with "No conversation found with session ID".
-  spawnPlan(item: WorkItem, product: Product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE, shipFailure = null, switched = false, movedHere = false, cloudNote = null }: { continuation?: boolean; resumeSessionId?: string | null; engine?: string; shipFailure?: string | null; switched?: boolean; movedHere?: boolean; cloudNote?: string | null } = {}): SpawnPlan {
+  spawnPlan(item: WorkItem, product: Product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE, shipFailure = null, switched = false, movedHere = false, cloudNote = null, cloud = false }: { continuation?: boolean; resumeSessionId?: string | null; engine?: string; shipFailure?: string | null; switched?: boolean; movedHere?: boolean; cloudNote?: string | null; cloud?: boolean } = {}): SpawnPlan {
     // A ROW'S OWN CHAT. Her reply on a row goes back to the session that wrote
     // what she is replying to. Four guards, and each one falls back to the old
     // behaviour rather than to anything worse:
@@ -10480,8 +10480,9 @@ export class Supervisor {
     if (earlyConflict) prompt = `${prompt}\n\n${earlyConflict}`;
     // WHAT HAPPENS TO WHAT IT LEAVES RUNNING, when that switch is on
     // (main/leftovers.mts): the rule, and the programs of this task still
-    // shutting down, which it must not reuse.
-    const leftoverNote = this.leftoverBriefNote(item);
+    // shutting down, which it must not reuse. Not in the cloud, whose machine
+    // goes with the run (main/cloud/run.mts `LIVE_NOTE`).
+    const leftoverNote = cloud ? null : this.leftoverBriefNote(item);
     if (leftoverNote) prompt = `${prompt}\n\n${leftoverNote}`;
     if (cloudNote) prompt = `${prompt}\n\n${cloudNote}`;
     // A request the cloud handed back (`_toldItMoved`).
@@ -11194,6 +11195,15 @@ export class Supervisor {
    * no second boolean anywhere that could disagree with it.
    */
   engineChoices() {
+    // Claude Code and Codex only. Everything drawn off this list (Settings, the
+    // usage corner, the cloud menu, small calls) was written for those two; a
+    // further harness is in `enginesHere` and reaches the screens as its own
+    // list (`engineFacts().further`).
+    return this.enginesHere().filter((e) => e.id === 'claude' || e.id === 'codex');
+  }
+
+  /** Every harness a thread may run on here: the two above, and any further one on offer whose binary was found. */
+  enginesHere() {
     // A Mac with only Codex is offered Codex whether or not the gate is open:
     // one engine is not a choice, so there is nothing for the gate to hold.
     if (this._homeEngine() !== DEFAULT_ENGINE) return availableEngines(this._enginesFound());
@@ -11215,7 +11225,12 @@ export class Supervisor {
     // come from the sign-in check (main/engine-setup.mts); until it has
     // answered, nothing moves.
     const claudeSignedOut = this.config.claudeSignedIn === false && codex && this.config.codexSignedIn === true && !this._addedClaudeSignedIn();
-    return { claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
+    // Any further harness on offer is here when its binary was found (main/config.mts).
+    const others: Record<string, boolean> = {};
+    for (const { id } of ENGINES) {
+      if (id !== 'claude' && id !== 'codex') others[id] = !!harnessFor(id).binary(this.config);
+    }
+    return { ...others, claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
   }
 
   /** The launch check only asks the default login, so a signed-in added account must be counted here. */
@@ -11277,15 +11292,21 @@ export class Supervisor {
    */
   engineFacts(items: WorkItem[] = []) {
     const choices = this.engineChoices();
+    // A further harness, with its model list, which only it knows. Its own
+    // list, so nothing written for the two above meets a third.
+    const further = this.enginesHere()
+      .filter((e) => !choices.some((c) => c.id === e.id))
+      .map((e) => ({ ...e, models: harnessFor(e.id).models({ sup: this }) as { id: string; label: string }[] }));
     const workspace = this._engineFor(null);
     const byItem: Record<string, string> = {};
-    if (choices.length > 1) {
+    if (choices.length + further.length > 1) {
       for (const item of items) {
         const engine = this._engineFor(item);
         if (engine !== workspace) byItem[item.id] = engine;
       }
     }
-    return { choices, workspace, byItem };
+    // Absent rather than empty, so a computer with no further harness is told exactly what it always was.
+    return { choices, ...(further.length ? { further } : {}), workspace, byItem };
   }
 
   /**
@@ -11363,7 +11384,7 @@ export class Supervisor {
    */
   engineOffered(engine: unknown): string | null {
     if (!isEngine(engine)) return null;
-    if (!this.engineChoices().some((e) => e.id === engine)) return null;
+    if (!this.enginesHere().some((e) => e.id === engine)) return null;
     return engine === this._engineFor(null) ? null : engine as string;
   }
 
@@ -12243,6 +12264,27 @@ export class Supervisor {
     return this._codexCards?.changed(id, shown) ?? false;
   }
 
+  /**
+   * ONE WORKER'S CARDS, for an engine whose approval requests arrive inside
+   * this process (main/harnesses/acp.mts). They are the same in-process cards
+   * Codex's are, so the one answering door settles them and nothing new reads
+   * an answer off the disk. The adapter closes them when its worker exits.
+   */
+  approvalCardsFor(item: Pick<WorkItem, 'id' | 'product'>, say: (line: string) => unknown) {
+    const scope = this._codexApprovals().scope({ product: item.product, item: item.id, say });
+    let changes = 0;
+    return {
+      command: async (command: string, cwd: string | null) => await scope.handle('item/commandExecution/requestApproval', { command, cwd }) === 'accept',
+      // The card for a file change is drawn from the change itself, which this vocabulary sends first.
+      edit: async (files: { path: string; kind: 'add' | 'update' | 'delete'; diff: string }[]) => {
+        const itemId = `change-${changes += 1}`;
+        scope.remember('item/started', { item: { type: 'fileChange', id: itemId, changes: files.map((file) => ({ path: file.path, kind: { type: file.kind }, diff: file.diff })) } });
+        return await scope.handle('item/fileChange/requestApproval', { itemId }) === 'accept';
+      },
+      close: (why?: string) => scope.close(why),
+    };
+  }
+
   // A loaded app-server thread holds Codex's writer lock even after its turn
   // finishes. Closing an idle account returns its sessions to the native CLI.
   _releaseIdleCodex(profile: string = 'default') {
@@ -12461,7 +12503,7 @@ export class Supervisor {
     }
 
     const cloudNote = where === 'local' ? this._cloudNoteForHere(item, product, cwd, engine) : null;
-    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine, shipFailure, switched, movedHere: this._toldItMoved(item, where), cloudNote });
+    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine, shipFailure, switched, movedHere: this._toldItMoved(item, where), cloudNote, cloud: where === 'cloud' });
     const { args } = plan;
     // Why it runs locally, where a branch below says so rather than `_whyLocal`.
     let whyLocal: WhyLocal | null = null;
@@ -13786,7 +13828,7 @@ export class Supervisor {
     const fresh = product ? this.store.readItem?.(item.product, item.id) ?? item : null;
     if (!fresh) return;
     const engine = engineOf(session?.engine);
-    const plan = this.spawnPlan({ ...fresh, answer: REPLY_MARK, status: 'open', wrote: { ...(fresh.wrote ?? {}), answer: { ts: Date.now(), source: 'founder' } } }, product!, { continuation: true, engine });
+    const plan = this.spawnPlan({ ...fresh, answer: REPLY_MARK, status: 'open', wrote: { ...(fresh.wrote ?? {}), answer: { ts: Date.now(), source: 'founder' } } }, product!, { continuation: true, engine, cloud: true });
     const frame = plan.command ? null : replyFrame(plan.prompt);
     if (!frame) return;
     const profile = plan.resumeProfile ?? session.profile;
@@ -13889,7 +13931,7 @@ export class Supervisor {
   }
 
   _writeClaudeNewThreadKit({ slug, stub, product, root, defaultEngine, rec, plain }: NewKitCtx) {
-    const plan = this.spawnPlan(stub, product!, { continuation: false, engine: 'claude' });
+    const plan = this.spawnPlan(stub, product!, { continuation: false, engine: 'claude', cloud: true });
     if (plan.command || plan.resumeId) return;
     const frame = replyFrame(this.replyBrief({ ...stub, answer: REPLY_MARK }, { product }));
     if (!frame) return;
@@ -13915,7 +13957,7 @@ export class Supervisor {
   // names marked) with the turn's own settings, and its brief. Her title and
   // body go only into the first turn, so a start that carried them is none.
   _writeCodexNewThreadKit({ slug, stub, product, root, defaultEngine, rec, plain }: NewKitCtx) {
-    const plan = this.spawnPlan(stub, product!, { continuation: false, engine: 'codex' });
+    const plan = this.spawnPlan(stub, product!, { continuation: false, engine: 'codex', cloud: true });
     if (plan.command || plan.resumeId || plan.reviewTarget) return;
     const frame = replyFrame(this.replyBrief({ ...stub, answer: REPLY_MARK }, { product }));
     if (!frame) return;
@@ -14718,7 +14760,8 @@ export class Supervisor {
     // AGENTBOX_KEEP=1 is still honoured but no longer asked for: the task's
     // rule decides what stays, not the agent's guess about what is needed.
     if (cleaner.enabled) {
-      parts.push('Anything you leave running after your turn (a dev server, a preview, a background job) keeps running while this task is open and is stopped when the person closes it, or sooner if this computer runs critically short of memory. '
+      parts.push('Anything you leave running after your turn (a dev server, a preview) keeps running while this task is open and is stopped when the person closes it, or sooner if this computer runs critically short of memory. '
+        + 'Start what the person will use so it outlives your turn, `nohup <command> > <log file> 2>&1 &`, not as a background job of your own (run_in_background): your answer waits until those end, and they end with your session. '
         + 'Stop anything you started that the person will not need before you finish.');
     }
     const stopping = cleaner.stoppingNote(item.id);

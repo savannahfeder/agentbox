@@ -122,6 +122,7 @@ describe('in the app', () => {
   });
 
   it('keeps View and filters over every board, not only yours', () => {
-    expect(app).toContain("filters={!roomShown && (!evOn || evKey === 'me' || !!evBoardEl)}");
+    // Only your AI teammate's page, which shows no board, gives the corner to its own ⋯.
+    expect(app).toContain("filters={!mateCorner && !roomShown && (!evOn || evKey === 'me' || !!evBoardEl)}");
   });
 });
