@@ -181,13 +181,14 @@
 .th-table .row { min-height: 0; }
 /* A thread row far off screen is skipped until it comes near, so the sidebar
    sliding open, which narrows every row on every frame, lays out and paints
-   only the rows in view. A row is 54px tall, which holds its place meanwhile.
-   Not in the phone layout (phone.css), which has no sliding sidebar and rows
-   of more than one height. */
+   only the rows in view. A two-line row is 75px tall, which holds its place
+   meanwhile. Not in the phone layout (phone.css), which has no sliding sidebar
+   and rows of more than one height. */
 @media (min-width: 701px) and (min-height: 521px) {
-  .th-table .row[data-item-id] { content-visibility: auto; contain-intrinsic-size: auto 54px; }
+  .th-table .row[data-item-id] { content-visibility: auto; contain-intrinsic-size: auto 75px; }
 }
 .th-grid > div { line-height: 20px; }
+
 .th-grid.with-person { --th-proj: 140px; --th-person: 130px; }
 /* A column no row of the table fills is not drawn, header included. */
 .th-table:has(.th-head):not(:has(.th-cell-state:not(:empty))) .th-grid { --th-state: initial; }
@@ -677,3 +678,44 @@ body:has(.tm-tab[data-clicked]:hover) .hint-plate { display: none !important; }
 .th-mate .tq { border: 0; background: var(--mate-tint); color: #2b2a33; font-weight: 600; }
 /* A box, not a run of text, so the face centres on the title rather than sitting on a baseline. */
 .th-mate { display: inline-flex; }
+
+/* TWO LINES A THREAD (w-6714ad1360), picked over nine rounds of pictures: the
+   title, and under it what came back, led by who said it. One 24px face per
+   row whose top is the top of the title's capitals, and the cells centred on
+   the two lines. The phone keeps its own rows, so all of it is the desktop's.
+   Every number was measured on the built page at 2.4 pixels a point, by the
+   first row of ink of each face, letter and cell. */
+.th-line { display: none; }
+@media (min-width: 701px) and (min-height: 521px) {
+  /* The rows end where the header's last button ends. */
+  .list.th-table { --row-r: 28px; --face-ring: color-mix(in srgb, var(--text) 8%, transparent); }
+  .th-table .row:not(.th-head) { padding-top: 17px; padding-bottom: 17px; }
+  /* The select box's middle on the middle of the title's capitals. */
+  .th-table .row:not(.th-head) > .mark { top: 18px; }
+  .th-table .row:not(.th-head) .th-grid { position: relative; }
+  .th-table .row:not(.th-head) .th-grid.has-line { grid-template-rows: auto auto; row-gap: 3px; }
+  .th-table .row:not(.th-head) .th-cell-title { font-size: 14.5px; padding-left: 35px; padding-right: 32px; }
+  .th-table .row:not(.th-head) .th-grid.has-line > .th-line { display: block; grid-row: 2; grid-column: 1; min-width: 0; padding-left: 35px; padding-right: 32px; font-size: 13px; line-height: 18px; color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .th-line-who { margin-right: 6px; color: var(--text-dim); }
+  .th-cell-title.name-moved > .th-who-name { display: none; }
+  .th-cell-title.aside-moved > .th-aside-box { display: none; }
+  /* 5px is the cap line of 14.5px Geist in its 20px line. Chrome snaps a face's
+     border in steps when it is moved by `top`, landing a pixel above or below
+     the capitals; a transform lands it on their first row. */
+  .th-table .row:not(.th-head) .th-cell-title > .th-slot { position: absolute; left: 0; top: 5px; width: 24px; height: 24px; margin: 0; display: flex; align-items: flex-start; justify-content: center; transform: translateY(-0.36px); }
+  .th-table .row:not(.th-head) .th-slot :is(.tm-av, .tq, .th-mate, .harness-mark, .agent-face) { width: 24px; height: 24px; }
+  .th-table .row:not(.th-head) .th-slot .tm-av { line-height: 22px; font-size: 10px; }
+  .th-table .row:not(.th-head) .th-slot .harness-mark > svg { width: 19.68px; height: 19.68px; }
+  .th-table .row:not(.th-head) .th-slot :is(.tm-av, .tq, i.mate-face, .harness-mark) { border-radius: 7px; }
+  .th-table .row:not(.th-head) .th-slot :is(.tm-av, .harness-mark) { border-color: var(--face-ring); }
+  .th-table .row:not(.th-head) .th-slot i.mate-face { box-shadow: none; border: 1px solid var(--face-ring); }
+  .th-table .row:not(.th-head) .th-grid.has-line > :is(.th-cell-state, .th-cell-proj, .th-cell-person, .th-cell-prio, .th-cell-when) { grid-row: 1 / span 2; align-self: center; }
+  /* Text moved by `top` jumps whole pixels; a transform puts each cell's ink
+     within half a device pixel of the middle of the thread's two lines. */
+  .th-table .row:not(.th-head) .th-grid.has-line > :is(.th-cell-state, .th-cell-proj, .th-cell-prio) { transform: translateY(-0.6px); }
+  .th-table .row:not(.th-head) .th-grid.has-line > .th-cell-when { top: 0.5px; }
+  /* The transform makes the cell its own layer; this keeps its card over the rows below. */
+  .th-table .row:not(.th-head) .th-cell-state.has-card:hover { z-index: 30; }
+  /* Unread is the heavier title alone: the orange square read as clutter. */
+  .th-table .row.unread::before { display: none; }
+}

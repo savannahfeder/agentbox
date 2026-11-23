@@ -104,12 +104,13 @@ describe('where the face sits', () => {
     expect(slot).not.toMatch(/position: absolute/);
   });
 
+  // `:not(.th-head)` is a rule for the rows, which the heading does not take.
   it('leaves the Thread heading where the titles of rows without faces start', () => {
-    expect(css).not.toMatch(/\.th-head[^{]*\{[^}]*padding-left/);
+    expect(css).not.toMatch(/(?<!:not\()\.th-head[^{]*\{[^}]*padding-left/);
   });
 
-  it('leaves the unread dot in the margin', () => {
-    expect(css).not.toMatch(/\.row\.unread[^{]*::before\s*\{[^}]*display: none/);
+  // The desktop draws no unread square since w-6714ad1360 (tests/an-inbox-row-has-two-lines-and-its-face-sits-on-the-title).
+  it('puts no unread mark on the face', () => {
     expect(css).not.toMatch(/\.th-slot::after/);
   });
 });

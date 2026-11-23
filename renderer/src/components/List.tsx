@@ -336,7 +336,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
         onClick={() => onOpenRepeat?.(rule)}>
         <span className="mark" aria-hidden="true" />
         <RowCells status={running?.live ? running : laterCell(null)}
-          lead={<RepeatMark />} title={rule.title} aside={repeatTag(rule)} where={rule.productName}
+          lead={<RepeatMark />} title={rule.title} line={{ text: repeatRow(rule, last).last }} aside={repeatTag(rule)} where={rule.productName}
           person={withPerson ? personCell?.(team?.me ?? null) : undefined}
           priority={shownPriority(rule)} updatedAt={rule.updatedAt ?? rule.createdAt}
           when={nextRunWords(rule)} now={Date.now()} />
@@ -410,6 +410,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                 <div key={key} className={`row th-their-row${selectedCard === key ? ' selected' : ''}`} onClick={() => onOpenCard?.(c)}>
                   <span className="mark" aria-hidden="true" />
                   <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} who={{ face: <Face person={team?.byId.get(c.personId) ?? null} />, name: team?.byId.get(c.personId)?.name ?? undefined }} title={c.title ?? 'Private thread'} where={cardPlace(c)} person={personCell?.(c.personId)}
+                    line={c.problem ? { who: team?.byId.get(c.personId)?.name ?? undefined, text: c.problem } : null}
                     priority={c.priority} updatedAt={c.updatedAt} now={Date.now()} />
                 </div>
               );
