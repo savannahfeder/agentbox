@@ -682,7 +682,7 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
   line?: RowLine | null;
   /** Try again, on a thread nothing will start (TryAgainButton). */
   retry?: ReactNode;
-  /** Pinned to the top of the list (w-20323283e6): a faint pin after the title. */
+  /** Pinned to the top of the list (w-20323283e6): a pin after the title that a long title never cuts off. */
   pinned?: boolean;
   /**
    * WHAT IS HAPPENING ON THIS THREAD, in the column of its own (w-ec2b04d449).
@@ -721,7 +721,7 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
         people with a small count beside them for a thread only a few people
         see. The whole team, the default, carries nothing (2026-10-02). */}
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}${aside ? ' with-aside' : ''}${moved}`}><span className="th-slot">{who?.face ?? lead}</span>{aside ? <span className="th-title-text">{title}</span> : title}{who?.name && <span className="th-who-name">{who.name}</span>}{aside && <span className="th-aside-box"><span className={`th-aside${late ? ' late' : ''}`}>{aside}</span></span>}{held && <span className="th-aside">not started</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{pinned && <PinMark size={13} className="th-pin" />}</div>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}${aside ? ' with-aside' : pinned ? ' with-pin' : ''}${moved}`}><span className="th-slot">{who?.face ?? lead}</span>{aside || pinned ? <span className="th-title-text">{title}</span> : title}{who?.name && <span className="th-who-name">{who.name}</span>}{aside && <span className="th-aside-box"><span className={`th-aside${late ? ' late' : ''}`}>{aside}</span></span>}{held && <span className="th-aside">not started</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{pinned && <PinMark size={13} className="th-pin" />}</div>
     <div className={`th-cell-state${status?.why ? ' has-card' : ''}${retry ? ' can-retry' : ''}`} title={status?.why ? undefined : status?.title}>{status && <><StatusMark status={status} />{status.word}</>}{retry}
       {status?.why && <span className="th-why-card" role="tooltip"><b>{status.why.head}</b><span>{status.why.body}</span></span>}</div>
     {/* Third in the grid: the phone layout draws only the first, second and last cells, so it never shows this. */}
