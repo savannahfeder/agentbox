@@ -480,7 +480,11 @@ export function paletteOrder(all: Command[], threads: Command[], phone = false, 
   const said = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
   const namedTitles = found.filter((t) => namesIt(query, t.label)).map((t) => said(t.label));
   const carriesANamedTitle = (c: Command) => namedTitles.some((t) => said(c.label).includes(t));
-  const ahead = (c: Command) => named(c) && (!carriesANamedTitle(c) || said(c.label).startsWith(said(query)));
+  // A word several sky themes share ("dark") is more likely a thread's: they go
+  // first only when the words pick one out or ask for a theme.
+  const skies = matched.filter((c) => c.id.startsWith('theme-sky-') && named(c));
+  const sharedSky = (c: Command) => skies.length > 1 && skies.includes(c) && !/\b(?:themes?|sky|skies)\b/i.test(query);
+  const ahead = (c: Command) => named(c) && !sharedSky(c) && (!carriesANamedTitle(c) || said(c.label).startsWith(said(query)));
   if (!phone) {
     // A command the words only touch by keyword comes after the threads they found.
     if (found.length && query.trim()) {
