@@ -80,7 +80,8 @@ describe('answered in the terminal', () => {
     expect(progressAfterReply(stopped, T, 'all')).toBe(true);
   });
   it('stopped again: back in Needs you', () => {
-    const idle = { ...stopped, status: 'idle' };
+    // Stamped when it stopped, after what she typed: a typed message counts as her reply until then.
+    const idle = { ...stopped, status: 'idle', statusAt: T + 60_000 };
     expect(answeredWhereItRuns(idle)).toBe(false);
     expect(reachesInbox(idle, T, 'all')).toBe(true);
   });
