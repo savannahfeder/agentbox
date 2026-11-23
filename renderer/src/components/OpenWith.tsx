@@ -1,7 +1,6 @@
 // The open mark over a file, and the menu it opens: the apps the Mac offers
-// for that file, default first, and Show in Finder (w-b374aa5dfe, option 1).
-// The row picked says Opening until the app is up, because a big app's first
-// start takes seconds and the mark used to say nothing at all.
+// for that file, default first, and Show in Finder. The row picked says
+// Opening until the app is up, since a big app's first start takes seconds.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api';
 import type { AppsThatOpen } from '../types';
