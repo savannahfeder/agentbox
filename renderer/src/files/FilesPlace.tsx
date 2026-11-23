@@ -18,6 +18,7 @@ import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace,
 import { fileRenameUndo, moveUndo, renameUndo } from './files-undo';
 import { FilesHome, type HomeActs, type HomePage, type ProjectShelf } from './FilesHome';
 import { crumbsFor, FILE_DRAG, folderFiles, homeOf, NOT_IN_A_FOLDER } from './files-home';
+import { cleanName, withChanges, type Shown } from './files-changes';
 import './files-place.css';
 
 const NONE: FilesPlaceList = { files: [], projects: [], folders: [] };
@@ -30,21 +31,59 @@ const readAgain = () => { for (const read of readers) read(); };
 // A pass over every file takes seconds on a big store; a visit starts from the last one.
 let lastList: FilesPlaceList | null = null;
 
+// Changes made here, drawn over the list until one asked for after the app wrote them arrives. `done` is when it did.
+let pending: Array<{ change: Shown; done: number | null }> = [];
+const redraws = new Set<() => void>();
+const redraw = () => { for (const r of redraws) r(); };
+type ActAnswer = Awaited<ReturnType<typeof api.filesPlaceFolder>>;
+function actNow(p: FileFolderAct): Promise<ActAnswer> {
+  const mine = p.do === 'make' || p.do === 'restore' ? null : { change: p, done: null as number | null };
+  // A folder put back is drawn by the next list, unless the deletion is still only drawn here.
+  if (p.do === 'restore') pending = pending.filter((q) => !(q.change.do === 'remove' && p.ids.includes(q.change.id)));
+  if (mine) pending = [...pending, mine];
+  redraw();
+  return api.filesPlaceFolder(p).then((r) => {
+    if (mine) {
+      if (!r.ok) pending = pending.filter((q) => q !== mine);
+      else mine.done = Date.now();
+    }
+    if (r.ok && p.do === 'make' && r.folder) {
+      pending = [...pending, { change: { do: 'made', folder: { id: r.folder, project: p.project, name: cleanName(p.name), parent: p.parent ?? null, at: Date.now() } }, done: Date.now() }];
+    }
+    redraw();
+    readAgain();
+    return r;
+  });
+}
+
 /** Every file, read again whenever the store says something changed. */
 export function useFilesList(on: boolean) {
   const [list, setList] = useState<FilesPlaceList | null>(() => lastList);
+  const [drawn, setDrawn] = useState(0);
+  useEffect(() => {
+    const again = () => setDrawn((n) => n + 1);
+    redraws.add(again);
+    return () => { redraws.delete(again); };
+  }, []);
   useEffect(() => {
     if (!on) return;
     let live = true;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const read = (soon = false) => { void api.filesPlace(soon ? { soon } : undefined).then((l) => { lastList = l; if (live) setList(l); }); };
+    const read = (soon = false) => {
+      const asked = Date.now();
+      void api.filesPlace(soon ? { soon } : undefined).then((l) => {
+        if (!soon) pending = pending.filter((p) => p.done === null || p.done > asked);
+        lastList = l;
+        if (live) setList(l);
+      });
+    };
     read(!lastList);
     readers.add(read);
     // A burst of changes reads once.
     const off = api.onChanged(() => { if (timer) clearTimeout(timer); timer = setTimeout(read, 400); });
     return () => { live = false; readers.delete(read); if (timer) clearTimeout(timer); off?.(); };
   }, [on]);
-  return list;
+  return useMemo(() => (list && pending.length ? withChanges(list, pending.map((p) => p.change)) : list), [list, drawn]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 function DocFace({ file }: { file: PlacedFile }) {
@@ -572,16 +611,15 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
     return () => watch.disconnect();
   }, [drawn, total]);
   const nameOf = (id: string) => firstName(team?.byId.get(id) ?? null) || 'A teammate';
-  const act = (p: FileFolderAct) => api.filesPlaceFolder(p).then((r) => { if (!r.ok) onNotice(r.error || 'That could not be done.'); else readAgain(); return r; });
+  const act = (p: FileFolderAct) => actNow(p).then((r) => { if (!r.ok) onNotice(r.error || 'That could not be done.'); return r; });
   const undoable = (u: { label: string; undoes: string }, back: FileFolderAct[]) => onUndoable?.({
     label: u.label,
     undoes: u.undoes,
     run: async () => {
       for (const p of back) {
-        const r = await api.filesPlaceFolder(p);
-        if (!r.ok) { readAgain(); return { refused: r.error || 'That could not be put back.' }; }
+        const r = await actNow(p);
+        if (!r.ok) return { refused: r.error || 'That could not be put back.' };
       }
-      readAgain();
     },
   });
   const moveAll = (keys: string[], to: string | null) => {
