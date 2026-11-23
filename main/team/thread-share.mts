@@ -129,7 +129,8 @@ export interface ThreadShareOptions {
 }
 
 export interface ThreadShare {
-  pass(teamId: string | null | undefined): Promise<void>;
+  /** `cards`: the list the caller has just read, so this reads none of its own. */
+  pass(teamId: string | null | undefined, cards?: readonly SyncCard[]): Promise<void>;
   read(owner: string, threadId: string): SharedThreadView;
   folders(): { ownerId: string; threadId: string; version: string }[];
   products(): { slug: string; name: string; dir: string }[];
@@ -403,9 +404,9 @@ export function createThreadShare({
     goingUp.set(key, run);
   }
 
-  async function publish(teamId: string, heads: ThreadHead[]) {
+  async function publish(teamId: string, heads: ThreadHead[], known?: readonly SyncCard[]) {
     const mine = new Map(heads.filter((h) => h.personId === me).map((h) => [h.threadId, h.hash]));
-    const cards = listCards() ?? [];
+    const cards = known ?? listCards() ?? [];
     readers = new Map(cards.map((c) => [c.threadId, Array.isArray(c.people) ? c.people.filter((p): p is string => typeof p === 'string') : null]));
     if (!cards.length) { built.clear(); return; }
     const threads = listThreads();
@@ -686,11 +687,11 @@ export function createThreadShare({
 
   return {
     /** One pass. Nothing here may stop a sync. */
-    async pass(teamId) {
+    async pass(teamId, cards) {
       if (!backend.threadWorkHeads || !teamId) return;
       const heads = await quietly('reading what is shared', () => backend.threadWorkHeads!());
       if (!heads) return;
-      await publish(teamId, heads);
+      await publish(teamId, heads, cards);
       await take(heads);
       if (backend.fileMarks) await sendWaiting(heads);
       comments = await quietly('reading comments', () => backend.threadComments(), comments);
