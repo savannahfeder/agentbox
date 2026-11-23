@@ -254,7 +254,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
   // The name over a message in an agent's thread.
   const whoSaid = (e: AgentTurn): ReactNode => (voiceOf(e) ? <><Face person={teammateOf(e)} agent />{voiceOf(e)}</> : teammateOf(e)
     ? <><Face person={teammateOf(e)} />{firstName(teammateOf(e))}</>
-    : helperOf(e) ? <><Face person={helperOf(e)} />{firstName(helperOf(e))}</>
+    : helperOf(e) ? (helperOf(e)!.id === team?.me ? 'You' : <><Face person={helperOf(e)} />{firstName(helperOf(e))}</>)
     : e.who === 'you' ? 'You' : ((e as { from?: string }).from ?? nameOf?.(e) ?? name));
   // AN AGENT'S MESSAGE IS ITS OWN, on its owner's screen as well as anyone's.
   const voiceOf = (e: AgentEvent): string | null => {
@@ -559,7 +559,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
               // saying so, and here it gets its name back. The fold is
               // untouched, so the header still counts it as one message with
               // the half she cannot see.
-              <div className={`msg ${e.who === 'you' && !teammateOf(e) && !voiceOf(e) ? 'yours' : ''} ${turnStarts[n] ? 'turn' : ''} ${turnEnds[n] ? 'turn-end' : ''}${e.same && !e.resumed ? 'same' : ''} ${e.pending ? 'sending' : ''}`}>
+              <div className={`msg ${(e.who === 'you' && !teammateOf(e) && !voiceOf(e)) || (!!team?.me && helperOf(e)?.id === team.me) ? 'yours' : ''} ${turnStarts[n] ? 'turn' : ''} ${turnEnds[n] ? 'turn-end' : ''}${e.same && !e.resumed ? 'same' : ''} ${e.pending ? 'sending' : ''}`}>
                 {(!e.same || e.resumed) && (
                   <div className="msg-head">
                     <span className="msg-who">{whoSaid(e)}</span>
