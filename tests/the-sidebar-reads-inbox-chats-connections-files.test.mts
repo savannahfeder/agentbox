@@ -14,7 +14,7 @@ const at = (needle) => { const i = nav.indexOf(needle); expect(i).toBeGreaterTha
 describe('the sidebar', () => {
   it('puts Chats right under Inbox, then Connections, then Files', () => {
     const inbox = at('data-tab="inbox"');
-    const chats = at('{groups}');
+    const chats = at('{workspaceOpen && groups}');
     const connections = at('data-tab="connections"');
     const files = at('data-tab="files"');
     expect(inbox).toBeLessThan(chats);

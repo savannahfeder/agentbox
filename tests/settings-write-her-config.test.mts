@@ -379,11 +379,11 @@ describe('the workspace settings', () => {
     expect('outsideAgents' in onDisk()).toBe(false);
   });
 
-  // Off, since (2026-08-27): a session started in a terminal is kept
-  // separate from the inbox unless somebody asks for it there.
-  it('reads off on a config that has never heard of the key', () => {
-    expect(outsideAgentsMode(loadConfig(appDir))).toBe('off');
-    expect(outsideAgentsMode({ outsideAgents: 'nonsense' })).toBe('off');
-    expect(outsideAgentsMode({ outsideAgents: 'all' })).toBe('all');
+  // All, since 2026-11-23 (off from 2026-08-27): the founder asked for the
+  // sessions you start yourself to be on by default, with an easy way off.
+  it('reads all on a config that has never heard of the key', () => {
+    expect(outsideAgentsMode(loadConfig(appDir))).toBe('all');
+    expect(outsideAgentsMode({ outsideAgents: 'nonsense' })).toBe('all');
+    expect(outsideAgentsMode({ outsideAgents: 'off' })).toBe('off');
   });
 });

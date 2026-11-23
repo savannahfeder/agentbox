@@ -23,7 +23,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, firstRowStaysFirst, type CursorMark, type CursorWait } from './cursor-follows';
 import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, FileNote, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
+import type { AgentMode, AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, FileNote, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import type { ReplyPick } from './reply-pick';
 import { api } from './api';
 import { setClaudeModels, setCodexFreePlan, setFurtherHarnesses } from './models';
@@ -31,7 +31,7 @@ import { codexFromSettings } from './web-settings';
 import { advanceAfter, advanceLandsHere, pickSentWords, pickStaysPut, replyMovesOn, opensIntoNeedsYou, nextAfterAdvance, sayWhoseBox, sentLineSays, type Advance } from './advance';
 import { arrowRows, pageTitle, spotIn, stepIn } from './one-thing-at-a-time';
 import { AIMED_AT_THE_THREAD_YOU_LEFT, CLICK_FOR_THE_THREAD_YOU_LEFT, clickAimedHere, pickLandsHere, type Arrival, type Point } from './pick-settles';
-import { followedAfter, freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
+import { followedAfter, freshAgentRow, freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
 import { LogoOrbit } from './components/LogoOrbit';
 import { cameBackFromACrash, keepHeldWriter, RELOADED_AFTER_A_CRASH } from './after-a-crash';
@@ -109,7 +109,7 @@ import { wearJustMade, type JustMade } from './just-made';
 import { newToDraw, useKeptSet, type Drawn } from './shown-snapshot';
 import { agentOnOrComing, askPutOff, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, heldForHer, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
-import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
+import { agentKey, agentLayout, agentRow, agentRowId, asksSomething, byRecency, choicesArePressed, listed as agentIsListed, onTheRail, putAway, railLine, reachesInbox, progressAfterReply, replyIsSwallowed, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
 import { eOnThisList, keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
@@ -138,7 +138,10 @@ import { HintPlate } from './components/HintPlate';
 import { applySkin, applySkinDetail, applyTune, DEFAULT_SKIN, lookMeans, lookOf, resolveSkin, resolveSkinDetail, resolveTune, seedFirstRunLook, SKINS, storeTune, walkSkin, wornSkin, SKIN_KEY, TUNE_DEFAULT, TUNE_KEY, type Look, type SkinChoice, type SkinId, type SkinTune } from './skins';
 // THE SHAPE OF AN OPENED TASK IS STILL AN OPEN QUESTION. Six of them,
 // one attribute, and the whole file goes when she picks.
-import { WorkspaceNavigation } from './components/WorkspaceNavigation';
+import { WorkspaceNavigation, type RecentRow } from './components/WorkspaceNavigation';
+import { recentThreads } from './recent-threads';
+import { HarnessMark } from './components/EngineLogos';
+import { TeammateMark } from './teammates/TeammatesRail';
 import { useRooms } from './team/rooms/useRooms';
 import { useTeammates } from './teammates/useTeammates';
 import { ThreadQuestions } from './teammates/TeammatesPage';
@@ -271,6 +274,8 @@ import { mentionRows } from './team/rooms/room-rules';
 import { notMarkedDone, useChatsMarkedDone } from './team/rooms/chats-marked-done';
 import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheLastToast, opensTheToast, saysWhereItWent, toastOpens, toastParts, type LastToast, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
+import { BROUGHT_IN, OUTSIDE_SAID } from './outside-agents';
+import { movedLabel, movedSessions } from '../../shared/bring-in.mts';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
 import { HomePage, type MateAct, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
@@ -1650,12 +1655,14 @@ export default function App() {
   // CONVERSATION THE CARD RECALLS: the message it was STARTED with, up to three
   // later ones from the user, and where the thread got to. That is the only
   // shape, one size for every row, so there is no setting to read here any more.
+  // A session moved into Agentbox is its thread there while that is open, so it is not a second row.
+  const movedHere = useMemo(() => movedSessions(items), [items]);
   const agentRows = useMemo(() => {
-    const live = (snap?.agents ?? []).filter(agentIsListed);
+    const live = (snap?.agents ?? []).filter((a) => agentIsListed(a) && !movedHere.has(movedLabel(a)));
     return [...live].sort(byRecency).map((a) => {
       const { title, body } = agentRow(a, listNow);
       return {
-        id: `agent:${a.pid}`,
+        id: agentRowId(a),
         product: a.product ?? '',
         productName: a.productName ?? whereItRuns(a),
         status: 'open' as const,
@@ -1668,7 +1675,7 @@ export default function App() {
         // else is scored by, because inventing a second ordering is how the top
         // of the inbox stops meaning what it says. This is also what keeps the
         // thirteen she is sweeping underneath the one that is actually asking.
-        priority: asksSomething(a) ? 9 : 1,
+        priority: asksSomething(a) ? 9 : agentLayout(a).kind === 'asks' ? 5 : 1,
         epoch: 0,
         claim: null,
         createdAt: a.startedAt,
@@ -1685,19 +1692,18 @@ export default function App() {
         agent: a,
       } as WorkItem;
     });
-  }, [snap?.agents, listNow]);
+  }, [snap?.agents, listNow, movedHere]);
 
-  const agentList = agentRows;
+  // A session she closed, or is closing (Z can still take it back), is out of every list, whatever moment it was put off to.
+  const agentList = useMemo(() => agentRows.filter((r) => !pendingIds.has(r.id) && (!r.agent || !putAway(r.agent))), [agentRows, pendingIds]);
 
   // HOW MANY OF HER AGENTS THE INBOX TAKES: all of them, only the ones stopped
   // on a question, or none.
   //
-  // NONE IS THE DEFAULT NOW: a session started in a terminal is kept separate
-  // from the inbox unless the setting says otherwise. The real default is
-  // decided once, in main/settings.mts; this fallback only covers the moment
-  // before the first snapshot arrives, and it agrees with it so the inbox
-  // cannot flash a row it is about to drop.
-  const agentMode = snap?.config?.outsideAgents ?? 'off';
+  // ALL IS THE DEFAULT (2026-11-23), decided once, in main/settings.mts; this
+  // fallback only covers the moment before the first snapshot arrives, and it
+  // agrees with it so the inbox cannot flash a row it is about to drop.
+  const agentMode = snap?.config?.outsideAgents ?? 'all';
 
   // Execution schedules gate work; inbox snoozes only gate her attention.
   // A word held for Z lifts now what its write will lift (laterHerWordLifts).
@@ -3392,7 +3398,8 @@ export default function App() {
     })),
     ...(() => {
       const now = Date.now();
-      const found = searchThreads(items, q, searchContext, { opened: openedLately(seenAtNow.current, now, focused?.id), now, inside });
+      // Sessions started outside Agentbox are found by the names their rows wear too.
+      const found = searchThreads([...items, ...agentList], q, searchContext, { opened: openedLately(seenAtNow.current, now, focused?.id), now, inside });
       const summaries = new Map(found.map(({ item, summary }) => [item, summary]));
       const leads = new Map(found.map(({ item, lead }) => [item, lead]));
       return withoutRunsOf(found.map(({ item }) => item), ruled).map((item) => ({
@@ -3411,7 +3418,7 @@ export default function App() {
       run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(null); openTeammateCard(card); },
     })),
     ];
-  }, [repeats, items, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard, stateOfMine, focused?.id]);
+  }, [repeats, items, agentList, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard, stateOfMine, focused?.id]);
   // J AND K FROM AN OPEN THREAD OR AN OPEN TEAMMATE CARD (w-fb16bcaeba): open
   // the next stop, whoever's it is. Yours opens as your thread, theirs as
   // their card, exactly as a click on its row would.
@@ -3558,6 +3565,11 @@ export default function App() {
     const fresh = freshCopy(items, focused, following);
     if (fresh) setFocused(fresh);
   }, [items, focused, following]);
+  // A session started outside Agentbox is not in the ledger, so its open page follows its own row.
+  useEffect(() => {
+    const fresh = freshAgentRow(agentRows, focused);
+    if (fresh) setFocused(fresh);
+  }, [agentRows, focused]);
 
   // AND THE WAY OUT OF THAT ROW IS HER INBOX, whichever way she takes it.
   //
@@ -3602,8 +3614,8 @@ export default function App() {
   // out of the app. A session with no row left (she closed it, or put it off)
   // simply does not answer the click; the panel is not a way back into a list
   // she has already cleared.
-  const openAgent = useCallback((pid: number) => {
-    const row = agentRows.find((r) => r.id === `agent:${pid}`);
+  const openAgent = useCallback((id: string) => {
+    const row = agentRows.find((r) => r.id === id);
     if (!row) return;
     setFocused(row);
     markSeen(row);
@@ -3670,10 +3682,10 @@ export default function App() {
     const sessions = (snap?.agents ?? [])
       .filter((a) => a.product === slug && onTheRail(a, now))
       .map((a) => ({
-        key: `agent:${a.pid}`,
+        key: agentRowId(a),
         line: railLine(a),
         at: a.lastActiveAt || a.startedAt,
-        open: () => openAgent(a.pid),
+        open: () => openAgent(agentRowId(a)),
       }));
     return [...tasks, ...sessions].sort((x, y) => y.at - x.at);
   }, [railItem?.product, items, snap?.agents, pendingIds, deliveredThrough, hiddenAt, dueAt, now, markSeen, openAgent, liveIds, shippingIds, stalledIds, waitingOn]);
@@ -3722,6 +3734,32 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);
   }, []);
   showToastRef.current = showToast;
+  // The thread a session was just brought in as, opened the moment it is in the list.
+  const [movedIn, setMovedIn] = useState<{ product: string; id: string; reply: boolean } | null>(null);
+  // R on one of those sessions is its Continue in Agentbox, and lands in the reply box.
+  const bringIn = useCallback(async (item: WorkItem, { reply = false } = {}) => {
+    const agent = item.agent;
+    if (!agent) return;
+    const r = await api.bringInSession({ pid: agent.pid, engine: agent.engine, sessionId: agent.sessionId });
+    if (!r.ok) { showToast(r.reason); return; }
+    showToast(BROUGHT_IN);
+    setMovedIn({ product: r.product, id: r.id, reply });
+  }, [showToast]);
+  useEffect(() => {
+    if (!movedIn) return;
+    const it = snap?.items.find((i) => i.product === movedIn.product && i.id === movedIn.id);
+    if (!it) return;
+    setMovedIn(null);
+    setFocused(it);
+    markSeen(it);
+    if (movedIn.reply) setModal('reply');
+  }, [snap, movedIn, markSeen]);
+  // From one of those sessions' ⋯, the inbox's View and filters, or ⌘K. The
+  // filters menu shows the list change under it, so it raises no toast.
+  const chooseOutside = useCallback((mode: AgentMode, { say = true } = {}) => {
+    void api.setWorkspaceSetting({ key: 'outsideAgents', value: mode });
+    if (say) showToast(OUTSIDE_SAID[mode]);
+  }, [showToast]);
   // A second copy on an invented team, for a call where this inbox should stay
   // off the shared screen (main/demo.mts). The toast says which window is which.
   const openDemoCopy = useCallback(async () => {
@@ -5110,7 +5148,7 @@ export default function App() {
     // exactly as closing one does, and this used to drop her at the top of the
     // list instead.
     leaveResolved(item);
-    const out = await api.agentReply({ pid: agent.pid, text });
+    const out = await api.agentReply({ pid: agent.pid, text, engine: agent.engine });
     // Two true sentences, never one hopeful one. A failed hand-over says so; a
     // send says Sent, which is what it says everywhere else in this app; and a
     // session seen going back to work says the better thing.
@@ -5146,7 +5184,7 @@ export default function App() {
   const revealAgent = useCallback(async (item: WorkItem) => {
     const agent = item.agent;
     if (!agent) return;
-    const out = await api.agentReveal({ pid: agent.pid });
+    const out = await api.agentReveal({ pid: agent.pid, engine: agent.engine, sessionId: agent.sessionId });
     if (!out?.ok) showToast(out?.reason ?? `${Name} cannot tell which window it is running in.`);
   }, [showToast]);
 
@@ -5185,7 +5223,13 @@ export default function App() {
     // anywhere has a row called `trouble` or `update` in it, so every one of
     // these would be a write into nothing. Both behave like a task in every way
     // she can see and in none that she cannot.
-    if (item.agent || isTroubleRow(item) || isUpdateRow(item)) return;
+    // AN AGENT'S OWN CHOICES ARE ANSWERED BY SENDING THE CHOICE, word for word, into the session.
+    if (item.agent) {
+      const choice = agentLayout(item.agent).choices[n - 1];
+      if (choice && choicesArePressed(item.agent)) await replyToAgent(item, choice);
+      return;
+    }
+    if (isTroubleRow(item) || isUpdateRow(item)) return;
     // The agent's own offer, and whether it is still live is format.ts's to
     // say; else the one the app asked for a finished run (./ship-offer.ts).
     const option = liveOption(item, n) ?? offerNow(item).find((o) => o.n === n) ?? null;
@@ -5258,7 +5302,7 @@ export default function App() {
     }, pickSentWords(option.text, rowTitle(item)), takeBack, isTourPractice(tourRef.current, item) || !movesOn(item) || pickStaysPut(option.text, { live: liveIds.has(item.id) }), { product: item.product, id: item.id }, undid,
     // Nothing real is sent from the practice thread, so nothing is held back for an undo: its agent answers at once.
     isTourPractice(tourRef.current, item) ? 0 : undefined);
-  }, [deferCommit, pushUndo, markDone, markSeen, movesOn, offerNow, focused?.id, focused?.product, liveIds]);
+  }, [deferCommit, pushUndo, markDone, markSeen, movesOn, offerNow, focused?.id, focused?.product, liveIds, replyToAgent]);
   // The discard question is raised inside `pickOption` and answered by
   // `answerCloseAsk`, which is made above it.
   useEffect(() => { pickRef.current = pickOption; }, [pickOption]);
@@ -6033,7 +6077,9 @@ export default function App() {
       // show, and the key says so rather than going quiet.
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
         e.preventDefault();
-        if (!focused || focused.agent) { showToast('Open a task to use its terminal'); return; }
+        // On a session started outside Agentbox it is that session's own terminal.
+        if (focused?.agent) { void revealAgent(focused); return; }
+        if (!focused) { showToast('Open a task to use its terminal'); return; }
         window.dispatchEvent(new Event('task-terminal-toggle'));
         return;
       }
@@ -6279,6 +6325,8 @@ export default function App() {
         // The page stays open: full screen draws the box under it.
         // An open box focuses itself only when it opens, so R on one already
         // there has to put the caret back (focus-at-end.ts).
+        // R on a session nothing here can answer is its Continue in Agentbox (the bar's other half).
+        else if (e.key.toLowerCase() === 'r' && !e.metaKey && !e.ctrlKey && focused.agent && replyIsSwallowed(focused.agent) && focused.agent.product && focused.agent.sessionId) { e.preventDefault(); void bringIn(focused, { reply: true }); }
         else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setModal('reply'); if (modal === 'reply') focusTheReplyBox(); else if (sayWhoseBox(arrived.current, keyOf(focused), Date.now())) { const whose = replyingTo({ people: conversationNames(focused) }); if (whose) showToast(whose); } }
         // N MEANS THE SAME THING ON BOTH SCREENS. The + in the top bar is on
         // this screen too and its tooltip says "New task (N)", so the key is
@@ -6457,7 +6505,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [modal, newProject, focused, focusedRepeat, inFullScreen, current, pointed, list, view, markDone, openSnooze, pickOption, offerNow, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, roomShown, roomsUi, teammatesShown, teammatesUi, filesShown, connectionsShown, boardCols, stops, pageStops, keyLead, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, closeAskWhy, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow, urgentShownRow, openUrgentReady, clearSlot, teamMode, evPick, evView, onBoard, pickMember, goNeedsYou, keyTab, team]);
+  }, [modal, newProject, focused, focusedRepeat, inFullScreen, current, pointed, list, view, markDone, openSnooze, pickOption, offerNow, undo, markSeen, optionSel, snoozed, unsnooze, items, selectable, batchDone, selected, showToast, snap, multiSel, refresh, settingsOpen, search, openSearch, closeSearch, openDoc, artifactMode, artifactReturnBeside, teamShown, openCard, inboxDisplay, setInboxDisplay, stateTabOrder, roomShown, roomsUi, teammatesShown, teammatesUi, filesShown, connectionsShown, boardCols, stops, pageStops, keyLead, keyCard, walkPlace, goToStop, openTeammateCard, closeAskOn, closeAskWhy, waitingFiled, answerCloseAsk, keepThreadOpen, toast, openToastRow, urgentShownRow, openUrgentReady, clearSlot, teamMode, evPick, evView, onBoard, pickMember, goNeedsYou, keyTab, team, bringIn, revealAgent]);
 
   // WHO HOLDS THE KEYBOARD WHILE SEARCHING. The field is in the top bar and
   // stays mounted while a result is open, so without this the J and K that walk
@@ -7458,6 +7506,29 @@ export default function App() {
   const inboxHere = !homeShown && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focused && !focusedRepeat
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
   const engineFacts = { running: snap?.supervisor?.running, engines: snap?.engines };
+  // The sidebar's Recent, which a phone has no sidebar to draw in. A chat with
+  // a person is named for them and opens as their chat; a chat this window
+  // cannot open that way is left out.
+  const waitingIds = new Set(inbox.map((i) => i.id));
+  const recentRows: RecentRow[] = !narrowSidebar ? [] : recentThreads(items.filter((i) => !directSlugs.has(i.product) || directs.some((d) => d.item.id === i.id)), seenAt).map((i) => {
+    const direct = directs.find((d) => d.item.id === i.id) ?? null;
+    const sent = !direct && team ? sentFrom(i, team.products.get(i.product), team.me) : null;
+    const mateId = teammateIdOf(i);
+    const mate = !direct && !sent && mateId ? teammatesUi.list.find((t) => t.id === mateId) ?? null : null;
+    const person = direct ? team?.byId.get(direct.people[0]) ?? null : sent && !sent.agent ? team?.byId.get(sent.from) ?? null : null;
+    return {
+      key: `${i.product}/${i.id}`,
+      mark: mate ? <TeammateMark t={mate} /> : person ? <Face person={person} size={18} /> : <HarnessMark engine={rowEngine(i, engineFacts)} />,
+      title: direct ? direct.name : rowTitle(i),
+      waits: waitingIds.has(i.id) && i.id !== focused?.id,
+      onOpen: () => {
+        if (direct && direct.people.length === 1 && homeLayout === 'chats') { openChatsPlace(`person:${direct.people[0]}`); return; }
+        openView('inbox');
+        if (direct) setChatsDirect(i.id);
+        setFocused(i); markSeen(i);
+      },
+    };
+  });
   const homeNeeds: NeedsRow[] = homeShown ? homeNeedsRows(needsList, {
     nameOf: (id) => team?.byId.get(id)?.name ?? '',
     item: (i) => {
@@ -7752,6 +7823,7 @@ export default function App() {
           `onInvite` is still handed in, for the account menu. */}
       <WorkspaceNavigation
         onPalette={() => setModal('palette')}
+        recent={recentRows}
         update={announcesUpdate(snap?.update, { closed: '' }) ? { installing: !!snap?.update?.installing, version: snap?.update?.newVersion, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
         onUpdate={() => { void api.updateInstall(); }}
         /* AND THE COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS
@@ -7936,6 +8008,7 @@ export default function App() {
               onCloudWhenOn={(mode) => { void api.setWorkspaceSetting({ key: 'cloudWhenOn', value: mode }); }}
               onCloudSetUp={() => setCloudSetupOpen(true)}
               onCloudMove={(ids) => { void moveToCloud(ids); }}
+              outside={{ mode: agentMode, onMode: (mode) => chooseOutside(mode, { say: false }) }}
               filters={!mateCorner && !roomShown && (!evOn || evKey === 'me' || !!evBoardEl)}
               home={teamMode && !onPhone() ? { group: needsGroup, onGroup: setNeedsGroup } : null}
               view={mateCorner ?? (roomShown ? roomsUi.viewButton : null)}
@@ -8274,6 +8347,9 @@ export default function App() {
                   onReopenDone={() => reopenDone(focused)}
                   onMove={() => { setPaletteTyped('Move to '); setModal('palette'); }}
                   onPriority={(value) => { void retag([focused], value); }}
+                  outside={agentMode}
+                  onOutside={chooseOutside}
+                  onBringIn={() => { void bringIn(focused); }}
                   session={snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null}
                   // WHAT THE FLEET IS DOING ABOUT THIS ROW, through `factsFor`,
                   // which is the builder every row already reads. Written out
@@ -8672,6 +8748,9 @@ export default function App() {
         phone={onPhone()}
         cloud={snap.cloud?.setUp ? snap.cloud : null}
         onCloudMode={(mode) => { if (cloudOffAsks(mode)) { setModal('cloud-off'); return; } setModal(null); void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode }); }}
+        outside={agentMode}
+        onOutside={(mode) => { setModal(null); chooseOutside(mode); }}
+        onBringIn={focused?.agent?.product && focused.agent.sessionId ? () => { setModal(null); void bringIn(focused); } : null}
         onFirstRun={walkAgain}
         onTutorial={startTutorial}
         onImportAgents={() => { setModal(null); setImportAgents(true); }}

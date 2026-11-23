@@ -235,9 +235,9 @@ export class AgentSchedule {
    * set, at every app start, with no symptom except her deferred rows all
    * coming back.
    */
-  decorate(agents: ScheduledAgent[], now = Date.now()) {
+  decorate<T extends ScheduledAgent>(agents: T[], now = Date.now(), { sweep = true }: { sweep?: boolean } = {}): T[] {
     const live = new Set<string>();
-    const out = agents.map((agent): ScheduledAgent => {
+    const out = agents.map((agent): T => {
       const key = agentKey(agent);
       live.add(key);
       const entry = this.byKey[key];
@@ -253,7 +253,7 @@ export class AgentSchedule {
     });
     let dropped = false;
     for (const [key, entry] of Object.entries(this.byKey)) {
-      const gone = live.size > 0 && !live.has(key);
+      const gone = sweep && live.size > 0 && !live.has(key);
       if (!gone && (entry.runAt > now || entry.doneThrough > 0 || entry.repliedAt > 0 || entry.spoke?.length)) continue;
       delete this.byKey[key];
       dropped = true;

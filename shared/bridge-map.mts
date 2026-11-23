@@ -248,6 +248,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   saveRailNote: 'zero:save-rail-note',
   agentReply: 'zero:agent-reply',
   agentReveal: 'zero:agent-reveal',
+  bringInSession: 'zero:bring-in-session',
   agentConversation: 'zero:agent-conversation',
   scheduleAgent: 'zero:schedule-agent',
   closeAgent: 'zero:close-agent',
