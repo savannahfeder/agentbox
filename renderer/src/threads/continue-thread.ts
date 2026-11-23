@@ -32,13 +32,16 @@ type Carried = { name: string; srcPath: string; image: boolean };
 
 /**
  * `files`: from one file's notes, as found on this computer (a path not found
- * here is only its name). That file goes and no other, the brief's newest copy
- * of it first, since the brief gathers only its last messages' attachments.
+ * here is only its name). That file goes and no other: the very copy when the
+ * brief holds it, else the brief's newest of its family, since the brief gathers
+ * only its last messages' attachments. It goes by its own name, as one file has no
+ * namesake on the card to be told apart from.
  */
 export function carriedForFile(attachments: readonly Carried[], files: readonly string[] | undefined): Carried[] {
   if (!files?.length) return [...attachments];
   const families = new Set(files.map((f) => familyOfName(f)));
   const ofTheFile = attachments.filter((a) => families.has(familyOfName(a.name)));
-  if (ofTheFile.length) return ofTheFile.slice(-1);
+  const picked = ofTheFile.find((a) => files.includes(a.srcPath)) ?? ofTheFile.at(-1);
+  if (picked) return [{ ...picked, name: shownName(picked.name) }];
   return files.filter((f) => f.startsWith('/')).slice(-1).map((f) => ({ name: shownName(f), srcPath: f, image: /\.(png|jpe?g|gif|webp)$/i.test(f) }));
 }
