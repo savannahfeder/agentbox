@@ -23,9 +23,9 @@ export function OpenWithMenu({ list, opening, onPick }: { list: AppsThatOpen; op
         <button key={a.path} type="button" role="menuitem" tabIndex={-1} className={row(a.path)} onClick={() => onPick(a.path)}>
           <span className="ico">{a.icon ? <img className="open-with-icon" src={a.icon} alt="" /> : <AnApp />}</span>
           <span className="ts-more-label">{a.name}</span>
-          {opening === a.path
-            ? <span className="ts-more-detail open-with-busy"><span className="open-with-spin" aria-hidden="true" />Opening</span>
-            : a.isDefault && <span className="ts-more-detail">Default</span>}
+          <span className="ts-more-detail open-with-detail">
+            {opening === a.path ? <><span className="open-with-spin" aria-hidden="true" />Opening</> : a.isDefault ? 'Default' : null}
+          </span>
         </button>
       ))}
       {list.reveal && <>

@@ -198,6 +198,13 @@ describe('the menu', () => {
     expect(draw({ opening: IN_FOLDER })).not.toContain('open-with-spin');
   });
 
+  it('keeps room for Opening on every app row, so the menu does not widen when you pick one', () => {
+    // Measured in the built screen: 236 points wide at rest, 252 once Opening appeared beside Microsoft Excel.
+    expect(draw({}).match(/open-with-detail/g)).toHaveLength(list.apps.length);
+    const css = fs.readFileSync(new URL('../renderer/src/styles.css', import.meta.url), 'utf8');
+    expect(css).toMatch(/\.open-with-menu \.open-with-detail \{[^}]*min-width: 86px/);
+  });
+
   it('still offers the default app when the Mac gave no list', () => {
     expect(words(draw({ list: { ok: false, apps: [], reveal: true, finder: true } }))).toBe('Default app Show in Finder');
     expect(DEFAULT_APP).not.toMatch(/\//);
