@@ -4,6 +4,8 @@
 // Codex). On a home page of Claude Code threads that read as "icons not showing
 // up". Measured by rendering HomePage with Home's real styles in a headless
 // browser and reading which mark each row's face slot holds, and its size.
+// The first cut left the tile see-through, so the light sky tinted it cream
+// where the Inbox draws the approved white tile; its colour is read too.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { build } from 'esbuild';
 import { createRequire } from 'node:module';
@@ -47,11 +49,11 @@ beforeAll(async () => {
 }, 60_000);
 afterAll(async () => { await browser?.close(); });
 
-async function look() {
+async function look({ theme = 'dark' } = {}) {
   const page = await browser.newPage({ viewport: { width: 1425, height: 884 } });
   page.setDefaultTimeout(5_000);
   await page.route('http://home.test/**', (r) => r.fulfill({ contentType: 'text/html',
-    body: `<html data-theme="dark"><style>${css}</style><div id="root" style="height:884px"></div></html>` }));
+    body: `<html data-theme="${theme}"><style>${css}</style><div id="root" style="height:884px"></div></html>` }));
   await page.goto('http://home.test/');
   await page.addScriptTag({ content: 'window.zero = new Proxy({}, { get: () => () => Promise.resolve([]) });' });
   await page.addScriptTag({ content: bundle });
@@ -64,7 +66,11 @@ async function look() {
       return { mark: mark ? [...mark.classList].find((c) => c !== 'harness-mark') : null, eyes: !!f.querySelector('.agent-face'), size: size(mark ?? f.querySelector('.agent-face')), slot: size(f), live: f.classList.contains('live') };
     };
     const [needs, progress] = [...document.querySelectorAll('.hm-card')];
-    return { needs: [...needs.querySelectorAll('.hm-row')].map(face), progress: [...progress.querySelectorAll('.hm-row')].map(face) };
+    const tile = getComputedStyle(needs.querySelector('.harness-mark'));
+    const p = document.createElement('i'); p.style.color = 'var(--surface)'; document.body.append(p);
+    const surface = getComputedStyle(p).color; p.remove();
+    return { needs: [...needs.querySelectorAll('.hm-row')].map(face), progress: [...progress.querySelectorAll('.hm-row')].map(face),
+      tile: { background: tile.backgroundColor, ring: tile.borderTopColor }, surface };
   });
   await page.close();
   return m;
@@ -77,6 +83,13 @@ describe.skipIf(!browserAvailable)('Home draws the mark of what an agent thread 
   it("draws Codex's mark on a Codex thread", async () => {
     expect((await look()).needs[1]).toMatchObject({ mark: 'codex', eyes: false, size: 28 });
   }, 30_000);
+  for (const theme of ['light', 'dark']) {
+    it(`sits the mark on the Inbox's solid tile with a faint ring, not on the see-through sky (${theme})`, async () => {
+      const m = await look({ theme });
+      expect(m.tile.background).toBe(m.surface);
+      expect(m.tile.ring).toMatch(/color\(srgb [\d.]+ [\d.]+ [\d.]+ \/ 0\.08\)/);
+    }, 30_000);
+  }
   it('keeps the agent face for a harness that has no mark', async () => {
     expect((await look()).needs[2]).toMatchObject({ mark: null, eyes: true, size: 28 });
   }, 30_000);

@@ -191,8 +191,9 @@ html:root[data-skin="ember-grid"][data-sky-dark] {
 .hm-face.hm-agent, :root[data-theme="light"] .hm-face.hm-agent { background: none; }
 .hm-agent > .agent-face { width: 28px; height: 28px; }
 .hm-agent .agent-eyes { width: 22px; height: 22px; }
-.hm-agent > .harness-mark { width: 28px; height: 28px; border-radius: 8px; }
-.hm-agent > .harness-mark > svg { width: 26px; height: 26px; }
+/* The Inbox's white tile and ring (threads/pages.css .th-slot .harness-mark), at Home's size. */
+.hm-agent > .harness-mark { width: 28px; height: 28px; border-radius: 8px; background: var(--surface); border-color: color-mix(in srgb, var(--text) 8%, transparent); }
+.hm-agent > .harness-mark > svg { width: 22.96px; height: 22.96px; }
 :root[data-theme="light"] .hm-face.ai { background: rgba(255, 255, 255, .6); border-color: rgba(30, 22, 36, .14); }
 :root[data-theme="light"] .hm-face.live::after, :root[data-theme="light"] .hm-face.wait::after { box-shadow: 0 0 0 2px rgba(255, 255, 255, .95); }
 :root[data-theme="light"] .hm-face.live::after { background: #3fb36b; }
