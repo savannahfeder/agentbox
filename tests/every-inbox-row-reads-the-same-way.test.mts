@@ -104,8 +104,9 @@ describe('where the face sits', () => {
     expect(slot).not.toMatch(/position: absolute/);
   });
 
+  // `:not(.th-head)` is a rule for the rows, which the heading does not take.
   it('leaves the Thread heading where the titles of rows without faces start', () => {
-    expect(css).not.toMatch(/\.th-head[^{]*\{[^}]*padding-left/);
+    expect(css).not.toMatch(/(?<!:not\()\.th-head[^{]*\{[^}]*padding-left/);
   });
 
   it('leaves the unread dot in the margin', () => {

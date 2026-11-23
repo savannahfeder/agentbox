@@ -320,6 +320,8 @@ export interface PlacedFile {
   name: string;
   /** The name a person gave it in Files; `name` stays its name on disk. */
   title?: string;
+  /** The icon a person picked for its tile. */
+  icon?: string;
   kind: FileKind | null;
   /** Made in Files and nothing written in it yet. */
   blank?: boolean;
@@ -374,6 +376,7 @@ export type FileFolderAct =
   | { do: 'rename'; id: string; name: string }
   | { do: 'move'; key: string; folder: string | null }
   | { do: 'name'; key: string; name: string }
+  | { do: 'icon'; key: string; icon: string }
   | { do: 'remove'; id: string }
   | { do: 'restore'; ids: string[] };
 
@@ -820,6 +823,8 @@ export interface RunningSession {
   startedAt: number;
   /** When the reply this cloud run is working on went in; absent on its first turn. Timers read `runningSince`. */
   turnStartedAt?: number;
+  /** How long its next command has waited for memory on this computer; absent while none waits. */
+  memoryHeldMs?: number;
   /**
    * WHICH CODING AGENT REALLY STARTED THIS RUN, written at the spawn — a fact,
    *  where `snapshot.engines.byItem` is the supervisor's answer for the NEXT
@@ -1822,7 +1827,7 @@ declare global {
       compact(p: { product: string; id: string }): Promise<{state: string; at: number}>;
       remoteControl(p: {product: string; id: string; action?: string}): Promise<{state: string; at: number; text?: string; url?: string; mayBeActive?: boolean} | null>;
       compactionStatus(p: {product: string; id: string}): Promise<{state: string; at: number} | null>;
-      answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean; reopenAs?: { status?: string; mine?: boolean } }): Promise<WorkItem>;
+      answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean; reopenAs?: { status?: string; mine?: boolean }; reopen?: boolean }): Promise<WorkItem>;
       sendNow(p: { product: string; id: string }): Promise<{ ok: boolean; interrupted: boolean }>;
       setProductOrder(p: { order: string[] }): Promise<unknown>;
       setThreadPlaces(p: { places: Record<string, number | null> }): Promise<unknown>;
@@ -1874,7 +1879,7 @@ declare global {
       connectionsCheck?(p: { id: string }): Promise<ConnectionTile | null>;
       connectionsDisconnect?(p: { id: string }): Promise<boolean>;
       connectionsAccept?(p: { id: string }): Promise<boolean>;
-      filesPlace?(): Promise<FilesPlaceList>;
+      filesPlace?(opts?: { soon?: boolean }): Promise<FilesPlaceList>;
       filesPlaceOpen?(p: { key: string }): Promise<FilesPlaceView | null>;
       filesPlaceEdit?(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }>;
       filesPlaceMark?(p: { key: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;

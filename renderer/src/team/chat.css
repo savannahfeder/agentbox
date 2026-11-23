@@ -139,6 +139,11 @@
 .chat-menu-row.on { background: var(--wash); color: var(--text); }
 .chat-menu-row kbd { font: 10.5px var(--mono); color: var(--text-faint); background: none; border: 0; }
 .chat-menu-row.danger.on { color: var(--text); }
+/* A row with a mark reads like the thread menu's: mark, words, then any key. */
+.chat-menu-row:has(.chat-menu-ico) { justify-content: flex-start; gap: 10px; padding-left: 9px; }
+.chat-menu-row:has(.chat-menu-ico) kbd { margin-left: auto; }
+.chat-menu-ico { width: 18px; height: 18px; flex: none; display: grid; place-items: center; color: var(--text-faint); }
+.chat-menu-row.on .chat-menu-ico { color: var(--text-dim); }
 .chat-menu-rule { height: 1px; margin: 4px 0; background: var(--line); }
 
 /* Deleting asks once, in a small card over the window. */
