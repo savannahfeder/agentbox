@@ -79,10 +79,11 @@ export const aWordFollows = ({ key, repeat }: { key: string; repeat: boolean }):
  * you opened the thread, which is a close unless a letter follows within
  * WORD_FOLLOWS_MS. A thread the app moved you to is never closed by it.
  */
-export function keyOnAnOpenThread({ key, justChanged, appMovedYou = false, hasOptions = false, stillTyping = false, boxOnScreen = true, sheetOpen = false }: { key: string; justChanged: boolean; appMovedYou?: boolean; hasOptions?: boolean; stillTyping?: boolean; boxOnScreen?: boolean; sheetOpen?: boolean }): 'shortcut' | 'to the box' | 'wait' | 'the sheet' {
+export function keyOnAnOpenThread({ key, justChanged, appMovedYou = false, hasOptions = false, stillTyping = false, boxOnScreen = true, sheetOpen = false, strayLately = false }: { key: string; justChanged: boolean; appMovedYou?: boolean; hasOptions?: boolean; stillTyping?: boolean; boxOnScreen?: boolean; sheetOpen?: boolean; strayLately?: boolean }): 'shortcut' | 'to the box' | 'wait' | 'the sheet' | 'nowhere' {
   // A sheet over the thread has its own note; a letter meant for it must not land in the agent's box.
   if (sheetOpen && printable(key)) return 'the sheet';
-  if (!boxOnScreen) return 'shortcut';
+  // "/" starts words somebody meant for a box, and the letters after it are those words.
+  if (!boxOnScreen) return key.length === 1 && (strayLately || key === '/') ? 'nowhere' : 'shortcut';
   if (stillTyping && key.length === 1) return 'to the box';
   if (!printable(key)) return 'shortcut';
   const k = key.toLowerCase();
@@ -92,8 +93,12 @@ export function keyOnAnOpenThread({ key, justChanged, appMovedYou = false, hasOp
   return 'to the box';
 }
 
-/** With the list on screen, where there is no box to put a letter in. */
-export function keyOnTheList({ key, justChanged, nothingToActOn = false }: { key: string; justChanged: boolean; nothingToActOn?: boolean }): 'shortcut' | 'held' | 'nowhere' {
+/**
+ * With the list on screen, where there is no box to put a letter in.
+ *  `stillTyping`: a letter went nowhere a moment ago, so this one is the next
+ *  letter of the same words. */
+export function keyOnTheList({ key, justChanged, nothingToActOn = false, stillTyping = false }: { key: string; justChanged: boolean; nothingToActOn?: boolean; stillTyping?: boolean }): 'shortcut' | 'held' | 'nowhere' {
+  if (stillTyping && key.length === 1) return 'nowhere';
   if (!printable(key)) return 'shortcut';
   const k = key.toLowerCase();
   if (nothingToActOn && ROW_KEYS.has(k)) return 'nowhere';

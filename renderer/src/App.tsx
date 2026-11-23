@@ -6126,10 +6126,11 @@ export default function App() {
         }
         // What is typed with no box under it goes in the box of the thread on
         // screen, and a key that closes things waits out a change of screen.
-        const means = !e.defaultPrevented && !focused.agent
-          ? keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), appMovedYou: !pickLandsHere(arrived.current, keyOf(focused), Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc, sheetOpen: !!document.querySelector('.th-menu[role="dialog"]') })
+        const means = !e.defaultPrevented
+          ? keyOnAnOpenThread({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), appMovedYou: !pickLandsHere(arrived.current, keyOf(focused), Date.now()), hasOptions: opts.length > 0, stillTyping: Date.now() - typedIntoBoxAt.current < STILL_TYPING_MS, boxOnScreen: !fullScreenDoc && !focused.agent, sheetOpen: !!document.querySelector('.th-menu[role="dialog"]'), strayLately: Date.now() - nowhereAt.current < STILL_TYPING_MS })
           : 'shortcut';
         if (means === 'the sheet') { e.preventDefault(); return; }
+        if (means === 'nowhere') { e.preventDefault(); nowhereAt.current = Date.now(); return; }
         if (means === 'to the box') {
           e.preventDefault();
           typeIntoTheBox(focused, e.key);
@@ -6242,7 +6243,7 @@ export default function App() {
         // On Your threads a row's keys are its own section's, the way its tab's were (./threads/stack-rules).
         const view = keyTab;
         if (!e.defaultPrevented) {
-          const means = keyOnTheList({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), nothingToActOn });
+          const means = keyOnTheList({ key: e.key, justChanged: screenJustChanged(screenChangedAt.current, Date.now()), nothingToActOn, stillTyping: Date.now() - nowhereAt.current < STILL_TYPING_MS });
           if (means === 'held') { showToast(HELD_AFTER_A_CHANGE); return; }
           if (means === 'nowhere') {
             const box = clearSlot?.querySelector('textarea');
