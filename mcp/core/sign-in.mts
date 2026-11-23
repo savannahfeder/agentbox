@@ -107,7 +107,7 @@ export async function waitForSignIn(id: string, askId: string, { product = null,
     if (Date.now() >= until) {
       return {
         status: 'waiting', ask: askId,
-        message: 'Not answered yet. Call sign_in again with this ask to keep waiting. Between calls, check whether the login finished by itself; if it did, call sign_in with this ask and finished: true, which takes the card away.',
+        message: 'Not answered yet. Call sign_in again with this ask to keep waiting. The card closes when your run ends, and so does the login behind it, so never end your turn pointing them at the card: to stop waiting, end it asking them to reply when they can sign in, and that run starts a fresh login. Between calls, check whether the login finished by itself; if it did, call sign_in with this ask and finished: true, which takes the card away.',
       };
     }
     await new Promise((r) => setTimeout(r, Math.min(pollMs, Math.max(0, until - Date.now()))));

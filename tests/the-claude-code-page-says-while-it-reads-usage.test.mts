@@ -20,6 +20,6 @@ describe('reading each login\'s usage', () => {
   });
 
   it('says a login with no figure yet is being read, rather than that it has none', () => {
-    expect(page).toMatch(/if \(engine !== 'codex'\) return refreshing \? \{ \.\.\.tile, none: 'Reading its usage…' \} : tile;/);
+    expect(page).toMatch(/if \(engine !== 'codex'\) return refreshing \? \{ \.\.\.placed, none: 'Reading its usage…' \} : placed;/);
   });
 });

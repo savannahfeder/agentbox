@@ -41,7 +41,9 @@ import { updateLook } from '../update-row';
 import { InstructionSettings, sizeLabel } from './InstructionSettings';
 import { EVERY } from '../instruction-scope';
 import type {AccountUsageReading, Usage, UsageLimit, WorkspaceSettings} from '../types';
-import { accountLabel, cloudAccountInUse, cloudRunsLine, cloudToggleTarget, countedAccounts, type CloudStatus } from '../cloud-menu';
+import { accountLabel, cloudAccountInUse, cloudRunsLine, cloudToggleTarget, cloudWhenLine, countedAccounts, type CloudStatus } from '../cloud-menu';
+import { cloudSlotWords, inUseWhere, showsCloudSlot } from '../cloud-places';
+import { engineTroubleNote } from '../../../shared/spawn-trouble.mts';
 import { cloudBilling, planKey, planSummary, type PaidPlan } from '../cloud-upgrade';
 import { keyLooksWrong } from '../key-asks';
 import { CloudPlanCards } from './CloudPlanCards';
@@ -475,7 +477,7 @@ const PLACE_TAG: Record<Where, { word: string; Mark: typeof CloudMark }> = {
  * One tile per account, two to a line, its meters stacked inside. IN USE sits
  *  beside the address (on the right margin it was missed), and the button
  *  that switches to an account sits in its top right corner. */
-export function PlaceTiles({ accounts, onAdd, now = Date.now() }: { accounts: PlaceAccount[]; onAdd?: () => void; now?: number }) {
+export function PlaceTiles({ accounts, onAdd, now = Date.now(), slot = null }: { accounts: PlaceAccount[]; onAdd?: () => void; now?: number; slot?: ReactNode }) {
   const headerTime = usageCheckedAt(Math.max(0, ...accounts.map((a) => a.checkedAt ?? 0)) || null, now);
   const ownTime = (a: PlaceAccount) => !!a.checkedAt
     && (!!a.usageError || now - a.checkedAt >= OWN_TIME_AFTER_MS || usageCheckedAt(a.checkedAt, now) !== headerTime);
@@ -510,6 +512,7 @@ export function PlaceTiles({ accounts, onAdd, now = Date.now() }: { accounts: Pl
           {ownTime(a) && <div className="acct-reading-time">{usageCheckedAt(a.checkedAt, now)}</div>}
         </div>
       ))}
+      {slot}
       {onAdd && <button type="button" className="acct-tile acct-tile-add" onClick={onAdd}>Add account</button>}
     </div>
   );
@@ -518,16 +521,29 @@ export function PlaceTiles({ accounts, onAdd, now = Date.now() }: { accounts: Pl
 /**
  * ONE PLACE AGENTS RUN: its name, whether it is on, one line on when threads
  *  go there, and a tile per account. */
-export function Place({ id, name, state = null, line = null, action, warn, accounts, onAdd, now }: {
+export function Place({ id, name, state = null, line = null, action, warn, accounts, onAdd, now, slot = null }: {
   id: string; name: string; state?: 'On' | 'Off' | null; line?: string | null; action?: ReactNode; warn?: string | null;
-  accounts: PlaceAccount[]; onAdd?: () => void; now?: number;
+  accounts: PlaceAccount[]; onAdd?: () => void; now?: number; slot?: ReactNode;
 }) {
   const label = <>{name}{state && <span className={`set-badge${state === 'On' ? '' : ' set-badge-off'}`}>{state}</span>}</>;
   return (
     <Group id={id} label={label} action={action} bare>
       {(warn || line) && <div className="acct-place-line" role="status">{warn ?? line}</div>}
-      <PlaceTiles accounts={accounts} onAdd={onAdd} now={now} />
+      <PlaceTiles accounts={accounts} onAdd={onAdd} now={now} slot={slot} />
     </Group>
+  );
+}
+
+/** The card that stands where an agent's cloud login would be, so a login on this computer alone is plain to see. */
+export function CloudSlot({ agent, onAdd }: { agent: string; onAdd?: () => void }) {
+  const { title, line } = cloudSlotWords(agent);
+  return (
+    <div className="acct-tile acct-tile-slot">
+      <div className="acct-tile-head"><span className="acct-place"><CloudMark size={12} />Cloud</span></div>
+      <div className="acct-slot-title">{title}</div>
+      <div className="acct-slot-line">{line}</div>
+      {onAdd && <div className="acct-slot-act"><button type="button" className="set-ghost" onClick={onAdd}>Add to cloud</button></div>}
+    </div>
   );
 }
 
@@ -563,7 +579,7 @@ export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, on
   many: boolean; now: number; onUse: (profile: string) => void;
   cloud?: boolean;
   engine?: 'claude' | 'codex';
-  onCloudSignIn?: (key: string | null, email: string | null) => void;
+  onCloudSignIn?: (key: string | null, email: string | null, engine?: 'claude' | 'codex') => void;
 }): PlaceAccount {
   const h = a.here;
   const c = a.cloud;
@@ -1786,7 +1802,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   /** The cloud, when this Mac is set up for it: its own logins are listed on the agent's page. */
   cloud?: CloudStatus | null;
   /** Signs a Claude account in to the cloud (a login's key to sign it in again), on the cloud's own screen. */
-  onCloudSignIn?: (key: string | null, email: string | null) => void;
+  onCloudSignIn?: (key: string | null, email: string | null, engine?: 'claude' | 'codex') => void;
   /** Agentbox Cloud's plans, where this copy offers it: the Cloud page. */
   /** `teamPlan`: a team's own Plan and Billing page, handed in like `teamPane` so this screen holds no team code. */
   cloudPlans?: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; teamPro?: StartTeamPro | null } | null;
@@ -2072,6 +2088,9 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
     const accounts = engine === 'codex'
       ? codexAccountsOnce({ here: agent.accounts, cloud: cloudLogins, readings: codexReadings, current: newerReading(agent.reading, codexReading) })
       : accountsOnce({ here: agent.accounts, cloud: cloudLogins, readings: accountReadings, current: agent.reading });
+    const mode = cloud?.setUp ? cloud.mode : 'mac';
+    const slot = showsCloudSlot({ setUp: !!cloud?.setUp, cloudLogins: cloudLogins.length });
+    const cloudCanRun = !!cloudInUse?.ready;
     const tiles = accounts.map((a) => {
       const tile = accountTile(a, {
         many: agent.accounts.length > 1, now, engine,
@@ -2093,11 +2112,22 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
         // Signing in to the cloud from a tile is Claude's alone.
         cloud: !!cloud?.setUp, onCloudSignIn: engine === 'claude' ? onCloudSignIn : undefined,
       });
-      if (a.limits?.length) return tile;
-      if (engine !== 'codex') return refreshing ? { ...tile, none: 'Reading its usage…' } : tile;
+      const at = inUseWhere({ chosenHere: !!tile.inUse, isCloudInUse: !!a.cloud && a.cloud.key === cloudInUse?.key, cloudCanRun, mode });
+      const cloudOnly = at.cloud && !a.here;
+      const placed: PlaceAccount = {
+        ...tile, inUse: at.here || at.cloud,
+        // The empty cloud card is the one way in, so the tile does not offer it again.
+        ...(slot ? { cloudAct: null } : {}),
+        ...(cloudOnly ? { about: mode === 'all' ? ['Runs every thread'] : tile.about, meters: true, none: 'No usage reading from the cloud yet' } : {}),
+      };
+      if (a.limits?.length || cloudOnly) return placed;
+      if (engine !== 'codex') return refreshing ? { ...placed, none: 'Reading its usage…' } : placed;
       // Codex writes an account's usage down only once it has worked.
-      return { ...tile, none: tile.inUse ? 'Codex reports usage as it works' : 'No reading until this account runs' };
+      return { ...placed, none: placed.inUse ? 'Codex reports usage as it works' : 'No reading until this account runs' };
     });
+    // This computer's login at its limit stops nothing while the cloud takes every thread.
+    const limitIsHereOnly = mode === 'all' && cloudCanRun
+      && (agent.accounts.some((h) => h.chosen && h.atLimit) || agent.trouble === engineTroubleNote('at-limit', agent.name));
     const lastRead = Math.max(0, ...tiles.map((a) => a.checkedAt ?? 0));
     const checked = lastRead ? usageCheckedAt(lastRead, now) : '';
     const busy = engine === 'codex' ? codexRefreshing : refreshing;
@@ -2117,7 +2147,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             state worth a row, because the card is the only place that choice can
             be given back: a choice that could only be undone by hand-editing a
             file nobody is told about is not a door, it is a trap. */}
-        {(!agent.found || agent.trouble || agent.chosen)
+        {(!agent.found || (agent.trouble && !limitIsHereOnly) || agent.chosen)
           && (engine === 'codex' ? <CodexCli {...status} /> : <ClaudeCode {...status} />)}
         {agent.found && (
           <>
@@ -2139,18 +2169,20 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               warn={engine === 'claude' ? w.accountsNote : null}
               /* WHY A SECOND ACCOUNT BUYS NO MORE AGENTS, said only where
                  somebody can see two of their own (w-dac993a554). */
-              line={tiles.length > 1 ? 'Your agents run on one account at a time.' : null}
+              // With the cloud on, each place has its own one, so the line is no longer true.
+              line={tiles.length > 1 && mode === 'mac' ? 'Your agents run on one account at a time.' : null}
               accounts={tiles}
               now={now}
               onAdd={() => void addAccount(agent)}
+              slot={slot ? <CloudSlot agent={agent.name} onAdd={onCloudSignIn ? () => onCloudSignIn(null, null, engine) : undefined} /> : null}
             />
-            {cloudHere && (
+            {cloud?.setUp && (
               <Group id="cloud-accounts" label="Cloud">
-                <Row label="Use the cloud" desc={cloudRunsLine(cloudHere.mode, cloudInUse ? accountLabel(cloudInUse, cloudLogins) : null)}>
+                <Row label="Use the cloud" desc={cloudInUse ? cloudRunsLine(cloud.mode, accountLabel(cloudInUse, cloudLogins)) : cloudWhenLine(cloud.mode)}>
                   <Switch
-                    on={cloudHere.mode !== 'mac'}
+                    on={cloud.mode !== 'mac'}
                     label="Use the cloud"
-                    onChange={() => void write(api.setWorkspaceSetting({ key: 'cloudRuns', value: cloudToggleTarget(cloudHere) }))}
+                    onChange={() => void write(api.setWorkspaceSetting({ key: 'cloudRuns', value: cloudToggleTarget(cloud) }))}
                   />
                 </Row>
               </Group>

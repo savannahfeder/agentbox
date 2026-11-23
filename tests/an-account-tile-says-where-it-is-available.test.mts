@@ -119,7 +119,7 @@ describe('the cloud’s sign-in, opened from the tile', () => {
 
   it('starts the sign-in and opens the cloud screen over Settings', () => {
     const app = read('renderer/src/App.tsx');
-    expect(app).toMatch(/onCloudSignIn=\{\(key, email\) => \{[\s\S]{0,200}api\.cloudSignIn\(\{ action: 'start', engine: 'claude', key \}\)[\s\S]{0,200}setCloudSetupOpen\(true\)/);
+    expect(app).toMatch(/onCloudSignIn=\{\(key, email, engine = 'claude'\) => \{[\s\S]{0,200}api\.cloudSignIn\(\{ action: 'start', engine, key \}\)[\s\S]{0,200}setCloudSetupOpen\(true\)/);
     expect(app).toMatch(/<CloudSetup[\s\S]{0,200}signInAs=\{cloudSignInAs\}/);
   });
 

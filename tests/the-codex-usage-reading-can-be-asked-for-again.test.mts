@@ -88,6 +88,6 @@ describe('the control the page offers', () => {
   // was wrong: "No usage reading yet" alone reads as something broken. One
   // line, with no caption under it, because a caption goes unread.
   it('says why there is nothing yet, in one line', () => {
-    expect(page).toContain("none: tile.inUse ? 'Codex reports usage as it works'");
+    expect(page).toContain("none: placed.inUse ? 'Codex reports usage as it works'");
   });
 });
