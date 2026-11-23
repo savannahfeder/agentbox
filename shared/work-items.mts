@@ -54,6 +54,9 @@ export interface RouteOffer { role: string; why: string; gains?: string[]; answe
 export interface Routed { to?: string; ask?: string[]; why: string; at: number; by: 'auto' | 'you'; offer?: RouteOffer }
 export interface SaidAt { said: string; at: number }
 export interface TeammateFrom { teammate: string; name: string }
+/** A thread owner asking one teammate for something on it (shared/thread-asks.mts). */
+export interface AskPatch { kind: 'help' | 'review'; owner: string; thread: string; product: string; step?: string; note?: string }
+export type Verdict = 'done' | 'yes' | 'changes';
 export type MessageEditPatch = { on: string; gone: true; text?: undefined } | { on: string; text: string; gone?: undefined };
 /** `place`: where in the file it points, as an in-app note does (shared/artifact-marks.mts). */
 export interface LinkComment { name: string; file: string; text: string; place?: NotePlace }
@@ -106,11 +109,15 @@ export type WorkItemPatch = {
   handedOver?: SaidAt;
   linkComment?: LinkComment;
   linkReply?: { file: string; text: string };
+  saidOutside?: string;
+  chatAt?: number;
   comment?: { text: string; name?: string };
   artifact?: ArtifactMarkPatch;
   putAway?: boolean;
   signIn?: SignInAsk;
   signInAnswer?: SignInAnswer;
+  ask?: AskPatch;
+  verdict?: Verdict;
 };
 export type WorkItemField = keyof WorkItemPatch;
 export type PatchInput = { readonly [K in WorkItemField]?: unknown };
@@ -393,6 +400,13 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // THE OWNER'S ANSWER TO THOSE, POSTED ON THE LINK PAGE: `{ file, text }`. It
   // answers the comments before it and starts no agent.
   'linkReply',
+  // WHAT YOU TYPED TO A CHAT BROUGHT IN, WHERE IT STARTED (main/chat-follow.mts),
+  // written by the app as yours. Like `linkReply` it starts no agent: the agent
+  // it was typed to already has it.
+  'saidOutside',
+  // HOW FAR THAT CHAT HAS BEEN READ, in its own times: the row's last write is
+  // no measure, since the write-up of one answer lands after the next message.
+  'chatAt',
   // WORDS A TEAMMATE LEFT ON A SHARED THREAD: `{ text }`, on a line the sync
   // writes from the cloud's own comment (main/team/thread-share.mts). A delta
   // like `react`, read back as `waitingComments` until the owner deals with
@@ -408,6 +422,9 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // A SIGN-IN LINK A RUNNING AGENT IS WAITING ON, AND THE ANSWER TO IT
   // (shared/sign-in-ask.mjs). Latest wins on both, whoever wrote it.
   'signIn', 'signInAnswer',
+  // A TASK THAT ASKS FOR HELP OR A REVIEW ON ONE THREAD, and what its holder
+  // said when they handed it back (shared/thread-asks.mts).
+  'ask', 'verdict',
 ];
 
 // THE SUMMARY IS SHARED BETWEEN THE PERSON AND THE AGENT. Everywhere else the
@@ -671,7 +688,7 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
     // rule about how the app writes, and it lives with the writer in
     // main/row-label.mts. This module holds no taxonomy, only storage.
     case 'label': return str(value, MAX_TITLE);
-    case 'body': case 'result': case 'note': case 'answer': case 'typed': return str(value, MAX_TEXT_BYTES);
+    case 'body': case 'result': case 'note': case 'answer': case 'typed': case 'saidOutside': return str(value, MAX_TEXT_BYTES);
     // kind and product are free strings on purpose: the taxonomy of work is the
     // caller's to invent and change without a migration here.
     //
@@ -733,7 +750,7 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
     //
     // A ts rather than a flag, so her NEXT answer outdates it by carrying a
     // later one, with nothing to clear and nobody who has to remember to.
-    case 'answeredThrough': return Number.isFinite(value) ? Math.trunc(value as number) : undefined;
+    case 'chatAt': case 'answeredThrough': return Number.isFinite(value) ? Math.trunc(value as number) : undefined;
     // An empty list is a real value: it is how the last label, `ship` above
     // all, comes off.
     case 'labels': {
@@ -804,6 +821,17 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
     case 'signIn': return cleanSignIn(value);
     case 'signInAnswer': return cleanSignInAnswer(value);
     case 'putAway': return typeof value === 'boolean' ? value : undefined;
+    case 'ask': {
+      if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+      const kind = value.kind === 'help' || value.kind === 'review' ? value.kind : null;
+      const owner = shortId(value.owner);
+      const thread = shortId(value.thread);
+      const product = str(value.product, MAX_SHORT);
+      const step = str(value.step, MAX_SUMMARY);
+      const note = str(value.note, MAX_SUMMARY);
+      return kind && owner && thread && product ? { kind, owner, thread, product, ...(step ? { step } : {}), ...(note ? { note } : {}) } : undefined;
+    }
+    case 'verdict': return value === 'done' || value === 'yes' || value === 'changes' ? value : undefined;
     case 'shippedAt': return Number.isFinite(value) && (value as number) >= 0 ? Math.trunc(value as number) : undefined;
     case 'linkComment': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
@@ -1122,7 +1150,7 @@ export function foldWorkItems(lines: unknown, now = Date.now()): Map<string, Wor
 // A reply taken back reads as this, and is nobody's news.
 const WITHDRAWN = '(withdrawn)';
 // How much of a message the record keeps: enough for a row's one line.
-const TALK_TEXT = 280;
+export const TALK_TEXT = 280;
 // How many of the newest messages the record keeps, in the chat and in each
 // thread. The counts it answers stop at your own newest word, which in a chat
 // you are part of is never this far back.
@@ -1163,6 +1191,8 @@ export const WORK_THREAD = 'work-thread';
 function reopenIfWrittenPastTheClose(item: FoldingItem, said: Said[]): void {
   const close = item.status === 'done' ? item.wrote.status : null;
   if (!close?.by) return;
+  // An ask handed back (shared/thread-asks.mts) stays handed back: a thank-you after it is a message, not more work.
+  if (item.ask && item.verdict) return;
   const others = said.filter((s) => s.by !== close.by && !s.body);
   const crossed = others.filter((s) => s.crossed === close.ts);
   if (!crossed.length && !others.some((s) => s.ts > close.ts)) return;

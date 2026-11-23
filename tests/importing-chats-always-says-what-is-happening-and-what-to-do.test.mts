@@ -88,7 +88,7 @@ describe('the row', () => {
 describe('the page', () => {
   it('shows where the chat left off under the status, never an empty page', () => {
     const page = read('renderer/src/components/ItemThread.tsx');
-    const at = page.indexOf('if (queue && catchUpDue(item)) {');
+    const at = page.indexOf('if (queue && gettingReady(item) && !earlierOpen) {');
     const block = page.slice(at, page.indexOf('if (queue && working && !newest', at));
     expect(block).toContain('Getting this chat ready. Its summary and options will appear here.');
     expect(block).toContain('<QueueAnswer');

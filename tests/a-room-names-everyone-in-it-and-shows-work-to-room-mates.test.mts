@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { PGlite } from '@electric-sql/pglite';
 import { emptyDatabase } from './an-empty-test-database.mts';
+import { EVERY_TEAM_PAYS } from './every-team-pays.mts';
 
 const dir = path.join(import.meta.dirname, '..', 'cloud/supabase/migrations');
 const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
@@ -61,6 +62,8 @@ beforeAll(async () => {
   db = new PGlite(await emptyDatabase());
   await db.exec(STAND_IN);
   await db.exec(migration);
+  await db.exec(`insert into public.multiplayer_people (email) values ('*')`);
+  await db.exec(EVERY_TEAM_PAYS);
   await db.exec(GRANTS);
   for (const [id, email, name] of [[ANA, 'ana@astral.test', 'Ana Lima'], [TEO, 'teo@astral.test', 'Teo Park'], [MAYA, 'maya@tester.test', 'Maya Chen'], [JUN, 'jun@elsewhere.test', 'Jun Ito']]) {
     await db.query(`insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values ($1, $2, now(), $3)`, [id, email, { full_name: name }]);

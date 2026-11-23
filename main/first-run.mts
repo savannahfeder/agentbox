@@ -177,6 +177,7 @@ export function lastCommit(folder: string) {
     for (const key of Object.keys(env)) if (key.startsWith('GIT_')) delete env[key];
     const out = execFileSync('git', ['-C', folder, 'log', '-1', '--format=%cr'], {
       stdio: ['ignore', 'pipe', 'ignore'], timeout: 2_000, env,
+      windowsHide: true,
     }).toString().trim();
     return out || null;
   } catch {

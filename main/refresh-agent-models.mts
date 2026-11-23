@@ -28,7 +28,7 @@ export async function refreshAgentModels(engine: string,config: ModelRefreshConf
 function openAppServer(config: ModelRefreshConfig,home: string): ModelRefreshClient{
  // codex-cli refuses a CODEX_HOME that does not exist rather than making it.
  ensureCodexHome(home);
- return createCodexAppServer({spawn:(()=>spawn(config.codexBin!,['app-server'],{cwd:config.home,env:codexLaunchEnv(config.codexBin!,{...terminalEnv(),CODEX_HOME:home}),stdio:['pipe','pipe','pipe']})) as never,requestTimeoutMs:10000});
+ return createCodexAppServer({spawn:(()=>spawn(config.codexBin!,['app-server'],{cwd:config.home,env:codexLaunchEnv(config.codexBin!,{...terminalEnv(),CODEX_HOME:home}),stdio:['pipe','pipe','pipe'],windowsHide:true})) as never,requestTimeoutMs:10000});
 }
 async function refreshOne(client: ModelRefreshClient,home: string){
  const deadline=setTimeout(()=>client.close('Model refresh timed out'),15000);

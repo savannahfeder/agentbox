@@ -22,5 +22,7 @@ command -v aws >/dev/null 2>&1 || {
   d=$(mktemp -d) && curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-$(uname -m).zip" -o "$d/aws.zip" \
     && unzip -q "$d/aws.zip" -d "$d" && sudo "$d/aws/install" >/dev/null; rm -rf "$d"
 }
+# The skills, their tests and the plans: a private repository (.agentbox/private.json).
+sh .agentbox/private-folder.sh
 # python3-venv: the pre-push hook installs semgrep into a venv (scripts/security-scan-the-push.mjs).
 python3 -c 'import ensurepip' >/dev/null 2>&1 || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-venv; }

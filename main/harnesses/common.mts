@@ -1,8 +1,8 @@
 import path from 'node:path';
 import type { ChildProcess } from 'node:child_process';
 import { instructionsFor } from './instructions-file.mts';
+import { windowsRoot } from '../shell-path.mts';
 import type { InstructionsContext, InstructionsAnswer } from './instructions-file.mts';
-import type { OpenCodeProperties } from '../opencode.mts';
 import type { ToolingResult } from '../account-tooling.mts';
 import type { CodexFrame } from '../codex.mts';
 
@@ -50,12 +50,14 @@ export interface HarnessDefinition {
   commandRoute: string;
   casks: readonly string[];
   installer: { shell: string; url: string; pipe: string };
+  windowsInstaller: { url?: string; page: string };
   loginArgs: readonly string[];
   statusArgs: readonly string[];
   credentialFiles: readonly string[];
   scrubPatterns: readonly string[];
   minVersion?: string;
   run?: HarnessRun;
+  acp?: { bin: string; args: readonly string[] };
   instructions?: { file?: string; in?: string };
   capabilities: HarnessCapabilities;
   imageInstruction: string;
@@ -97,6 +99,8 @@ export interface SignInFilesWhere {
 export interface HarnessCommand {
   file: string;
   args: string[];
+  /** Set when the command needs other variables than the caller's. */
+  env?: Env;
 }
 
 export interface HarnessItem {
@@ -109,6 +113,12 @@ export interface HarnessPlan {
   args: string[];
   answerMode?: string | null;
   resumeId?: string | null;
+  /** What an engine with no command line reads the turn from. */
+  prompt?: string | null;
+  system?: string | null;
+  model?: string | null;
+  /** The person's connections this run may use, by server name. */
+  connectionServers?: Record<string, HarnessToolServer> | null;
 }
 
 export interface HarnessSpawnContext {
@@ -130,8 +140,18 @@ export interface HarnessRecord {
 
 export interface HarnessSession {
   codexChange?: CodexFrame[];
-  opencodeChange?: string[];
+  acpChange?: string[];
   [key: string]: unknown;
+}
+
+/** A tool server a worker is handed: the store's, or one of the person's connections. */
+export interface HarnessToolServer { name?: string; command: string; args?: string[]; env?: Record<string, string | null | undefined> }
+
+/** One worker's approval cards, for an engine whose requests reach the app in this process. Each answers true for a yes. */
+export interface HarnessApprovalCards {
+  command(command: string, cwd: string | null): Promise<boolean>;
+  edit(files: { path: string; kind: 'add' | 'update' | 'delete'; diff: string }[]): Promise<boolean>;
+  close(why?: string): unknown;
 }
 
 export interface HarnessSupervisor {
@@ -154,8 +174,12 @@ export interface HarnessSupervisor {
   codexCardChanged(...args: unknown[]): unknown;
   codexMemoryGateEnv(): Env;
   _releaseIdleCodex(profile: string): unknown;
-  _openCodePassword?(): string | null;
-  _openCodeApprovals?(item: HarnessItem): ((type: string, properties: OpenCodeProperties) => unknown) | null;
+  /** The app's own folder, which no worker is granted. */
+  userDir?: string;
+  /** Tells the screens something they draw has changed. */
+  onChange?: (() => void) | null;
+  _codexStoreServer(item: HarnessItem): HarnessToolServer | null;
+  approvalCardsFor(item: HarnessItem, say: (line: string) => unknown): HarnessApprovalCards;
 }
 
 export interface CodexClient {
@@ -168,6 +192,8 @@ export interface HarnessReaders {
   summarize(...args: never[]): unknown;
   trace(...args: never[]): unknown;
   activity(...args: never[]): unknown;
+  /** The agent has begun answering, so the words it was started with are in its conversation. */
+  took(...args: never[]): boolean;
 }
 
 /** One operation of a harness as the registry hands it out: every name is a function, declined or absent ones refuse before doing anything. */
@@ -175,7 +201,7 @@ export interface Harness extends Omit<HarnessDefinition, 'instructions'> {
   discover(configured?: unknown, where?: unknown): HarnessBinaryFound;
   binary(config: HarnessConfig | null | undefined): string | null;
   workerArgs(options?: WorkerArgsOptions): string[];
-  install(): HarnessCommand;
+  install(platform?: NodeJS.Platform, env?: Env): HarnessCommand;
   signIn(bin: string): HarnessCommand;
   signInStatus(bin: string): HarnessCommand;
   signInFiles(where: SignInFilesWhere): string[];
@@ -257,6 +283,24 @@ export function workerArgsFrom(run: HarnessRun | null | undefined, { prompt, gra
   return args as string[];
 }
 
+// Windows has no /bin/bash, so it runs the vendor's documented PowerShell line.
+// Windows PowerShell by its full path, so a powershell.exe earlier on PATH is
+// never the one run.
+function windowsInstall(definition: HarnessDefinition, env: Env): HarnessCommand {
+  const { url, page } = definition.windowsInstaller;
+  if (!url) throw Error(`${definition.label} has no installer the app can run on Windows yet. Install it from ${page}, then try again.`);
+  // An allowlist: anything PowerShell could read as more than an address is refused.
+  if (!/^https:\/\/[A-Za-z0-9.-]+(\/[A-Za-z0-9._~\/-]*)?$/.test(url)) throw Error(`${definition.label}'s Windows installer address is not a plain https address.`);
+  return {
+    file: path.win32.join(windowsRoot(env), 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'),
+    args: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', `irm ${url} | iex`],
+    // Started from PowerShell 7, the app inherits a PSModulePath that names 7's
+    // modules first; Windows PowerShell then cannot load its own
+    // Get-FileHash, which Claude Code's installer needs. Unset, it builds its own.
+    env: Object.fromEntries(Object.entries(env).filter(([key]) => key.toLowerCase() !== 'psmodulepath')),
+  };
+}
+
 export function definitionMethods(definition: HarnessDefinition) {
   const scrub = definition.scrubPatterns.map(pattern => new RegExp(pattern));
   return {
@@ -270,7 +314,10 @@ export function definitionMethods(definition: HarnessDefinition) {
     // would say so.
     instructions: (context?: InstructionsContext) => instructionsFor(definition, context),
     launchEnv: (_bin: string | null | undefined, env: Env): Env => ({ ...env }),
-    install: () => ({ file: definition.installer.shell, args: ['-c', `curl -fsSL ${definition.installer.url} | ${definition.installer.pipe}`] }),
+    install: (platform: NodeJS.Platform = process.platform, env: Env = process.env): HarnessCommand => {
+      if (platform === 'win32') return windowsInstall(definition, env);
+      return { file: definition.installer.shell, args: ['-c', `curl -fsSL ${definition.installer.url} | ${definition.installer.pipe}`] };
+    },
     signIn: (bin: string): HarnessCommand => ({ file: bin, args: [...definition.loginArgs] }),
     signInStatus: (bin: string): HarnessCommand => ({ file: bin, args: [...definition.statusArgs] }),
     accountKey: (profile: string | null | undefined) => `${definition.accountPrefix}${profile}`,

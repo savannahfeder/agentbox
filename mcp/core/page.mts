@@ -123,7 +123,7 @@ export async function captureWithChrome({ url, width, height, chrome = findChrom
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', ...KEEPS_OFF_THE_KEYCHAIN,
     `--window-size=${width},${height}`, 'about:blank',
-  ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  ], { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
   const done = () => { try { child.kill('SIGKILL'); } catch { /* already gone */ } try { fs.rmSync(profile, { recursive: true, force: true }); } catch { /* best effort */ } };
 
   try {

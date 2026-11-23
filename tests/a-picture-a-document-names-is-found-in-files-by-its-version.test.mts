@@ -51,6 +51,8 @@ describe('a picture named by a version', () => {
 describe('the app', () => {
   it('asks Files for a picture the paths could not find', () => {
     const ipc = fs.readFileSync(new URL('../main/ipc.mts', import.meta.url), 'utf8');
-    expect(ipc).toMatch(/zero:open-artifact[\s\S]{0,1500}pictureNamed/);
+    // The finder the open channel and the open mark's menu share.
+    expect(ipc).toMatch(/const findToOpen = [\s\S]{0,900}pictureNamed/);
+    expect(ipc).toMatch(/'zero:open-artifact'[\s\S]{0,700}await findToOpen\(/);
   });
 });

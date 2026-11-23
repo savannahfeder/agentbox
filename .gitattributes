@@ -1,0 +1,4 @@
+# Every text file is checked out with LF, as it is committed. A Windows clone
+# with core.autocrlf converts them to CRLF, and tests that read a source file
+# as text then see a \r on every line.
+* text=auto eol=lf

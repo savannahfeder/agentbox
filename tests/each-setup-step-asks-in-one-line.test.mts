@@ -4,8 +4,7 @@
 // rows go over etc looks messy") and from the account step ("feels too
 // cluttered"). Walking every screen in both themes afterwards, the invite,
 // AI teammates, look and finished steps still carried one, so the setup read
-// two ways. Every step but the folder one, whose second line says agents can
-// change the files, now has a heading alone, short enough for one line.
+// two ways. Every step now has a heading alone, short enough for one line.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { PRO_PITCH } from '../renderer/src/setup-split.ts';
@@ -18,21 +17,20 @@ describe('the headings of the setup', () => {
     expect(heads.map((h) => h.ask)).toEqual([
       'Add your recent agents.',
       'Pick a folder for your first project.',
-      'Invite your team.',
       'Add your own AI teammates.',
       'Pick your agent.',
       'Pick your look.',
       'You’re set up.',
     ]);
   });
-  it('have no second line, except where it warns that agents change your files', () => {
-    for (const h of heads) {
-      if (h.ask.startsWith('Pick a folder')) expect(h.under).toBe('Agents can read and change the files in it.');
-      else expect(h.under).toBe('');
-    }
+  // The folder step's "Agents can read and change the files in it." went too, on
+  // 2026-11-23: "That's extra unnecessary context. You just need to say, 'Pick a
+  // folder for your first project.'"
+  it('have no second line', () => {
+    for (const h of heads) expect(h.under).toBe('');
   });
   it('fit on one line of the steps column', () => {
-    for (const h of heads.filter((x) => !x.under)) expect(h.ask.length).toBeLessThanOrEqual(26);
+    for (const h of heads) expect(h.ask.length).toBeLessThanOrEqual(h.ask.startsWith('Pick a folder') ? 38 : 26);
   });
   it('include the purchase page’s, from its own words, alone and on one line', () => {
     expect(split).toMatch(/head = \[PRO_PITCH\.head, ''\];/);

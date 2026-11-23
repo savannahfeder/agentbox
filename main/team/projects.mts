@@ -151,7 +151,25 @@ export function markShared(dir: string, { teamId, visibility = 'team', people = 
 
 // A project a teammate shared, made into a project here. Its folder is named
 // from the project's name, and a name already taken on this Mac gets -2, -3.
-export function joinSharedProject(accountRoot: string, cloudProject: CloudProject): SharedProjectRef {
+/**
+ * The name a joined project goes by here. One of your own already called the
+ * same thing gets the sharer's first name after it, or two rows, two filter
+ * choices and two composer chips read "Web app" and nobody can tell which is
+ * the team's (two rounds of team testers, 2026-11-20).
+ */
+export function joinedName(accountRoot: string, name: string, sharer: string | null | undefined): string {
+  if (!sharer) return name;
+  let taken = false;
+  try {
+    taken = fs.readdirSync(accountRoot).some((d) => {
+      const p = readProject(path.join(accountRoot, d));
+      return !!p && !p.team?.direct && String(p.name ?? '').trim().toLowerCase() === name.trim().toLowerCase();
+    });
+  } catch { /* no projects yet */ }
+  return taken ? `${name} · ${sharer}` : name;
+}
+
+export function joinSharedProject(accountRoot: string, cloudProject: CloudProject, sharerName: string | null = null): SharedProjectRef {
   const base = cloudProject.direct ? `direct-${String(cloudProject.id).slice(0, 8)}` : String(cloudProject.name || 'shared').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'shared';
   let slug = base;
   for (let n = 2; fs.existsSync(path.join(accountRoot, slug)); n += 1) {
@@ -163,11 +181,12 @@ export function joinSharedProject(accountRoot: string, cloudProject: CloudProjec
     slug = `${base}-${n}`;
   }
   const dir = path.join(accountRoot, slug);
+  const name = cloudProject.direct ? cloudProject.name : joinedName(accountRoot, cloudProject.name, sharerName);
   fs.mkdirSync(dir, { recursive: true });
   writeProject(dir, {
     schemaVersion: 1,
     id: slug,
-    name: cloudProject.name,
+    name,
     createdAt: new Date().toISOString(),
     team: {
       projectId: cloudProject.id,
@@ -178,7 +197,31 @@ export function joinSharedProject(accountRoot: string, cloudProject: CloudProjec
       ...(cloudProject.direct ? { direct: true } : {}),
     },
   });
-  return { projectId: cloudProject.id, dir, name: cloudProject.name, slug, direct: cloudProject.direct === true };
+  return { projectId: cloudProject.id, dir, name, slug, direct: cloudProject.direct === true };
+}
+
+const sameName = (name: unknown) => String(name ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+/**
+ * A shared project with no folder on this computer takes the folder of your
+ * own project of the same name, when exactly one has one: without a folder its
+ * agents cannot touch code. The cloud does not say which repository a project
+ * is, so the name is what ties them.
+ */
+export function linkSharedFolders(products: readonly { dir: string; name?: string; repoPath?: string | null; team?: Partial<TeamRecord> | null }[]): { dir: string; repoPath: string }[] {
+  const linked: { dir: string; repoPath: string }[] = [];
+  for (const shared of products) {
+    if (!shared.team || shared.team.direct || shared.repoPath) continue;
+    // joinedName may have put the sharer's name after it.
+    const names = new Set([sameName(shared.name), sameName(String(shared.name ?? '').replace(/ · [^·]+$/, ''))]);
+    const own = products.filter((p) => !p.team && p.repoPath && names.has(sameName(p.name)));
+    if (own.length !== 1 || !fs.existsSync(own[0].repoPath!)) continue;
+    const project = readProject(shared.dir);
+    if (!project || project.repoPath) continue;
+    writeProject(shared.dir, { ...project, repoPath: own[0].repoPath });
+    linked.push({ dir: shared.dir, repoPath: own[0].repoPath! });
+  }
+  return linked;
 }
 
 // THE RECORD A MESSAGE BETWEEN TWO PEOPLE LIVES IN, made on the sender's Mac

@@ -128,12 +128,11 @@ describe('the state leads the line under the title, said once', () => {
     expect(css).toMatch(/\.by-lead \.ts-lead ~ \.fm-said::before \{ content: '· '; \}/);
   });
 
-  // SAID ONCE, AND NOW ONCE ACROSS THE WHOLE THREAD (w-a3482b8c2c): the
-  // summary's rail and its Status row say the state, so the line only leads
-  // with it while neither is on screen.
-  it('is handed the mark by the thread page only while the summary cannot say it', () => {
+  // The side summary that once said the state instead went in 2026-11
+  // (w-d143fcb40a), so every summarised thread's line leads with it.
+  it('is handed the mark by the thread page on every summarised thread', () => {
     const focus = read('renderer/src/components/Focus.tsx');
-    expect(focus).toContain('lead={summarised && !summaryOffered ? <ThreadStateMark item={item} /> : null}');
+    expect(focus).toContain('lead={summarised ? <ThreadStateMark item={item} /> : null}');
   });
 });
 
@@ -152,8 +151,9 @@ describe('the right side is the dots', () => {
     // One thing at a time (w-65bcefb857) puts the line saying where an answer
     // went, and its place and arrows, beside the dots, in that mode only.
     // The faces sit with them so the header is one row (2026-11-02); Add
-    // people is a row in the menu since w-c25aae4035.
-    expect(portals[0]).toMatch(/<span className="ts-top">(\{sentUp && aboveDock\}\{queue && <QueueNav spot=\{queue\.spot\} onStep=\{queue\.onStep\} \/>\})?(\{crumbFrom && !inChats && \(direct \|\| summarised\) && <ConversationAside item=\{item\} \/>\})?\{threadMenu\}<\/span>/);
+    // people is a row in the menu since w-c25aae4035, and whoever you asked
+    // onto the thread sits beside them (w-f702d60afe).
+    expect(portals[0]).toMatch(/<span className="ts-top">(\{sentUp && aboveDock\}\{queue && <QueueNav spot=\{queue\.spot\} onStep=\{queue\.onStep\} \/>\})?(\{crumbFrom && !inChats && !givenTask && \(direct \|\| summarised\) && <ConversationAside item=\{item\} \/>\})?(\{asksCorner\})?\{threadMenu\}<\/span>/);
     expect(focus).not.toMatch(/doneButton|terminalHeaderTarget|done-mark/);
   });
 
@@ -213,7 +213,7 @@ describe('the right side is the dots', () => {
     const css = prose(read('renderer/src/threads/summary.css'));
     // --tag-radius: the button is the Summary button's square, and both of
     // them are tags, which are square in every theme.
-    expect(css).toMatch(/\.ts-more \{[^}]*width: 30px; height: 30px;[^}]*border-radius: var\(--tag-radius\)/);
+    expect(css).toMatch(/\.ts-more \{[^}]*width: 32px; height: 32px;[^}]*border-radius: var\(--tag-radius\)/);
     expect(css).not.toMatch(/border-radius: (1[0-9]|[2-9][0-9])px|50%\s*;[^}]*ts-more/);
   });
 });
@@ -239,10 +239,9 @@ describe('the menu is reachable by keyboard and every key still works', () => {
     expect(menu).toMatch(/onKeyDown=\{openFromKeys\}/);
   });
 
-  it('keeps E, ⌘J and S where they were', () => {
+  it('keeps E and ⌘J where they were', () => {
     expect(app).toContain("else if (e.key === 'e' || e.key === 'E') { e.preventDefault(); markDone(focused); }");
     expect(app).toContain("window.dispatchEvent(new Event('task-terminal-toggle'));");
-    expect(focus).toMatch(/useSummaryShortcut\(toggleSummary, summaryOffered\)/);
     // The menu's terminal row sends the very event ⌘J sends, and the terminal
     // tells the page whether it is open so the row can say Open or Hide.
     expect(focus).toContain("onToggleTerminal={() => window.dispatchEvent(new Event('task-terminal-toggle'))}");

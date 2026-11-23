@@ -9,7 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import { traceStreamLine } from '../main/harnesses/claude-stream.mts';
 import { runNodes } from '../renderer/src/item-thread.ts';
-import { traceLines } from '../renderer/src/terminal.ts';
+import { traceLines } from '../shared/trace-lines.mts';
 
 const call = (id, command) => JSON.stringify({
   type: 'assistant',

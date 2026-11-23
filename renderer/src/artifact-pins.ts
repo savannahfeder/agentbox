@@ -1,6 +1,6 @@
 // PURE. How the big file view (components/ArtifactView.tsx) draws its pins,
 // zooms a picture, and what it offers for the file it found.
-import { noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent, threadFiles, unsentReplies, versionNamed, viewKind } from '../../shared/artifact-marks.mts';
+import { agentOfVersion, noteGoesTo, notesForTheAgent, placeWords, tagsYourAgent, threadFiles, unsentReplies, versionNamed, viewKind } from '../../shared/artifact-marks.mts';
 import type { FileVersion } from '../../shared/artifact-marks.mts';
 import { MAX_ZOOM } from './picture-view';
 import type { FileMarks, FileNote, NotePlace } from './types';
@@ -201,6 +201,12 @@ export function viewOffers(found: Found, signedIn: boolean): { approve: boolean;
 
 type Named = ReadonlyArray<{ id: string; name?: string | null }>;
 
+/** The version as Send reads it: a person's edit of an agent's file is still that agent's. */
+export function withItsAgent<V extends FileVersion>(versions: readonly FileVersion[], v: V): V {
+  const agent = agentOfVersion(versions, v.id);
+  return agent === null ? v : { ...v, agent };
+}
+
 /** Your own open comments on this version that Send hands your agent, and those it has with a reply of yours since. Main sends none on a file the agent did not make. */
 export function notesToSendTheAgent(marks: FileMarks, version: FileVersion, count: number, people: Named, me: string | null): string[] {
   if (typeof version.agent !== 'string') return [];
@@ -217,7 +223,7 @@ export function notesToSendTheAgentAnywhere(marks: FileMarks, families: Readonly
   for (const family of families) {
     const open = family.versions.some((v) => v.id === here);
     for (const v of family.versions) {
-      const got = notesToSendTheAgent(marks, v, family.versions.length, people, me);
+      const got = notesToSendTheAgent(marks, withItsAgent(family.versions, v), family.versions.length, people, me);
       ids.push(...got);
       if (open || !got.length) continue;
       elsewhere += got.length;
@@ -227,6 +233,9 @@ export function notesToSendTheAgentAnywhere(marks: FileMarks, families: Readonly
   return { ids, elsewhere, elsewhereKind: allPictures ? 'picture' : 'file' };
 }
 
+/** Send all sits beside Approve, off the page being read; a film or a picture keeps its bar under the stage. */
+export const sendAllBesideTheNotes = (kind: string | null): boolean => kind !== 'film' && kind !== 'image';
+
 /** The bar under the file: how many comments wait, and how many of them are on another file. */
 export function unsentWords(total: number, elsewhere: number, kind: 'picture' | 'file'): string {
   const head = `${total} ${total === 1 ? 'comment' : 'comments'} not sent to your agent`;
@@ -235,7 +244,10 @@ export function unsentWords(total: number, elsewhere: number, kind: 'picture' | 
   return elsewhere >= total ? `${head}, on ${where}` : `${head}, ${elsewhere} on ${where}`;
 }
 
-export type NoteGoes = { to: 'agent'; now: boolean } | { to: 'person'; person: string } | { to: 'file' };
+/** The bar while Send all is on its way. */
+export const sendingWords = (total: number): string => `Sending ${total} ${total === 1 ? 'comment' : 'comments'} to your agent`;
+
+export type NoteGoes ={ to: 'agent'; now: boolean } | { to: 'person'; person: string } | { to: 'file' };
 
 /**
  * WHO A NOTE GOES TO follows whose thing it is on. A name in the words wins.
@@ -303,7 +315,11 @@ export function whoTalksOnFile(notes: readonly Pick<FileNote, 'file' | 'by' | 't
 }
 
 /** What the button says once the note it sent has saved: who it went to, or null for a comment kept on the file. */
-export const noteSentWords = (sendWords: string): string | null => (sendWords.startsWith('Send to ') ? `Sent to ${sendWords.slice('Send to '.length)}` : null);
+/** A note written while a teammate's review is on you goes with your reply, not on its own. */
+export const ADD_TO_YOUR_REPLY = 'Add to your reply';
+
+export const noteSentWords = (sendWords: string): string | null => (sendWords === ADD_TO_YOUR_REPLY ? 'Added to your reply'
+  : sendWords.startsWith('Send to ') ? `Sent to ${sendWords.slice('Send to '.length)}` : null);
 
 /**
  * Whether a key goes into the note box. The view takes every key while it is

@@ -14,9 +14,10 @@ import {
 } from '../../main/store/teammates-files.mts';
 import { teammateIdOf, hopOf, workOf, setupTitle, mentionsIn, isWorks, letterFor, cleanDuty, dutyStart, isDate, tooLongForAChat, METHOD_CAP, VOICES, YOU, MAX_HOPS, HOP_LABEL_PREFIX } from '../../shared/teammates.mts';
 import { periodKey } from '../../shared/repeats.mts';
+import { isCause } from '../../shared/causes.mts';
 import { resolveProduct, resolveAccount } from './account.mts';
 import type { Duty, Playbook, Teammate } from '../../shared/teammates.mts';
-import type { WorkItem } from '../../shared/work-items.mts';
+import { isDue, type WorkItem } from '../../shared/work-items.mts';
 import type { ProjectSummary } from '../../main/store/project.mts';
 
 /** Where a store tool is called from: the run's environment, and the clock. */
@@ -121,7 +122,9 @@ export function teamPass({ to, title, details, project: named }: { to?: unknown;
   if (!target) throw new Error('pass work to another teammate, not to yourself. For work in another project, name it in project');
   const what = plain(title);
   if (!what) throw new Error('give the work a short title');
-  const yours = toSelf ? startedByYou(item) : !!me?.primary && startedByYou(item);
+  // A pass is yours only from a run your words opened or your reply is newest
+  // on, so a run another teammate's pass started still waits for your yes.
+  const yours = startedByYou(item);
   const m = writeChat(dir, { kind: 'pass', from: me?.id ?? YOU, to: target, title: what.slice(0, 200), details: String(details ?? '').slice(0, 6000), hop, ...writtenIn, ...(where ? { product: where } : {}), ...(yours ? { yours: true } : {}) }, ctx.now);
   const them = team.find((t) => t.id === target);
   const held = me && !yours && (toSelf || them?.handoffsNeedYes !== false);
@@ -159,7 +162,8 @@ export function teamHire({ name, job }: { name?: unknown; job?: unknown } = {}, 
   const now = ctx.now ?? Date.now();
   const id = newTeammateId();
   writeTeammate(dir, id, { name: role, role, letter: letterFor(role, team), job: words.slice(0, 2000), status: 'draft', product: me?.product ?? project.id, createdAt: now, paused: false }, now);
-  writeChat(dir, { kind: 'msg', from: YOU, to: [id], text: words.slice(0, 8000), setup: true }, now);
+  // The job is this thread's words, so it carries `via` like any line a thread writes for you.
+  writeChat(dir, { kind: 'msg', from: YOU, to: [id], text: words.slice(0, 8000), setup: true, via: item.id, viaProduct: project.id }, now);
   writeChat(dir, { kind: 'act', from: me?.id ?? YOU, verb: 'hired', text: `${me?.name ?? 'You'} made ${role}, which is setting itself up.` }, now);
   return { teammate: { id, name: role, status: 'draft' }, note: `${role} wakes now to set itself up, and asks the person what it cannot tell from the job.` };
 }
@@ -200,8 +204,11 @@ const SAID: { [K in keyof Teammate]?: string } = {
 };
 
 // Made from your threads and has written its method from them: the threads
-// answered what a newcomer would otherwise have to ask.
+// answered what a newcomer would otherwise have to ask. One a thread hired was
+// not made by you, so your threads are not your answer to it.
 function learnedFromThreads(dir: string, id: string): boolean {
+  const made = readChat(dir).messages.find((m) => m.kind === 'msg' && m.from === YOU && m.setup && (m.to ?? []).includes(id));
+  if (made?.via) return false;
   try {
     return fs.readdirSync(sourcesDir(dir, id)).length > 0 && fs.statSync(methodFile(dir, id)).size > 0;
   } catch {
@@ -392,14 +399,29 @@ export function teamRoster(ctx: RunContext = {}) {
   };
 }
 
-// WORDS ONE AGENT LEAVES ON ANOTHER AGENT'S STOPPED THREAD go there as a
-// teammate's reply, which the supervisor takes as a turn, as it does a person's
-// reply: her own stop or close outranks it, and so does the hand-off count.
-// Null when this is not that, and the ordinary write goes ahead.
-export function noteToAnotherThread(id: string, patch: { note?: unknown; result?: unknown } | null | undefined, { ownItem, now = Date.now() }: { ownItem?: string | null; now?: number } = {}) {
-  if (!ownItem || !id || id === ownItem) return null;
+// A writer's summary is about its own thread, so it never lands on another's.
+const SUMMARY_FIELDS = ['problem', 'progress', 'solution'];
+
+// Filed by an agent, and the person neither wrote it nor approved it (a
+// withdrawn approval is none), so another agent's word does not start it.
+function waitsForYourYes(item: WorkItem): boolean {
+  if ((item.labels ?? []).includes('founder')) return false;
+  return !item.answer || item.answer === '(withdrawn)';
+}
+
+// WORDS ONE AGENT LEAVES ON ANOTHER AGENT'S THREAD go there as a teammate's
+// reply, which the supervisor takes as a turn, as it does a person's reply:
+// her own stop or close outranks it, and so does the hand-off count. A thread
+// whose agent is working takes them when its run ends (`deliverMidflightReply`).
+// One no agent has run yet keeps them as its note, which its first run reads,
+// except a cause, whose lead lists every waiting thread anyway. The writer
+// never claims the thread, which would hold it from its own agent. Null for its
+// own thread, one it holds, or a write of more than words, and the ordinary
+// write goes ahead.
+export function noteToAnotherThread(id: string, patch: { note?: unknown; result?: unknown } | null | undefined, { ownItem, mine = false, now = Date.now() }: { ownItem?: string | null; mine?: boolean; now?: number } = {}) {
+  if (!ownItem || !id || id === ownItem || mine) return null;
   const keys = Object.keys(patch ?? {}).filter((k) => (patch as Record<string, unknown>)[k] !== undefined);
-  if (!keys.length || keys.some((k) => k !== 'note' && k !== 'result')) return null;
+  if (!keys.length || keys.some((k) => k !== 'note' && k !== 'result' && !SUMMARY_FIELDS.includes(k))) return null;
   const words = String(patch!.note ?? patch!.result ?? '').trim();
   if (!words) return null;
   let target: ProjectSummary; let writer: ProjectSummary;
@@ -409,9 +431,20 @@ export function noteToAnotherThread(id: string, patch: { note?: unknown; result?
   } catch { return null; }
   const item = readWorkItem(target.dir, id, now);
   const from = readWorkItem(writer.dir, ownItem, now);
-  // A thread an agent has spoken on and that nobody is on now; a proposal is
-  // not started on another agent's word.
-  if (!item || !from || item.status === 'claimed' || !item.wrote?.result || !(item.labels ?? []).includes('founder')) return null;
+  if (!item || !from) return null;
+  const title = plain(item.label || item.title);
+  const left = keys.some((k) => SUMMARY_FIELDS.includes(k))
+    ? ' Its summary belongs to its own agent, so your problem and progress were not written there.' : '';
+  const proposal = waitsForYourYes(item);
+  if (proposal || (item.status !== 'claimed' && !item.wrote?.result)) {
+    if (!isCause(item)) updateWorkItem(target.dir, id, { note: words.slice(0, 8000) }, { source: 'agent', now });
+    return {
+      told: id, woke: false,
+      note: proposal
+        ? `It is on "${title}" as a note, but an agent filed that thread and it still waits for the person's yes, so it starts nothing. Say so in your answer.${left}`
+        : `It is on "${title}" as a note. No agent has run that thread yet, and its first run reads it.${left}`,
+    };
+  }
   const tid = teammateIdOf(from);
   const me = tid ? readTeammates(teamDir(legacyRoot(), resolveAccount().accountId), now).find((t) => t.id === tid) : null;
   const name = me?.name ?? `The agent on "${plain(from.label || from.title).slice(0, 60)}"`;
@@ -424,10 +457,13 @@ export function noteToAnotherThread(id: string, patch: { note?: unknown; result?
     const labels = [...(after.labels ?? []).filter((l) => l !== 'clean' && !l.startsWith(HOP_LABEL_PREFIX)), `${HOP_LABEL_PREFIX}${hop}`];
     after = updateWorkItem(target.dir, id, { labels, ...(after.status === 'done' || after.status === 'blocked' ? { status: 'open' } : {}) }, { source: 'system', now });
   }
+  const when = after.status === 'claimed' ? 'Its agent is working now and takes them when this run ends.'
+    : isDue(after, now) ? 'Its agent starts a turn on it.'
+      : 'That thread is put off until later, and its agent reads them then.';
   return {
     told: id, woke,
-    note: woke ? `It is on "${plain(item.label || item.title)}" as your words, and its agent starts a turn on it.`
-      : tooMany ? `It is on that thread, but it wakes nobody: ${MAX_HOPS} hand-offs in a row with no person between is the most. Say so in your answer.`
-        : 'It is on that thread, but its owner stopped it, so it waits for them.',
+    note: woke ? `It is on "${title}" as your words. ${when}${left}`
+      : tooMany ? `It is on that thread, but it wakes nobody: ${MAX_HOPS} hand-offs in a row with no person between is the most. Say so in your answer.${left}`
+        : `It is on that thread, but its owner stopped it, so it waits for them.${left}`,
   };
 }

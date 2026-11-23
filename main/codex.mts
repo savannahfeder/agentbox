@@ -174,6 +174,11 @@ export function captureCodexEvent(session: CodexReadSession | null | undefined, 
   } catch { /* see the note at the top of this file */ }
 }
 
+/** The turn carrying its starting words has begun; `thread/started` comes before it. */
+export function codexTookTheWords(method: string, _params?: unknown): boolean {
+  return method === 'turn/started' || (typeof method === 'string' && method.startsWith('item/'));
+}
+
 function turnStatus(method: string, turn: CodexTurn | null | undefined): string {
   if (typeof turn?.status === 'string') return turn.status;
   return method === 'turn/failed' ? 'failed' : 'completed';

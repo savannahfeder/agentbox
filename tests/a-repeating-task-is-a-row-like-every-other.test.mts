@@ -70,16 +70,16 @@ describe('in the table, a repeating task is one row in the columns', () => {
     expect(row).toMatch(/th-grid/);
     expect(row).toMatch(/th-cell-title[\s\S]*Check for new video skills/);
     expect(row).toMatch(/th-cell-proj[^>]*>Northwind Video</);
-    expect(row).toMatch(/th-cell-prio[^>]*>[\s\S]*?Medium<\/div>/);
+    // Medium says Medium, like any row (a-thread-at-medium-says-medium-in-the-priority-column).
+    expect(row).toMatch(/th-cell-prio[^>]*>(?:(?!<\/div>)[\s\S])*Medium<\/div>/);
     expect(row).toMatch(/th-when[^>]*>Tomorrow</);
   });
 
-  it('carries no grey second line, which no other table row has', () => {
+  // Every table row has a second line since w-6714ad1360; a rule's says how its last run went.
+  it("carries the table's second line, saying how its last run went, and not the old list's preview", () => {
     const row = ruleRow(draw());
     expect(row).not.toMatch(/class="preview"/);
-    // What is drawn, not the hover title, which keeps how the last run went.
-    const shown = row.slice(row.indexOf('>') + 1).replace(/<[^>]*>/g, ' ');
-    expect(shown).not.toMatch(/not run yet/);
+    expect(row).toMatch(/<div class="th-line">not run yet<\/div>/);
     expect(row).toMatch(/title="not run yet"/);
   });
 

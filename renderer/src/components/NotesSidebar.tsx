@@ -132,13 +132,13 @@ export function NotesSidebar({ item, src, asked, onAsked }: { item: WorkItem; sr
     return () => { live = false; off?.(); };
   }, [item.product, item.id]);
 
-  const { version, fileIds, files } = useMemo(() => fileFamilyFor(lines, src), [lines, src]);
+  const { version, agent, fileIds, files } = useMemo(() => fileFamilyFor(lines, src), [lines, src]);
 
   const [pending, setPending] = useState<FileNote[]>([]);
   const stored = item.artifacts?.notes ?? [];
   const all = [...stored, ...pending.filter((p) => !stored.some((n) => n.id === p.id))];
   const { waiting, said } = sidebarNotes(all, fileIds, people);
-  const canSend = typeof version?.agent === 'string';
+  const canSend = agent !== null;
   const sentAt = useMemo(() => sentTimes(lines), [lines]);
   const authors = [...new Set([...waiting, ...said].map((n) => n.by))].slice(0, 3);
   const noteTo = {

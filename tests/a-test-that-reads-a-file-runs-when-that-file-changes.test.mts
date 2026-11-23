@@ -83,7 +83,8 @@ describe('the check an agent makes before it reports', () => {
 
   it('is one command, which selects the readers as well', () => {
     expect(JSON.parse(read('package.json')).scripts['test:changed']).toBe('node scripts/test-what-changed.mjs');
-    expect(read('scripts', 'test-what-changed.mjs')).toMatch(/testsThatRead\(/);
+    // Through the push's own selection, which adds the readers.
+    expect(read('scripts', 'test-what-changed.mjs')).toMatch(/testsTheChangeReaches\(/);
   });
 
   it('is the command CLAUDE.md tells an agent to run', () => {

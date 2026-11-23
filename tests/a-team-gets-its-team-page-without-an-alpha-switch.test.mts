@@ -179,9 +179,12 @@ describe('where the window and the phone read it', () => {
   });
 });
 
-describe('a team test copy', () => {
+// The skills are a private checkout, absent on GitHub and in a public clone.
+const LIVE = new URL('../.claude/skills/verify-agentbox/scripts/live.mjs', import.meta.url);
+
+describe.skipIf(!fs.existsSync(LIVE))('a team test copy', () => {
   it('saves no Rooms switch, as a real install has none', async () => {
-    const { copyConfig } = await import('../.claude/skills/verify-agentbox/scripts/live.mjs');
+    const { copyConfig } = await import(LIVE.href);
     expect(copyConfig({ storeRoot: '/s', teamFile: '/t/team.config.json' })).not.toHaveProperty('alphaRooms');
     expect(copyConfig({ storeRoot: '/s', teamFile: '/t/team.config.json', alpha: ['rooms'] })).toMatchObject({ alphaRooms: true });
   });

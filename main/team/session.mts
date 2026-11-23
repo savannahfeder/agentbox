@@ -14,6 +14,8 @@ import { CLOUD_ADDRESS, PHONE_SITE } from '../../shared/cloud-address.mts';
 import { runningAsAFreshUser } from '../../shared/fresh-user-home.mts';
 import { supabaseBackend } from './supabase-backend.mts';
 import { standinSession } from './standin-backend.mts';
+import { demoTeamSession } from '../demo-team.mts';
+import { runningAsADemo } from '../../shared/demo-world.mts';
 import { signInWithGoogle, cancelGoogleSignIn, listenForTheConfirmationLink } from './sign-in.mts';
 import { plainAuthError } from './auth-words.mts';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -27,6 +29,7 @@ export interface CloudConfig {
   phoneSite?: string;
   signInReturn?: string;
   standin?: boolean;
+  demo?: boolean;
   /** The live-file relay's ws:// or wss:// address (main/team/live-room.mts). */
   live?: string;
   contact?: string;
@@ -80,10 +83,11 @@ export function teamConfigOnThisMac(home = os.homedir()): string {
   return path.join(home, `.${nameSlug}`, 'team.config.json');
 }
 
-// The hosted project's address and public key. Row level security, not secrecy,
-// is what protects the data, but the file is kept out of the repository (it is
-// ignored), so a checkout with no key on its Mac runs as the single-person app;
-// cloud/team.config.example.json shows its shape.
+// Which team cloud this copy signs in to. Row level security, not secrecy,
+// protects the data, so A CHECKOUT WITH NO TEAM FILE USES THE ONE THAT SHIPS
+// (shared/cloud-address.mts): a fork, the npm command and the Linux install
+// get Multiplayer as the Mac download does. cloud/team.config.json (ignored;
+// cloud/team.config.example.json shows its shape) points a copy at another.
 //
 // THE FOLDER'S OWN KEY WINS when it has one, so a worktree set up against
 // another team is never quietly moved onto this Mac's. AGENTBOX_TEAM_CONFIG
@@ -114,7 +118,12 @@ function withPhoneSite(c: CloudConfig | null): CloudConfig | null {
   return ours(c.url) ? { ...c, phoneSite: PHONE_SITE } : c;
 }
 
+/** A demo copy's team: its own, in memory (main/demo-team.mts). */
+export const DEMO_CLOUD: CloudConfig = { url: 'demo:', anonKey: 'demo', demo: true };
+
 function cloudConfigFound(appDir: string, { packaged = isPackagedElectron(), home = os.homedir(), env = process.env }: CloudConfigLookup = {}): CloudConfig | null {
+  // Before any file: a demo on a screen share never signs in as a real person.
+  if (runningAsADemo(env)) return DEMO_CLOUD;
   if (packaged) return bakedTeam(appDir);
   if (runningAsAFreshUser(env) && !env.AGENTBOX_TEAM_CONFIG) return null;
   const tries = runningAsAFreshUser(env) ? [env.AGENTBOX_TEAM_CONFIG] : [
@@ -133,9 +142,10 @@ function cloudConfigFound(appDir: string, { packaged = isPackagedElectron(), hom
       if (!found) found = c;
       // TypeScript loses the narrowing of `found` inside its own reassignment.
       else if (c.url === found.url) found = { ...c, ...(found as CloudConfig) };
-    } catch { /* try the next place; none of them is the single-person app */ }
+    } catch { /* try the next place */ }
   }
-  return found;
+  if (found || runningAsAFreshUser(env)) return found;
+  return { url: CLOUD_ADDRESS.supabaseUrl, anonKey: CLOUD_ADDRESS.anonKey };
 }
 
 function bakedTeam(appDir: string): CloudConfig | null {
@@ -180,6 +190,7 @@ export const withDeadline = (ms = DATABASE_DEADLINE_MS) => (url: Parameters<type
 export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decrypt = null, openExternal, packaged = isPackagedElectron(), testLogin = process.env.AGENTBOX_TEAM_TEST_LOGIN }: SupabaseSessionOptions): TeamSession {
   const configured = !!cloudConfig;
   if (packaged) testLogin = null;
+  if (cloudConfig?.demo) return demoTeamSession();
   if (cloudConfig?.standin && !packaged) return standinSession({ cloudConfig, testLogin });
   let client: SupabaseClient | null = null;
 
@@ -260,10 +271,28 @@ export function supabaseSession({ cloudConfig, sessionFile, encrypt = null, decr
       // A link opened once before, by the person or a mail scanner, comes back spent, yet that first
       // open confirmed the address, so the password from this sign-up now signs in.
       const rescue = async () => !(await c.auth.signInWithPassword(account)).error;
+      // The wait goes on after a visit nothing could finish; the screen is still told why.
+      let failedVisit: (why: string) => void = () => {};
       // As long as the link lives (cloud/supabase/config.toml, otp_expiry).
-      const { over } = await listenForTheConfirmationLink({ client: c, returnUrl, timeoutMs: 60 * 60 * 1000, log, rescue });
-      over.catch(() => {});
-      return { confirm: true, confirmed: () => over.then(() => supabaseBackend(c)), stopWaiting: () => { cancelGoogleSignIn(); } };
+      const listen = async () => {
+        const held = await listenForTheConfirmationLink({ client: c, returnUrl, timeoutMs: 60 * 60 * 1000, log, rescue, onFailed: (why) => failedVisit(why) });
+        held.over.catch(() => {});
+        return held;
+      };
+      let { over } = await listen();
+      return {
+        confirm: true,
+        confirmed: () => over.then(() => supabaseBackend(c)),
+        failed: () => new Promise<string>((resolve) => { failedVisit = resolve; }),
+        stopWaiting: () => { cancelGoogleSignIn(); },
+        // Sent before the wait is replaced, so a refused send leaves the earlier link's wait as it was.
+        // The new code replaces the old one in the client, so only the newest link signs in.
+        async resend() {
+          const { error: refused } = await c.auth.resend({ type: 'signup', email: account.email, options: { emailRedirectTo: returnUrl } });
+          if (refused) throw new Error(plainAuthError(refused.message));
+          ({ over } = await listen());
+        },
+      };
     },
 
     // The session an Agentbox Cloud sign-in made (main/cloud/account.mts), so

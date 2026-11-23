@@ -112,11 +112,11 @@ describe('the window', () => {
   const tour = read('renderer/src/components/Tour.tsx');
   const frame = read('renderer/src/components/TourFrame.tsx');
   const home = read('renderer/src/home/HomePage.tsx');
-  it('keeps the bar above the app through the finishing moment, reading done, with Close where Skip was', () => {
+  it('keeps the column beside the app through the finishing moment, reading done, with Close where Skip was', () => {
     expect(app).toContain('const tourFramed = !fresh && homeOn && (tourLive(tour) || tourFinishing(tour));');
-    expect(frame).toContain("<span>{finished ? 'Walkthrough done' : `Walkthrough ${at} of ${of}`}</span>");
+    expect(frame).toContain("<h2 className=\"tf-place\"><b>Walkthrough</b>{finished ? 'Done' : `${at} of ${of}`}</h2>");
     expect(frame).toContain("{finished ? <>Close <kbd className=\"tf-key\">↵</kbd></> : 'Skip walkthrough'}");
-    expect(app).toMatch(/<TourFrame done=\{tour!\.done\} now=\{tourNow\} finished=\{finishing\} onSkip=\{\(\) => setTour\(finishing \? closeFinish\(tour!\) : skipTour\(tour!\)\)\} \/>/);
+    expect(app).toMatch(/<TourFrame done=\{tour!\.done\} now=\{tourNow\} finished=\{finishing\} away=\{walkAway\} onBack=\{backToWalk\} onSkip=\{\(\) => setTour\(finishing \? closeFinish\(tour!\) : skipTour\(tour!\)\)\} \/>/);
   });
   it('shows the same key beside Close, as a key and only once the walkthrough is done', () => {
     const css = read('renderer/src/components/tour-frame.css');

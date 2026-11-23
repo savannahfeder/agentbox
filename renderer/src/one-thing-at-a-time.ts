@@ -6,9 +6,8 @@ import type { AgentEvent, AgentTurn } from './types';
 import type { ItemOutcome } from './item-thread';
 import { optionsFrom } from './format';
 import { instructionOf } from '../../shared/repeats.mts';
+import { notShipped, type NotedItem } from '../../shared/not-shipped.mts';
 import { rowTitle } from './list-rules';
-import { teammateIdOf } from '../../shared/teammates.mts';
-import { shownTitle } from '../../shared/thread-title.mts';
 
 export interface Spot { pos: number; total: number; index: number }
 
@@ -38,16 +37,24 @@ export function stepIn<T extends Keyed>(rows: T[], item: Keyed, dir: 1 | -1): T 
 const said = (e: AgentEvent): e is AgentTurn & { kind?: undefined } => e.kind !== 'work';
 
 /** A note the app wrote on the row (the ship queue's "Shipped to main as …"), not an answer to lead with. */
-export function appWrote(outcome: ItemOutcome | null, wrote?: Record<string, { source: string } | undefined>): boolean {
-  return !!outcome && outcome.field === 'note' && wrote?.note?.source === 'system';
+export function appWrote(outcome: ItemOutcome | null, wrote?: Record<string, { source?: string } | undefined>): boolean {
+  return !!outcome && outcome.field === 'note' && (outcome.app ?? wrote?.note?.source === 'system');
+}
+
+/** How the newest answer is drawn at the foot of a thread: the app's own note as its quiet line, a ship that failed as Not shipped, anything else as the agent's. */
+export function footOf(outcome: ItemOutcome | null, item: NotedItem): 'app' | 'unshipped' | 'agent' | null {
+  if (!outcome) return null;
+  if (outcome.field === 'note' && notShipped(item)) return 'unshipped';
+  return appWrote(outcome, item.wrote) ? 'app' : 'agent';
 }
 
 /** The newest answer: the one lifted to the foot, or else the last thing said that was not yours. */
-export function newestAnswer(events: AgentEvent[], outcome: ItemOutcome | null): { at: number; text: string } | null {
+export function newestAnswer(events: AgentEvent[], outcome: ItemOutcome | null): { at: number; text: string; fromId?: string } | null {
   if (outcome) return { at: outcome.at, text: outcome.text };
   for (let i = events.length - 1; i >= 0; i--) {
     const e = events[i];
-    if (said(e) && e.who !== 'you' && e.text?.trim()) return { at: e.at, text: e.text };
+    // A person you asked to help signs what they wrote (team/AsksLine.tsx).
+    if (said(e) && e.who !== 'you' && e.text?.trim()) return { at: e.at, text: e.text, ...(e.fromId ? { fromId: e.fromId } : {}) };
   }
   return null;
 }
@@ -70,7 +77,10 @@ export function drawnWhole(behind: number, { leads = false, imported = false }: 
 
 /** The line under the title while an agent works: the first paragraph of what you asked, unless the title already says it. */
 export function askLine(ask: string, title = ''): string | null {
-  const first = instructionOf(ask).trim().split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
+  const paragraphs = instructionOf(ask).trim().split(/\n\s*\n/);
+  // "Priya Shah asked:" over a teammate's words says who, not what.
+  const at = paragraphs.findIndex((p) => !/:\s*$/.test(p));
+  const first = (paragraphs[at < 0 ? 0 : at] ?? '').replace(/\[([^\]\n]+)\]\([^)\s]+\)/g, '$1').replace(/\s+/g, ' ').trim();
   const named = title.replace(/\s+/g, ' ').trim().toLowerCase();
   // A repeating run's title is its ask with the day after it.
   if (!first || named === first.toLowerCase() || named.startsWith(`${first.toLowerCase()} · `)) return null;
@@ -93,10 +103,20 @@ export const broughtIn = (item: { labels?: string[] }): boolean =>
  * above what was said or picked and the agent's work since. -1 when the answer
  * is still the newest word, or there is none.
  */
-export function standsAt(events: AgentEvent[], newest: { at: number } | null): number {
+export function standsAt(events: AgentEvent[], newest: { at: number; fromId?: string } | null): number {
   if (!newest) return -1;
   const answered = events.some((e) => e.at > newest.at && (said(e) ? e.who === 'you' : !!e.yours));
-  return answered ? events.findIndex((e) => said(e) && e.who !== 'you' && e.at === newest.at) : -1;
+  return answered ? events.findIndex((e) => said(e) && e.who !== 'you' && e.at === newest.at) : helperAnswered(events, newest);
+}
+
+/** A teammate's words are the newest answer: start at the agent's message they answer, so its question and choices stay in view. */
+export function helperAnswered(events: AgentEvent[], newest: { at: number; fromId?: string } | null): number {
+  if (!newest?.fromId) return -1;
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (said(e) && e.who !== 'you' && !e.fromId && e.at < newest.at && e.text?.trim()) return i;
+  }
+  return -1;
 }
 
 /**
@@ -120,20 +140,15 @@ export function earlierThan(events: AgentEvent[], from: number): number {
   return events.slice(0, from).filter(said).length;
 }
 
-/**
- * The name of an open thread, in its header and on its page. A teammate's row
- * is named after its answer's first line, which changes with every answer, so
- * an open teammate thread is named the way any other thread is; the answer is
- * signed instead.
- */
+/** The name of an open thread, in its header and on its page: the name its row has. */
 export function pageTitle(item: Parameters<typeof rowTitle>[0]): string {
-  return teammateIdOf(item) && (item.title ?? '').trim() ? shownTitle(item) : rowTitle(item);
+  return rowTitle(item);
 }
 
-/** An answer opening with a line that is bold and nothing else wears it as its headline. */
+/** An answer opening with a line that is bold and nothing else wears it as its headline; one with a link stays in the answer, where links are drawn. */
 export function splitHeadline(text: string): { headline: string | null; rest: string } {
   const m = /^\s*\*\*([^*\n]+)\*\*[ \t]*(?:\n|$)/.exec(text);
-  if (!m) return { headline: null, rest: text };
+  if (!m || /\]\([^)]*\)/.test(m[1])) return { headline: null, rest: text };
   return { headline: m[1].trim(), rest: text.slice(m[0].length).replace(/^\s+/, '') };
 }
 

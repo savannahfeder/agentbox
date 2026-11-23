@@ -142,9 +142,7 @@ describe('only the drawing waits: the keys reach the row straight away', () => {
   it('leaves the pointed row instant, and delays a separate name', () => {
     // `hoveredId` is the target and is still set on the first mouse move.
     // `shownHint` is what is drawn and is the one the scheduler moves.
-    // (Behind the tutorial's one exception since 2026-10-06, `walkOwn`: on the
-    // beat that opens her own thread, ↵ means that thread wherever the pointer is.)
-    expect(app).toMatch(/const pointed: WorkItem \| undefined = walkOwn\s*\n\s*\?\? \(hoveredId && !multiSel\.size \? list\.find/);
+    expect(app).toMatch(/const pointed: WorkItem \| undefined = \(hoveredId && !multiSel\.size \? list\.find/);
     expect(list).toContain('onMouseMove={() => { if (hoveredId !== item.id) onHover?.(item.id); }}');
     // The drawn hint must never be what the key handler targets.
     expect(app).not.toMatch(/shownHint && !multiSel\.size \? list\.find/);

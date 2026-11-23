@@ -15,8 +15,9 @@ describe("a closed thread's menu", () => {
   it('the thread page tells the menu the thread is closed', () => {
     expect(page).toMatch(/closed=\{threadState\(item\) === 'done'\}/);
   });
-  it('the menu leaves out Later, its times and Close for a closed thread', () => {
+  it('the menu leaves out Later and its times for a closed thread, and Close lives in the bar', () => {
     expect(menu).toMatch(/\{!closed && <>\s*<SheetHead>Later<\/SheetHead>/);
-    expect(menu).toMatch(/\{!closed && <SheetRow label="Close this thread"/);
+    expect(menu).not.toMatch(/Close this thread/);
+    expect(page).toMatch(/\{threadState\(item\) !== 'done' && \(\s*<Pressable onPress=\{close\}[^>]*accessibilityLabel="Mark done"/);
   });
 });

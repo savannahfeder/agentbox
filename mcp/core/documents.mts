@@ -190,10 +190,33 @@ export function readDocument(ref: string | null | undefined, { id = null, path: 
   return withEditsRead(project.dir, envelope.path, { ...envelopeView(envelope), content: readCreationContent(project.dir, envelope) });
 }
 
+const versionNumber = (name: string): number => Number(/[-_ ]v(\d+)\.[^./]+$/i.exec(name)?.[1] ?? 1);
+
+/**
+ * Every version of the file at `rel` in the folder it sits in, oldest first, as
+ * paths relative to `root`. A person's save in the app lands beside the version
+ * they opened, so the folder holds the newest even when no thread names it.
+ */
+export function versionsInFolder(root: string, rel: string): string[] {
+  const folder = path.posix.dirname(rel);
+  const family = familyOfName(rel);
+  let names: string[] = [];
+  try { names = fs.readdirSync(path.join(root, folder)); } catch { return []; }
+  return names
+    .filter((n) => !n.startsWith('.') && familyOfName(n) === family && fs.statSync(path.join(root, folder, n)).isFile())
+    .sort((a, b) => versionNumber(a) - versionNumber(b) || a.localeCompare(b))
+    .map((n) => (folder === '.' ? n : `${folder}/${n}`));
+}
+
 // A person's edit is a new file under designs/<thread>/, so the path an agent
 // remembers still holds the old words, and it would quote them as current.
 function withEditsRead<D extends DocumentView & { content: unknown }>(root: string, rel: string | null | undefined, doc: D): D | (D & { content: string; newestVersion: string; note: string }) {
-  if (!rel || !/\.(?:md|markdown)$/i.test(rel) || rel.startsWith('designs/')) return doc;
+  if (!rel || !/\.(?:md|markdown)$/i.test(rel)) return doc;
+  if (rel.startsWith('designs/')) {
+    const newest = versionsInFolder(root, rel).at(-1);
+    if (!newest || newest === rel || versionNumber(path.basename(newest)) <= versionNumber(path.basename(rel))) return doc;
+    return { ...doc, replacedBy: newest, content: fs.readFileSync(path.join(root, newest), 'utf8'), newestVersion: newest, note: `These are the newest words of this file, from ${newest}. ${rel} holds an older version; write your next version from these.` };
+  }
   const family = familyOfName(rel);
   let best: string | null = null;
   let bestAt = 0;

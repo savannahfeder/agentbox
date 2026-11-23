@@ -3,12 +3,15 @@
 // "Extra unnecessary text in random areas... too cluttered to understand",
 // using the team version on 2026-11-01. Seen on the photo stage at 1440x900:
 // every agent row under NEEDS YOU read WAITING ON YOU, which is the tab's own
-// name; and a person's task or message put TASK or MESSAGE in the PROJECT column, which
+// name; every row read MEDIUM, the level a thread has when nobody set one; and
+// a person's task or message put TASK or MESSAGE in the PROJECT column, which
 // is a kind, not a project. Under IN PROGRESS a row with no agent read "In
 // progress", the tab again.
 //
 // Now the cell is left empty in each of those cases and the five cells stay,
-// so the columns still line up.
+// so the columns still line up. Medium came back on 2026-11-21, when the blank
+// it left read as a gap in the column
+// (a-thread-at-medium-says-medium-in-the-priority-column).
 import { describe, it, expect } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -48,7 +51,8 @@ const draw = (item, product, tab, fleet = { queued: [] }) => renderToStaticMarku
 // The text inside one cell, tags removed.
 const cell = (html, name) => {
   const at = html.indexOf(`th-cell-${name}`);
-  const next = html.indexOf('<div class="th-cell-', at + 1);
+  // Up to the next cell or the row's second line (w-6714ad1360), which sits after the status.
+  const next = html.indexOf('<div class="th-', at + 1);
   return html.slice(html.indexOf('>', at) + 1, next < 0 ? undefined : next).replace(/<[^>]+>/g, '').trim();
 };
 const cells = (html) => html.match(/<div class="th-cell-[a-z]+/g);
@@ -89,18 +93,6 @@ describe('the Project column', () => {
     const html = draw(message(), withSofia, 'inbox');
     expect(cell(html, 'proj')).toBe('');
     expect(cells(html)).toEqual(FIVE);
-  });
-});
-
-// Medium is named in its cell again since 2026-11-17
-// (a-medium-thread-says-medium-in-the-priority-column).
-describe('the Priority column', () => {
-  it('keeps the five cells at Medium', () => {
-    expect(cells(draw(thread({ priority: 5 }), company, 'inbox'))).toEqual(FIVE);
-  });
-
-  it.each([[9, 'Urgent'], [7, 'High'], [5, 'Medium'], [2, 'Low']])('says the level: %i is %s', (priority, word) => {
-    expect(cell(draw(thread({ priority }), company, 'inbox'), 'prio')).toBe(word);
   });
 });
 

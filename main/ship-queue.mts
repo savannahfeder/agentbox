@@ -32,6 +32,7 @@ import { notPushedNote, pushNeedsGitHubSignIn } from '../shared/github-push-sign
 import { conflictBrief, earlyConflictNote } from './ship-conflict-brief.mts';
 import type { ConflictThread } from './ship-conflict-brief.mts';
 import { redOnMain } from './main-went-red.mts';
+import { waitingForMemory } from '../shared/notes-for-the-agent.mts';
 import type { GateAnswer, GateRequest, GateReply } from './memory-gate.mts';
 
 export const SHIP_LABEL = 'ship';
@@ -351,7 +352,7 @@ export function failureNote(output: unknown) {
 }
 
 const commonDirOf = (dir: string) => new Promise<string | null>((resolve) => {
-  execFile('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', timeout: 10_000 }, (err, stdout) => {
+  execFile('git', ['-C', dir, 'rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8', timeout: 10_000, windowsHide: true }, (err, stdout) => {
     resolve(err ? null : realOrNull(String(stdout).trim()));
   });
 });
@@ -403,7 +404,7 @@ export async function runScript(script: string, cwd: string, { timeout = SHIP_MS
     try {
       // Its own process group, so a stop reaches the hook's test run and not
       // only this script.
-      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: ['ignore', 'pipe', 'pipe'], detached: ownGroup });
+      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: ['ignore', 'pipe', 'pipe'], detached: ownGroup, windowsHide: true });
     } catch (e) {
       resolve({ code: 1, out: String((e as Error)?.message ?? e) });
       return;
@@ -597,7 +598,7 @@ export class ShipQueue {
     const red = redOnMain(this.userDir);
     const gate = this.memoryGate();
     const giveBack = gate && await shipSlot(gate, item, this.shipScore(item), {
-      onWait: () => { try { this.store.noteItem?.(item.product, item.id, 'Waiting for memory on this computer before shipping.'); } catch { /* the ship still waits */ } },
+      onWait: () => { try { this.store.noteItem?.(item.product, item.id, waitingForMemory('shipping')); } catch { /* the ship still waits */ } },
     });
     let ran;
     let signIn: ReturnType<ShipQueue['pushSignIn']> = null;

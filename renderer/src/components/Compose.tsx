@@ -44,6 +44,7 @@ import { engineThisMacOffers, readLastEngine, writeLastEngine } from '../engines
 import { DEFAULT_ENGINE, ENGINES, type Engine } from '../../../shared/engines.mts';
 import { footerIsOpen, restingClause } from '../compose-footer';
 import { practiceRefusal } from '../compose-says';
+import { closesOnPress } from '../press';
 
 const LAST_PRODUCT_KEY = 'zero.lastProduct';
 
@@ -466,7 +467,7 @@ export function Compose({ products, hidden, onSend, onReorder, onHide, onNewProj
   };
 
   return (
-    <div className="modal-backdrop compose-backdrop" onClick={onClose}>
+    <div className="modal-backdrop compose-backdrop" {...closesOnPress(onClose)}>
       <div className="modal compose" onClick={(e) => e.stopPropagation()}>
         <textarea
           ref={ref}

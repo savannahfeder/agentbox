@@ -14,30 +14,27 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import {
-  setupSteps, stepLabel, typingInSetup, setupLook, tourCount, lookChoices, starterChoices, inviteList, setUpLines, tourChecklist,
+  setupSteps, stepLabel, typingInSetup, setupLook, tourCount, lookChoices, starterChoices, setUpLines, tourChecklist,
 } from '../renderer/src/setup-split.ts';
 import { SKY_THEMES } from '../renderer/src/home/sky.ts';
 
 describe('which steps the setup shows', () => {
   // The founder (2026-11-09): "we are making login required so this is not a
   // logical flow, anything that requires login should come after that step".
-  it('signs in as a step of its own, after the first one, before inviting', () => {
-    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'invite', 'teammates', 'look']);
+  it('signs in as a step of its own, after the first one, before the plan', () => {
+    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: false, plan: 'pro' })).toEqual(['chats', 'account', 'plan', 'teammates', 'look']);
   });
   it('skips the sign-in step for someone already signed in', () => {
-    expect(setupSteps({ chats: 0, team: true, teammates: false, project: true, signedIn: true, plan: 'pro' })).toEqual(['folder', 'plan', 'invite', 'look']);
+    expect(setupSteps({ chats: 0, team: true, teammates: false, project: true, signedIn: true, plan: 'pro' })).toEqual(['folder', 'plan', 'look']);
   });
   it('has no sign-in step on a build with no account to sign in to', () => {
     expect(setupSteps({ chats: 0, team: false, teammates: false, project: true, signedIn: false })).toEqual(['folder', 'look']);
   });
   it('shows every step on a team build with chats and teammates on', () => {
-    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: true, plan: 'pro' })).toEqual(['chats', 'plan', 'invite', 'teammates', 'look']);
+    expect(setupSteps({ chats: 3, team: true, teammates: true, project: true, signedIn: true, plan: 'pro' })).toEqual(['chats', 'plan', 'teammates', 'look']);
   });
   it('asks for a folder instead of chats when this computer has none', () => {
     expect(setupSteps({ chats: 0, team: true, teammates: true, project: true })[0]).toBe('folder');
-  });
-  it('leaves out inviting on a build with no team cloud', () => {
-    expect(setupSteps({ chats: 2, team: false, teammates: true, project: true })).not.toContain('invite');
   });
   it('leaves out AI teammates while they are off', () => {
     expect(setupSteps({ chats: 2, team: true, teammates: false, project: true, plan: 'pro' })).not.toContain('teammates');
@@ -62,11 +59,10 @@ describe('the looks offered', () => {
   it('puts the look you have first, then Match my system, then the dark orange sky', () => {
     expect(lookChoices('sage', true).slice(0, 3)).toEqual(['sage', 'match', 'ember']);
   });
-  // F-207 (QA session 41, Nov 9 2026): setup left out Light purple sky, which
-  // Settings offers, so the two lists disagreed.
-  it('offers every sky Settings offers, the light purple one too', () => {
+  // F-207 (QA session 41, Nov 9 2026): setup left out a sky Settings offers,
+  // so the two lists disagreed.
+  it('offers every sky Settings offers', () => {
     for (const sky of SKY_THEMES) expect(lookChoices('light', true)).toContain(sky.id);
-    expect(lookChoices('dusk-light', true)[0]).toBe('dusk-light');
   });
   it('lists each look once', () => {
     const l = lookChoices('ember', true);
@@ -98,22 +94,16 @@ describe('the AI teammates offered', () => {
   });
 });
 
-describe('the people invited', () => {
-  it('keeps each address once and drops what is not an address', () => {
-    expect(inviteList(['maya@northwind.dev', 'Maya@Northwind.dev ', 'theo', ''])).toEqual(['maya@northwind.dev']);
-  });
-});
-
 describe('what the last screen says was set up', () => {
   it('says only what happened, in counts', () => {
-    expect(setUpLines({ chats: 4, project: null, invited: 3, teammates: ['Quality lead'] }))
-      .toEqual(['4 chats brought in', '3 teammates invited', 'Quality lead added']);
+    expect(setUpLines({ chats: 4, project: null, teammates: ['Quality lead'] }))
+      .toEqual(['4 chats brought in', 'Quality lead added']);
   });
   it('names the project made from a folder, and says nothing of steps skipped', () => {
-    expect(setUpLines({ chats: 0, project: 'storefront', invited: 0, teammates: [] })).toEqual(['storefront is ready']);
+    expect(setUpLines({ chats: 0, project: 'storefront', teammates: [] })).toEqual(['storefront is ready']);
   });
   it('uses the singular for one', () => {
-    expect(setUpLines({ chats: 1, project: null, invited: 1, teammates: [] })).toEqual(['1 chat brought in', '1 teammate invited']);
+    expect(setUpLines({ chats: 1, project: null, teammates: [] })).toEqual(['1 chat brought in']);
   });
 });
 
@@ -161,6 +151,8 @@ describe('the look a new install starts on', () => {
   // As the pair that follows the Mac since w-fbe5e95dea (2026-11-10): she
   // switched macOS to light during the setup and it stayed dark.
   // Nothing picked wears the pair by main's own rule (w-1bf65f4322), so the setup ticks Match my system.
+  // Since w-9687db6270 (2026-11-22) a new install is light and ticks the light mountains
+  // (tests/a-new-install-opens-in-the-light-mountains-on-every-computer); these are a window that follows the computer.
   it('wears the pair: dark orange on a dark Mac, light green on a light one', () => {
     expect(setupLook({ skies: true, picked: false, worn: 'ember', light: false })).toBe('match');
     expect(setupLook({ skies: true, picked: false, worn: 'sage', light: true })).toBe('match');
@@ -172,9 +164,10 @@ describe('the look a new install starts on', () => {
 
 describe('the first page', () => {
   // The founder picked the sky design, "with a better title like 'An inbox for hundreds of agents'".
+  // On 2026-11-22 it took the website's words and mountains (tests/the-light-default-is-orange-mountains-with-birds-that-fly).
   const first = fs.readFileSync(new URL('../renderer/src/components/FirstRun.tsx', import.meta.url), 'utf8');
   it('says what the app is', () => {
-    expect(first).toContain('An inbox for hundreds of agents.');
+    expect(first).toContain('Your team and its agents, in one place.');
     expect(first).not.toContain('Give your agents an inbox');
   });
   it('stands on the sky the setup will wear', () => {

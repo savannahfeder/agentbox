@@ -109,7 +109,7 @@ describe('the app asks that rule rather than keeping its own copy', () => {
   it('reads the tiers before it pops anything', () => {
     expect(app).toContain("from './undo-window'");
     expect(app).toContain('nextUndo(undoStack, now)');
-    expect(app).toContain('undoAsk(last.undoes)');
+    expect(app).toContain('undoAsk(nowNamed(last.undoes))');
   });
 
   // The safeguard is the second press, so every other key has to be a no, and

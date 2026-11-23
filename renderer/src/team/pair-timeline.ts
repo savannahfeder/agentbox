@@ -4,6 +4,7 @@
 import { baseName, numberInName } from '../../../shared/artifact-marks.mts';
 import { isTaskRow, taskGiver } from '../../../shared/team-rules.mts';
 import { handedFrom } from '../../../shared/thread-link.mts';
+import { TALK_TEXT } from '../../../shared/work-items.mts';
 import type { RoomMessage, ThreadTalk } from '../types';
 
 export type { ThreadTalk };
@@ -19,6 +20,11 @@ export interface PairTask {
   createdAt?: number;
   labels?: string[];
   talk?: { chat: readonly { by: string; ts: number; text: string }[] } | null;
+  /** Help or a review asked on a thread (shared/thread-asks.mts), and what came back. */
+  ask?: { kind?: string } | null;
+  verdict?: string | null;
+  status?: string;
+  wrote?: Readonly<Record<string, { ts: number; by?: string } | undefined>>;
 }
 
 export type PairOpens =
@@ -26,7 +32,9 @@ export type PairOpens =
   | { to: 'thread'; owner: string; threadId: string }
   | { to: 'file'; owner: string; threadId: string; file: string; note: string };
 
-export type PairKind = 'message' | 'task' | 'handoff' | 'reply' | 'comment' | 'note';
+export type PairKind = 'message' | 'task' | 'handoff' | 'help' | 'review' | 'back' | 'reply' | 'comment' | 'note';
+/** The kinds that are a thread passing between the two, drawn as a card that opens it. */
+export const THREAD_KINDS: ReadonlySet<PairKind> = new Set(['task', 'handoff', 'help', 'review', 'back']);
 
 export interface PairEntry {
   key: string;
@@ -65,6 +73,13 @@ export function fileLabel(file: string, v?: number): string {
   return `${named ? baseName(name) : name} v${v ?? (mark === '@' ? num : named ?? num ?? '1')}`;
 }
 
+/** A reply the record cut at its length, ended at its last whole word with an ellipsis; the task it is on holds all of it. */
+const endsWhole = (text: string): string => {
+  if (text.length < TALK_TEXT) return text;
+  const space = text.trimEnd().lastIndexOf(' ');
+  return `${(space > 0 ? text.slice(0, space) : text).replace(/[\s,;:.-]+$/, '')}…`;
+};
+
 export function pairTimeline({ me, other, rooms, messages, directItems, talk, titleOf }: PairInput): PairEntry[] {
   const pair = new Set([me, other]);
   const otherOf = (by: string) => (by === me ? other : me);
@@ -79,7 +94,18 @@ export function pairTimeline({ me, other, rooms, messages, directItems, talk, ti
     const title = t.label || t.title;
     const open: PairOpens = { to: 'task', id: t.id };
     const handoff = !!handedFrom(t.body, giver);
-    out.push({ key: `task:${t.id}`, at: t.createdAt ?? 0, kind: handoff ? 'handoff' : 'task', by: giver, to: otherOf(giver), text: title, where: { label: title, open } });
+    const asked = t.ask?.kind === 'help' || t.ask?.kind === 'review' ? t.ask.kind : null;
+    out.push({ key: `task:${t.id}`, at: t.createdAt ?? 0, kind: asked ?? (handoff ? 'handoff' : 'task'), by: giver, to: otherOf(giver), text: title, where: { label: title, open } });
+    const back = asked && t.verdict ? t.wrote?.verdict : null;
+    if (back?.by && pair.has(back.by)) {
+      const word = t.verdict === 'yes' ? 'Said it looks good' : t.verdict === 'changes' ? 'Asked for changes' : 'Handed it back';
+      out.push({ key: `back:${t.id}`, at: back.ts ?? 0, kind: 'back', by: back.by, to: otherOf(back.by), text: word, where: { label: title, open } });
+    }
+    // Closed with no answer by whoever sent it: they took it back.
+    const close = t.status === 'done' && !t.verdict ? t.wrote?.status : null;
+    if ((asked || handoff) && close?.by === giver) {
+      out.push({ key: `took:${t.id}`, at: close.ts ?? 0, kind: 'back', by: giver, to: otherOf(giver), text: 'Took it back', where: { label: title, open } });
+    }
     const brief = said(t.body ?? '');
     let briefSeen = false;
     for (const [k, line] of (t.talk?.chat ?? []).entries()) {
@@ -88,7 +114,7 @@ export function pairTimeline({ me, other, rooms, messages, directItems, talk, ti
       const where = { label: `on ${title}`, open };
       const twin = chat.find((m) => m.by === line.by && said(m.body) === said(line.text) && Math.abs(m.at - line.ts) <= SAME_REPLY_MS && !wheres.has(m.id));
       if (twin) { wheres.set(twin.id, where); continue; }
-      out.push({ key: `reply:${t.id}:${k}`, at: line.ts, kind: 'reply', by: line.by, to: otherOf(line.by), text: line.text, where });
+      out.push({ key: `reply:${t.id}:${k}`, at: line.ts, kind: 'reply', by: line.by, to: otherOf(line.by), text: endsWhole(line.text), where });
     }
   }
 
@@ -113,5 +139,12 @@ export function pairLine(e: PairEntry, me: string, nameOf: (id: string) => strin
   const whom = e.to === me ? 'you' : nameOf(e.to ?? '').split(' ')[0];
   if (e.kind === 'task') return `Gave ${whom} a task`;
   if (e.kind === 'handoff') return `Handed ${whom} a thread`;
-  return e.text;
+  if (e.kind === 'help') return `Asked ${whom} to help`;
+  if (e.kind === 'review') return `Asked ${whom} for a review`;
+  return linksAsWords(e.text);
+}
+
+/** These lines are drawn as plain words, so a Markdown link shows its words; where it leads is the button under the line. */
+export function linksAsWords(text: string): string {
+  return text.replace(/\[([^\]\n]+)\]\((?:https?:\/\/|\/)[^)\s]+\)/g, '$1');
 }

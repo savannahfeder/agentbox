@@ -41,6 +41,11 @@ export function urgentRaised(row: Ref, on: Ref): UrgentRaised {
 
 const same = (a: Ref | null | undefined, b: Ref | null | undefined) => !!a && !!b && a.product === b.product && a.id === b.id;
 
+/** The mark is spent once its thread is left: coming back does not raise it again. */
+export function urgentKept(raised: UrgentRaised | null, open: Ref | null): UrgentRaised | null {
+  return raised && same(raised.on, open) ? raised : null;
+}
+
 /**
  * The row to name in the top bar right now: only over the thread it was raised
  * on, so leaving that thread puts it away, and only while it still waits in

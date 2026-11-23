@@ -145,7 +145,8 @@ describe('files and pictures a message names', () => {
       { text: ', ' },
       { text: 'cut.mp4', mention: { kind: 'media', src: 'films/cut.mp4' } },
       { text: ' and ' },
-      { text: 'main.mts', mention: { kind: 'code', src: 'main/main.mts' } },
+      // Code keeps its folder (a-code-reference-keeps-its-folder).
+      { text: 'main/main.mts', mention: { kind: 'code', src: 'main/main.mts' } },
     ]);
   });
 

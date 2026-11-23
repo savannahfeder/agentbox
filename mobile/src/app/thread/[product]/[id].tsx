@@ -4,8 +4,8 @@
 // Mac and shows at once as waiting for it.
 import { Redirect, useLocalSearchParams } from 'expo-router';
 import { router } from '../../../lib/router';
-import { useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Rect } from 'react-native-svg';
 import { isImageName } from '../../../../../renderer/src/attachments';
@@ -16,8 +16,7 @@ import { discardAsk } from '../../../../../renderer/src/discard-asks-first';
 import { MODE_WORDS } from '../../../../../renderer/src/modes';
 import { priorityLabelOf, priorityValueOf } from '../../../../../renderer/src/priority';
 import { clock, dayHeading } from '../../../../../renderer/src/thread-history';
-import { stateWordOf } from '../../../../../renderer/src/threads/summary-rules';
-import { summaryOf, threadState } from '../../../../../shared/thread-cards.mts';
+import { threadState } from '../../../../../shared/thread-cards.mts';
 import { arrivedAt } from '../../../../../renderer/src/unread';
 import { dayClock } from '../../../lib/back-at';
 import type { Choices, Press, PressedItem } from '../../../lib/actions';
@@ -33,7 +32,7 @@ import { useGroups } from '../../../state/groups';
 import { mateOf, questionThread, questionsForYou } from '../../../lib/teammates';
 import { TeammateMark, ThreadQuestions } from '../../../ui/Teammates';
 import { screenGate } from '../../../lib/thread-gate';
-import { liveOf, moveChoices, offersOf, ruleFor, shownLevel, summaryParts, type Offers } from '../../../lib/thread-offers';
+import { liveOf, moveChoices, offersOf, ruleFor, shownLevel, type Offers } from '../../../lib/thread-offers';
 import { madeThreadOf, phoneSlug, waitFacts } from '../../../../../renderer/src/phone-rows';
 import { madeHere } from '../../../../../shared/phone-snapshot.mts';
 import { replySender, type ReplyDeps } from '../../../lib/thread-reply';
@@ -46,15 +45,15 @@ import { useSendWhenOnline } from '../../../state/send-when-online';
 import { AttachSheet, Attached } from '../../../ui/Attach';
 import { withAttachments, withPicked } from '../../../lib/attach';
 import { SentFiles, ThreadFiles, useMessageFiles } from '../../../ui/Files';
-import { Back, Caret, Chevron, Clip, Clock, Cross, DoneMark, More, Panel } from '../../../ui/icons';
+import { Back, Caret, Chevron, Clip, Clock, Cross, DoneMark, More } from '../../../ui/icons';
 import { TimeBox, TypingSheet } from '../../../ui/Later';
 import { replyLaterRows } from '../../../lib/later';
 import { agentChoices, laterHint, momentFromWords } from '../../../../../renderer/src/threads/composer-rules';
 import { Waiting } from '../../../ui/LogoOrbit';
 import { Markdown, type MessageFiles } from '../../../ui/Markdown';
 import { Selectable } from '../../../ui/Selectable';
-import { ChoiceButton, footRoom, IconButton, PriorityBars, RunningMark, Sheet, SheetHead, SheetRow, T, TopBar, Wall } from '../../../ui/parts';
-import { ModelSheet, ModeSheet, PrioritySheet, barsFor } from '../../../ui/Pickers';
+import { ChoiceButton, footRoom, IconButton, RunningMark, Sheet, SheetHead, SheetRow, T, TopBar, Wall } from '../../../ui/parts';
+import { ModelSheet, ModeSheet, PrioritySheet } from '../../../ui/Pickers';
 import { ThreadMenu } from '../../../ui/ThreadMenu';
 import { DictationProblem, Listening, MicButton, useDictation } from '../../../ui/Dictation';
 import { ActLine, ChangeCard, FiledList, FocusActions, LiveLine, OptionsCard, RunLine, WorkLine } from '../../../ui/ThreadParts';
@@ -63,14 +62,6 @@ import { color, corner, font, size } from '../../../ui/theme';
 const when = (at: number) => (at ? `${dayHeading(at)} ${clock(at)}` : '');
 // The dark look's `--code-minus`, which a message her Mac refused says why in.
 const REFUSED = '#e28f82';
-
-/** A thread's state as the desktop marks it (`.th-st.s-*`, threads/pages.css). */
-function StateDot({ state }: { state: string }) {
-  if (state === 'running') return <RunningMark />;
-  const dot = { width: 12, height: 12, borderRadius: 6 };
-  if (state === 'scheduled') return <View style={{ ...dot, borderWidth: 1.5, borderStyle: 'dashed', borderColor: color.faint }} />;
-  return <View style={{ ...dot, backgroundColor: state === 'waiting' ? color.accent : color.faint }} />;
-}
 
 type Kind = 'msg' | 'same' | 'act' | 'work';
 const kindOf = (n: ThreadNode): Kind => (n.kind === 'run' ? 'work' : n.kind === 'work' ? (n.yours ? 'act' : 'work') : n.same && !n.resumed ? 'same' : 'msg');
@@ -311,66 +302,12 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   );
 }
 
-function Summary({ thread, now, close }: { thread: Thread; now: number; close: () => void }) {
-  const item = thread.item;
-  // Context and Done, the summary's two lines, with the desktop's fallbacks.
-  const told = summaryOf(item);
-  const { steps, updated } = summaryParts(item, now);
-  const level = shownLevel(item);
-  const inset = useSafeAreaInsets();
-  const heading = { fontFamily: font.mono, fontSize: 10.5, letterSpacing: 0.84, textTransform: 'uppercase' as const, color: color.faint };
-  const row = (label: string, value: ReactNode) => (
-    <View style={{ flexDirection: 'row', alignItems: 'center', minHeight: 20 }}>
-      <T style={{ width: 92, fontSize: 13, lineHeight: 20, color: color.faint }}>{label}</T>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>{value}</View>
-    </View>
-  );
-  return (
-    <Modal visible animationType="slide" onRequestClose={close}>
-      <View style={{ flex: 1, backgroundColor: color.bg }}>
-        <TopBar left={<IconButton label="Back" onPress={close}><Back /></IconButton>} title={<T numberOfLines={1} style={{ fontSize: 15, paddingHorizontal: 6 }}>{thread.title}</T>} />
-        {/* `.ts-panel`'s 20px 16px 40px, its title's line 22px under the bar; the home bar is the phone's own. */}
-        <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'space-between', paddingHorizontal: size.inset, paddingTop: 21, paddingBottom: 40 + inset.bottom }}>
-          <View style={{ gap: 22 }}>
-            <T style={{ fontSize: 16, lineHeight: 22, letterSpacing: -0.16, fontFamily: font.medium }}>{thread.title}</T>
-            {!!told.problem.trim() && (
-              <View style={{ gap: 9 }}>
-                <T style={heading}>Context</T>
-                <T style={{ fontSize: 13.5, lineHeight: 21, color: color.dim }}>{told.problem}</T>
-              </View>
-            )}
-            {steps.length > 0 && (
-              <View style={{ gap: 9 }}>
-                <T style={heading}>Done</T>
-                {steps.map((l, i) => (
-                  <View key={i} style={{ flexDirection: 'row', gap: 10 }}>
-                    <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color.faint, marginTop: 8 }} />
-                    <T style={{ flex: 1, fontSize: 13.5, lineHeight: 21, color: color.dim }}>{l}</T>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-          <View style={{ borderTopWidth: 1, borderTopColor: color.line, paddingTop: 22, marginTop: 28, gap: 14 }}>
-            {row('Status', <><StateDot state={threadState(item)} /><T style={{ fontSize: 13.5, lineHeight: 20 }}>{stateWordOf(item, threadState(item))}</T></>)}
-            {row('Priority', <><PriorityBars level={barsFor(priorityValueOf(level))} /><T style={{ fontSize: 13.5, lineHeight: 20 }}>{priorityLabelOf(level)}</T></>)}
-            {row('Owner', <T style={{ fontSize: 13.5, lineHeight: 20 }}>You</T>)}
-            {row('Project', <T style={{ fontSize: 13.5, lineHeight: 20 }}>{thread.projectName}</T>)}
-            {updated && row('Updated', <T style={{ fontSize: 13.5, lineHeight: 20 }}>{updated}</T>)}
-          </View>
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
-
 export default function ThreadScreen() {
   const { product, id } = useLocalSearchParams<{ product: string; id: string }>();
   const c = useCloud();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
-  const [summary, setSummary] = useState(false);
   // The left-out middle, asked back; dropped on leaving the thread (ItemThread.tsx).
   const [whole, setWhole] = useState(false);
   // Close asked first while filed tasks wait (close-asks-first.ts).
@@ -549,7 +486,6 @@ export default function ThreadScreen() {
               <IconButton label="Next thread" width={32} onPress={() => step(1)}><View style={{ opacity: stepOver(walk, here, 1) ? 1 : 0.35 }}><Chevron /></View></IconButton>
             </>
           )}
-          <IconButton label="Show the summary" width={walking ? 36 : 44} onPress={() => setSummary(true)}><Panel /></IconButton>
           {/* Done in a box of its own, left of the dots, as the desktop draws it (threads/ThreadMenu.tsx). */}
           {threadState(item) !== 'done' && (
             <Pressable onPress={close} disabled={busy} accessibilityRole="button" accessibilityLabel="Mark done"
@@ -627,7 +563,7 @@ export default function ThreadScreen() {
               <Markdown text={thread.outcome.text} dir={dir} files={files} />
             </View>
           )}
-          {thread.change && <ChangeCard change={thread.change} />}
+          {thread.change && <ChangeCard change={thread.change} product={item.product} id={item.id} />}
           {thread.after.length > 0 && (
             <View style={{ marginTop: 22, gap: 9 }}>
               {thread.after.map((a, k: number) => <ActLine key={`${a.at}-${k}`} act={a} joined={k > 0} />)}
@@ -677,8 +613,7 @@ export default function ThreadScreen() {
         place={offers.place} onPlace={(keep) => void press({ kind: 'keep-here', keep })}
         repeats={!!rule} onEndRepeat={() => { if (rule) void press({ kind: 'end-repeat', rule }); }}
         onReport={() => router.push({ pathname: '/settings/feedback', params: { report: `${product}/${id}`, title: item.title ?? '', answer: (page.answer ? [page.answer.headline, page.answer.rest].filter(Boolean).join('\n\n') : thread.outcome?.text ?? '').slice(0, 4000) } })}
-        onClose={close} closed={threadState(item) === 'done'} />
-      {summary && <Summary thread={thread} now={c.now} close={() => setSummary(false)} />}
+        closed={threadState(item) === 'done'} />
     </Wall>
   );
 }

@@ -6,6 +6,13 @@
 // SUPABASE_ACCESS_TOKEN the person had approved on a card, deleting the old one.
 // ALL_PROXY, OPENSSL_CONF, LUA_INIT, GCONV_PATH and AWS_CA_BUNDLE passed the
 // name check on the Mac and on the cloud machine.
+//
+// Daily security review, 2026-11-17: a service not on the list still had no
+// name rule, and nobody had to answer the card. One ask for "Acme" and three
+// keeps with no answer saved COREPACK_NPM_REGISTRY, PLAYWRIGHT_DOWNLOAD_HOST and
+// ELECTRON_MIRROR for every later cloud run, names that point its downloads at
+// any server. A blocklist of names keeps missing some, so a service off the
+// list keeps nothing; its key goes on a card the person answers.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -62,14 +69,25 @@ describe('a cloud agent keeps only the key of the sign-in it asked for', () => {
     expect(kept).toEqual([['SUPABASE_ACCESS_TOKEN', 'v-123']]);
   });
 
-  it('still keeps a key for a service not on the list, and for a login that finished by itself', async () => {
-    expect((await (await asked('Acme')).keep('ACME_TOKEN')).status).toBe('kept');
-    expect(kept).toEqual([['ACME_TOKEN', 'v-123']]);
+  it('keeps nothing for a service not on the list, whatever the name and even after the person signed in', async () => {
+    const acme = await asked('Acme');
+    for (const name of ['ACME_TOKEN', 'COREPACK_NPM_REGISTRY', 'PLAYWRIGHT_DOWNLOAD_HOST', 'RUSTC_WRAPPER']) {
+      const out = await acme.keep(name);
+      expect(out.status).toBe('denied');
+      expect(out.message).toMatch(/AGENTBOX-NEEDS: key/);
+    }
+    expect((await (await asked('Acme', 'signed-in')).keep('ACME_TOKEN')).status).toBe('denied');
+    expect(kept).toEqual([]);
+  });
+
+  it("still keeps a known service's key for a login that finished by itself", async () => {
+    expect((await (await asked('GitHub')).keep('GH_TOKEN')).status).toBe('kept');
+    expect(kept).toEqual([['GH_TOKEN', 'v-123']]);
   });
 
   it('keeps nothing once the person skipped the sign-in or replied instead', async () => {
     expect((await (await asked('GitHub', 'skipped')).keep('GH_TOKEN')).status).toBe('denied');
-    expect((await (await asked('Acme', 'replied')).keep('ACME_TOKEN')).status).toBe('denied');
+    expect((await (await asked('Vercel', 'replied')).keep('VERCEL_TOKEN')).status).toBe('denied');
     expect(kept).toEqual([]);
   });
 });

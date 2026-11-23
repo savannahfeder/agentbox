@@ -1,14 +1,30 @@
 /* Home. The sky sits under the main card's content; cards
    over it are glass. */
 
-.home-sky { position: absolute; z-index: 0; pointer-events: none; overflow: hidden; border-radius: var(--radius); }
-.home-sky canvas { display: block; width: 100%; height: 100%; }
+.home-sky { position: absolute; z-index: 0; pointer-events: none; overflow: hidden; border-radius: var(--pane-corner); }
+/* Pinned to the card's right edge and drawn as wide as the card with the
+   sidebar folded, so the sidebar opening covers its left edge (sky-follows-the-card.ts). */
+.home-sky canvas { position: absolute; top: 0; right: 0; width: 100%; height: 100%; }
 .home-sky::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07); }
 :root[data-theme="light"] .home-sky::after { box-shadow: inset 0 0 0 1px rgba(30, 22, 36, .08); }
 
 /* The light card is white and the window around it takes the sky's tint. */
 :root[data-theme="light"][data-sky-frame] body,
 :root[data-theme="light"][data-sky-frame] .app.workspace-layout { background: var(--sky-frame) !important; }
+/* The orange mountains bring warm greys to go with the orange. */
+:root[data-theme="light"][data-sky-frame="mountains"] {
+  --text: #16171b; --text-dim: #4f5159; --text-faint: #75777f;
+  --line: rgba(40, 28, 16, .07); --line-strong: rgba(40, 28, 16, .14); --wash: rgba(40, 28, 16, .04); --wash-strong: rgba(40, 28, 16, .08);
+  --film-strong: rgba(40, 28, 16, .07); --select: rgba(238, 96, 24, .16);
+}
+/* The mountains rise behind the cards, so the cards are clear enough to show them, frosted.
+   The frost is drawn once under them (frost.ts): the browser's own is drawn again each time a bird moves. */
+:root[data-theme="light"][data-sky-frame="mountains"] .hm-glass,
+:root[data-theme="light"][data-sky-frame="mountains"] .hm-start .tc-card.tc-inline,
+:root[data-theme="light"][data-sky-frame="mountains"] .hm-door {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .6), rgba(255, 255, 255, .42));
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
 
 .app.home-shown > .topbar { visibility: hidden; border-bottom-color: transparent; }
 .app.sky-shown .list-pane, .app.sky-shown .list-pane .th-table { background: transparent; }
@@ -36,7 +52,7 @@
 
 .hm-doors { display: flex; gap: 8px; margin-top: 16px; }
 .hm-door { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px 0 11px; font: inherit; font-size: 13.5px; color: var(--text); opacity: .9; cursor: pointer;
-  background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 255, 255, .15); border-radius: 8px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); }
+  background: rgba(255, 255, 255, .045); border: 1px solid rgba(255, 255, 255, .15); border-radius: var(--artifact-corner-small); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); }
 .hm-door:hover { opacity: 1; border-color: rgba(255, 255, 255, .26); }
 .hm-door svg { opacity: .65; }
 .hm-door .c { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--text-faint); }
@@ -70,6 +86,8 @@
 .hm-two { display: grid; grid-template-columns: 1.35fr 1fr; gap: 22px; margin-top: 24px; max-height: 300px; min-height: 240px; }
 /* Weighted so the cards give up their room before the words do. */
 .hm-col > .hm-two { flex: 1 100 300px; }
+/* Three rows or fewer: the cards fit them, and are already under the 240px the others give up to a long message. */
+.hm-col > .hm-two.fits { flex: none; min-height: 0; }
 .hm-card { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
 .hm-head { display: flex; align-items: center; justify-content: space-between; padding: 13px 18px 12px; border-bottom: 1px solid rgba(255, 255, 255, .07); font-size: 14px; }
 .hm-head .t { color: var(--text); font-weight: 500; }
@@ -86,25 +104,29 @@
 :root[data-theme="light"] .hm-row + .hm-row { border-top-color: rgba(30, 22, 36, .06); }
 :root[data-theme="light"] .hm-row:hover, :root[data-theme="light"] .hm-row.on { background: rgba(30, 22, 36, .04); }
 .hm-text { min-width: 0; }
-.hm-text b { display: block; font-weight: 400; font-size: 14.5px; line-height: 20px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hm-text b { display: block; font-weight: 400; font-size: 14px; line-height: 20px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hm-row.unread .hm-text b { font-weight: 500; }
 .hm-text small { display: block; font-size: 12.5px; line-height: 17px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hm-row time { font-size: 12.5px; color: var(--text-dim); white-space: nowrap; }
-.hm-mate .hm-text b { font-size: 14px; line-height: 19px; }
-.hm-mate .hm-text small { font-size: 12px; line-height: 16px; }
 
 .hm-face { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 500; color: var(--text); background: rgba(255, 255, 255, .12); position: relative; box-sizing: border-box; }
+.hm-face > .hm-photo { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .hm-face.ai { border-radius: 8px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .16); }
 .hm-face.live::after, .hm-face.wait::after { content: ''; position: absolute; right: -1px; bottom: -1px; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(18, 16, 18, .95); }
 .hm-face.live::after { background: #8fd18f; }
 .hm-face.wait::after { background: var(--accent); }
 :root[data-theme="light"] .hm-face { background: rgba(30, 22, 36, .07); }
+/* A letter in a circle read as a close button; an agent's thread wears the app's agent face. */
+.hm-face.hm-agent, :root[data-theme="light"] .hm-face.hm-agent { background: none; }
+.hm-agent > .agent-face { width: 28px; height: 28px; }
+.hm-agent .agent-eyes { width: 22px; height: 22px; }
 :root[data-theme="light"] .hm-face.ai { background: rgba(255, 255, 255, .6); border-color: rgba(30, 22, 36, .14); }
 :root[data-theme="light"] .hm-face.live::after, :root[data-theme="light"] .hm-face.wait::after { box-shadow: 0 0 0 2px rgba(255, 255, 255, .95); }
 :root[data-theme="light"] .hm-face.live::after { background: #3fb36b; }
 
-.hm-week { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.hm-week > span { font-size: 11.5px; line-height: 14px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.hm-week { display: flex; flex-direction: column; align-items: flex-end; }
+/* The bars take the title's line and the count the second line's, so the count sits level with it. */
+.hm-week > span { font-size: 12.5px; line-height: 17px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .hm-bars { display: grid; grid-template-columns: repeat(7, 5px); gap: 3px; align-items: end; height: 20px; }
 .hm-bars i { display: block; border-radius: 1px; background: rgba(255, 255, 255, .22); }
 .hm-bars i.t { background: rgba(255, 255, 255, .8); }
@@ -119,6 +141,7 @@
   .hm-col > .hm-two, .hm-col > .hm-start { flex: none; }
   .hm-col::before { flex-shrink: 0; }
   .hm-card { height: 300px; }
+  .hm-two.fits .hm-card { height: auto; }
 }
 
 /* Settings, Appearance: a tile is the sky on a small card, the way the window wears it. */
@@ -133,6 +156,8 @@
   background: linear-gradient(to bottom, rgba(24, 21, 26, 0), rgba(24, 21, 26, .9)); }
 :root[data-theme="light"] .hm-card::after { background: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(255, 255, 255, .7)); }
 .hm-scroll { padding-bottom: 28px; }
+.hm-two.fits .hm-card::after { content: none; }
+.hm-two.fits .hm-scroll { padding-bottom: 4px; }
 
 /* The Inbox under a sky (approved 2026-11-08, design 86): the sky at full
    strength behind the header and nowhere else, so the list keeps the page.
@@ -152,7 +177,7 @@
 .app.sky-shown:not(.home-shown) > .topbar { border-bottom-color: transparent; }
 /* The board has no tabs, so the same sky sits 60px higher, its top cut off,
    and is gone before the column headings. */
-.app.sky-board .inbox-sky-head { transform: scaleY(-1) translateY(60px); clip-path: inset(0 0 60px 0 round var(--radius));
+.app.sky-board .inbox-sky-head { transform: scaleY(-1) translateY(60px); clip-path: inset(0 0 60px 0 round var(--pane-corner));
   -webkit-mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px);
   mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px); }
 
@@ -170,20 +195,12 @@
 .app:has(> .inbox-sky-zero) .th-start .tc-chip { color: var(--text); }
 .app:has(> .inbox-sky-zero) .th-start .tc-send > button:disabled { opacity: 1; }
 .app:has(> .inbox-sky-zero) .th-start .tc-send kbd { opacity: 1; }
-/* The light purple sky draws its ink soft here (sky.ts emptySoft), and the
-   controls are filled white so no dot sits inside one. */
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-chip { background: #fff; }
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-send > button { background: #fff; box-shadow: inset 0 0 0 1px rgba(30, 22, 36, .14); }
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-send > button:hover:not(:disabled) { background: #f3f1f5; }
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-ideas { background: rgba(255, 255, 255, .55); }
 
 /* Team and Files wear the Inbox's sky; the Team list would cover it. */
 .app.sky-place .cx-list { background: transparent; }
 
-/* A row's facts as tags in the Inbox's own column type, so they read as
-   settings of the thread rather than a sentence about it. */
-.hm-tags { display: flex; align-items: center; gap: 10px; margin-top: 3px; min-width: 0; overflow: hidden; }
-.hm-tag { display: inline-flex; align-items: center; gap: 6px; font: 10.5px/16px var(--mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); white-space: nowrap; }
+.hm-tags { display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden; }
+.hm-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; line-height: 17px; color: var(--text-faint); white-space: nowrap; }
 .hm-tag:last-child { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .hm-prio { display: inline-flex; align-items: center; color: var(--text-faint); }
 .hm-prio.urgent { color: var(--accent); }

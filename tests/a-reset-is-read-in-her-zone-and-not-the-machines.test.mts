@@ -61,9 +61,9 @@ describe('the same stamp, read for three different zones', () => {
   // nine hours behind us and already gone.
   it('turns into the pill\'s own words without the machine getting a vote', () => {
     const hers = readUsage('Current session: 45% used · resets Sep 1 at 4pm', NOW, 'America/Los_Angeles');
-    expect(pillText(hers, NOW)).toEqual({ used: '45%', when: '2h 14m left' });
+    expect(pillText(hers, NOW)).toEqual({ used: '45%', when: 'resets in 2h 14m' });
     const berlin = readUsage('Current session: 45% used · resets Sep 1 at 4pm', NOW, 'Europe/Berlin');
-    expect(pillText(berlin, NOW)).toEqual({ used: '45%', when: 'any moment' });
+    expect(pillText(berlin, NOW)).toEqual({ used: '45%', when: 'resets any moment' });
   });
 
   // THE BOUNDARY ON THE OTHER SIDE. No zone to be told means the process's own

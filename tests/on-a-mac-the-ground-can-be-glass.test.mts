@@ -253,7 +253,8 @@ describe('the page', () => {
     const band = rule(`${GLASS} .glass-band`);
     // Its 26px buttons centred on the lights in a 50px band.
     expect(band).toMatch(new RegExp(`padding: ${y + 7 - 13}px 20px 0 ${x + 60 + 16 + 54 + 12}px`));
-    expect(rule(`${GLASS} .app:not(.back-forward-on) .glass-band`)).toMatch(new RegExp(`padding-left: ${x + 60 + 16}px`));
+    // The arrows are on the inbox only; Home and Inbox stay put on pages without them.
+    expect(nav).not.toMatch(/\.app:not\(\.back-forward-on\) \.glass-band/);
     expect(rule('.glass-band')).toMatch(/display: none/);
   });
 
