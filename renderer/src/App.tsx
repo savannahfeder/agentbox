@@ -31,7 +31,7 @@ import { codexFromSettings } from './web-settings';
 import { advanceAfter, advanceLandsHere, pickSentWords, pickStaysPut, replyMovesOn, opensIntoNeedsYou, nextAfterAdvance, sayWhoseBox, sentLineSays, type Advance } from './advance';
 import { arrowRows, pageTitle, spotIn, stepIn } from './one-thing-at-a-time';
 import { AIMED_AT_THE_THREAD_YOU_LEFT, CLICK_FOR_THE_THREAD_YOU_LEFT, clickAimedHere, pickLandsHere, type Arrival, type Point } from './pick-settles';
-import { freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
+import { followedAfter, freshCopy, staysOnTheTask, stillFollowing, wayOut, type Followed } from './stay-with-a-command';
 import { List } from './components/List';
 import { LogoOrbit } from './components/LogoOrbit';
 import { cameBackFromACrash, keepHeldWriter, RELOADED_AFTER_A_CRASH } from './after-a-crash';
@@ -4730,7 +4730,7 @@ export default function App() {
     const isRunning = running && !later;
     const runStays = later && running;
     if (isRunning) {
-      setFollowing({ product: item.product, id: item.id });
+      setFollowing({ product: item.product, id: item.id, reply: true });
       setModal(null);
       // ON THE SCREEN BEFORE ANYTHING IS ASKED OF ANYBODY. The moment she
       // presses send, her message is the last thing in the conversation, where
@@ -4913,7 +4913,7 @@ export default function App() {
     const priorSnooze = item.snoozedUntil ?? 0;
     // The store lifts a time she set when the reply lands (laterHerWordLifts); Z puts it back.
     const runLifted = !later && !waiting && laterHerWordLifts(item).runAt;
-    if (stay) setFollowing({ product: item.product, id: item.id });
+    if (stay) setFollowing(followedAfter(item, text, engine));
     const undid = [{ product: item.product, id: item.id, words: 'Undid your reply' }];
     await deferCommit(item, async () => {
       // In a conversation, any agent it mentions starts now and the message is
