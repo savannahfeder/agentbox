@@ -635,6 +635,11 @@ export function clipToSentence(text: string, budget = SUMMARY_BUDGET): string {
   return `${text.slice(0, space > 40 ? space : budget).trimEnd()}…`;
 }
 
+// A message drawn as a row's title stops where the longest thread name would
+// (NAME_MAX in main/row-label.mts), however wide the window.
+export const MESSAGE_ROW_BUDGET = 64;
+export const messageOnRow = (text: string): string => clipToSentence(text, MESSAGE_ROW_BUDGET);
+
 // Every ordered list sorts through this, so the inbox, In progress and the
 // fleet agree on which row comes next. `score` is the one in shared/rank.mts,
 // passed in so this stays pure. Recency only breaks ties.
