@@ -1543,7 +1543,10 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       const waits: Promise<boolean>[] = [];
       const products = readable();
       const sharedIn = new Map<string | null, boolean>();
+      const line = lineNow();
       for (const whole of allFiles().filter((f) => f.chain.some((v) => v.copies.some((c) => c.thread.ref.product === product && c.thread.ref.id === id)))) {
+        // What the cloud holds is known by its hash: only such a file's versions are looked up on disk.
+        if (!line.hashesOf(whole.key).some((hash) => hash && keeper.off(hash))) continue;
         if (!sharedIn.has(whole.project)) sharedIn.set(whole.project, audienceOf(whole.project) !== 'private');
         const { chain } = await lineChain(whole, sharedIn.get(whole.project), products);
         for (const v of chain) if (v.hash && !v.opened && keeper.off(v.hash)) waits.push(keeper.bringBack(v.hash));
