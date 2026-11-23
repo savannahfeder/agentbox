@@ -59,4 +59,17 @@ describe('what the system draws for the app', () => {
     expect(config).toContain(`backgroundColor: '${LIGHT.bg}'`);
     expect(config).not.toMatch(/#1a1817/);
   });
+  // iOS draws its launch screen from the storyboard, and without expo-splash-screen
+  // prebuild leaves it systemBackgroundColor: black on a phone set to Dark (seen on the
+  // iPhone 17 simulator, 2026-11-22).
+  it('draws the iPhone launch screen in Light\'s ground, not the system background', () => {
+    const config = fs.readFileSync('mobile/app.config.ts', 'utf8');
+    const pkg = JSON.parse(fs.readFileSync('mobile/package.json', 'utf8'));
+    expect(pkg.dependencies['expo-splash-screen']).toBeTruthy();
+    expect(config).toMatch(new RegExp(`\\['expo-splash-screen', \\{[^}]*backgroundColor: '${LIGHT.bg}'`));
+    expect(config).not.toMatch(/'expo-splash-screen'[^\]]*dark:/);
+    // With no image, expo-splash-screen writes the colour but leaves the storyboard on the system background.
+    expect(config).toContain('systemColor="systemBackgroundColor"');
+    expect(config).toContain('name="SplashScreenBackground"');
+  });
 });

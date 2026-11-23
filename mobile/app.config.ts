@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { ExpoConfig } from 'expo/config';
+import { withDangerousMod, type ConfigPlugin } from 'expo/config-plugins';
 import { NAME, nameSlug } from '../shared/product-name.mjs';
 import { CLOUD_ADDRESS, PHONE_SITE } from '../shared/cloud-address.mts';
 
@@ -36,6 +37,17 @@ export function cloudConfig(env: Record<string, string | undefined> = process.en
 // microphone line from Info.plist and block the microphone on Android.
 const MICROPHONE_USE = `${NAME} listens only while you dictate a message, and writes what you say into it.`;
 const SPEECH_USE = `${NAME} writes what you say into your message. Your iPhone does this itself when it can, and Apple's speech recognition does it when it cannot.`;
+
+// With no image, expo-splash-screen writes SplashScreenBackground but leaves the
+// launch storyboard on systemBackgroundColor, which is black on a phone set to Dark.
+const withLaunchGround: ConfigPlugin = (config) => withDangerousMod(config, ['ios', (c) => {
+  const file = path.join(c.modRequest.platformProjectRoot, c.modRequest.projectName ?? '', 'SplashScreen.storyboard');
+  if (fs.existsSync(file)) {
+    const xml = fs.readFileSync(file, 'utf8');
+    fs.writeFileSync(file, xml.replace('<color key="backgroundColor" systemColor="systemBackgroundColor"/>', '<color key="backgroundColor" name="SplashScreenBackground"/>'));
+  }
+  return c;
+}]);
 
 const bundleId = process.env.MOBILE_BUNDLE_ID || 'now.astral.agentbox';
 const projectId = process.env.EAS_PROJECT_ID || '2b129901-faac-4b8d-8709-9a08cf6778f5';
@@ -81,6 +93,8 @@ const config: ExpoConfig = {
   web: { favicon: './assets/favicon.png' },
   plugins: [
     'expo-router',
+    // The iPhone's launch screen, before anything draws; without it iOS paints the system background (black under Dark).
+    ['expo-splash-screen', { backgroundColor: '#f8f8fa' }],
     // The keychain holds the sign-in without Face ID, so the build asks for none.
     ['expo-secure-store', { faceIDPermission: false }],
     'expo-apple-authentication',
@@ -97,4 +111,4 @@ const config: ExpoConfig = {
   },
 };
 
-export default config;
+export default withLaunchGround(config);
