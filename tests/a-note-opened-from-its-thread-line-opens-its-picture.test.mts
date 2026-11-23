@@ -9,11 +9,17 @@
 // note, not a path, so the -v2 was dropped and the press never landed.
 // Rebuilt from the note's record and the run-log case in
 // a-picture-opened-big-walks-the-answer-only-its-runs-log-holds.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import { build } from 'esbuild';
 import { filesInLines, pathsAPressKeeps, stillInHand, threadFiles, whereAPressLands, withFilesAsked } from '../shared/artifact-marks.mts';
 import { withRunsSaid } from '../shared/runs-said.mts';
 
+const require = createRequire(import.meta.url);
+let chromium;
+try { ({ chromium } = require('playwright')); } catch {}
+const browserAvailable = chromium && fs.existsSync(chromium.executablePath());
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 const D = '/Users/someone/store/designs/w-1/round-two';
 const startedAt = Date.UTC(2026, 10, 21, 19, 20, 0);
@@ -110,4 +116,57 @@ describe('the wiring', () => {
   it('the big view keeps what the press and its note name', () => {
     expect(read('renderer/src/components/ArtifactView.tsx')).toMatch(/const kept = useMemo\(\(\) => pathsAPressKeeps\(open, given\.notes\)/);
   });
+});
+
+// The real big view in Chromium, handed what ThreadArtifacts hands it for this thread.
+let browser;
+const opened = async (withLog) => {
+  const props = {
+    lines: withLog ? lines : ledger,
+    numbers,
+    marks: { notes: [notes[1]], approvals: [], seen: {} },
+    open: fromTheLine(notes[1]),
+  };
+  const bundle = (await build({
+    stdin: { contents: `
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { ArtifactView } from './renderer/src/components/ArtifactView';
+      const call = () => Promise.resolve(Object.assign([], { ok: true }));
+      window.zero = new Proxy({}, { get: (_, k) => (k === 'liveRoom' ? () => Promise.resolve(null) : typeof k === 'string' && k.startsWith('on') ? () => () => {} : call) });
+      const p = ${JSON.stringify(props)};
+      createRoot(document.getElementById('root')).render(
+        <ArtifactView product="p" thread="t" lines={p.lines} numbers={p.numbers} marks={p.marks} me="u-me" people={[]}
+          open={p.open} ownerOfRow="u-me" withAgent write={async () => ({ ok: true })} onClose={() => {}}
+          files={{ find: async (f) => f, readText: async () => null }} />);`,
+    resolveDir: process.cwd(), loader: 'tsx' },
+    bundle: true, write: false, format: 'iife', jsx: 'automatic', logLevel: 'error',
+    loader: { '.css': 'empty', '.svg': 'dataurl', '.png': 'dataurl', '.woff2': 'empty', '.mp3': 'empty' },
+  })).outputFiles[0].text;
+  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  page.setDefaultTimeout(5_000);
+  await page.route('http://view.test/**', (r) => r.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' }));
+  await page.goto('http://view.test/');
+  await page.addScriptTag({ content: bundle });
+  await page.locator('.av-stage').waitFor();
+  return page;
+};
+
+describe.skipIf(!browserAvailable)('in the big view, pressed from the note\'s line', () => {
+  beforeAll(async () => { browser = await chromium.launch({ headless: true }); }, 60_000);
+  afterAll(async () => { await browser?.close(); });
+
+  it('shows the note\'s version, not "Opening This file…"', async () => {
+    const page = await opened(true);
+    await expect.poll(() => page.locator('.av-of').textContent()).toBe('v2 of 2');
+    expect(await page.getByText('Opening This file').count()).toBe(0);
+    await page.close();
+  }, 30_000);
+
+  it('does so before the run\'s log is read, too', async () => {
+    const page = await opened(false);
+    await expect.poll(() => page.locator('.av-of').textContent()).toBe('v2 of 2');
+    expect(await page.getByText('Opening This file').count()).toBe(0);
+    await page.close();
+  }, 30_000);
 });
