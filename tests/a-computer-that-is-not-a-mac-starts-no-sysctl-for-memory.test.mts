@@ -17,7 +17,10 @@ vi.mock('node:child_process', async (importOriginal) => {
     cb?.(null, 'kern.memorystatus_vm_pressure_level: 1\nkern.memorystatus_level: 42\n');
   };
   const execFileSync = (file: string) => { started.push(file); return '1\n42\n'; };
-  return { ...real, default: { ...real, execFile, execFileSync }, execFile, execFileSync };
+  // The shell that reads for a Mac (main/mac-pressure.mts) cannot start here,
+  // so a Mac's reading falls back to sysctl itself.
+  const spawn = (file: string) => { started.push(file); throw new Error('no shell in this test'); };
+  return { ...real, default: { ...real, execFile, execFileSync, spawn }, execFile, execFileSync, spawn };
 });
 
 beforeEach(() => { started.length = 0; });
@@ -38,6 +41,6 @@ describe('the memory reading off a Mac', () => {
     const { readMacPressureNow } = await import('../main/start-hold.mts');
     expect(await readMacPressure('darwin')).toMatchObject({ level: 1, freePct: 42 });
     expect(readMacPressureNow('darwin')).toMatchObject({ level: 1, freePct: 42 });
-    expect(started).toEqual(['/usr/sbin/sysctl', '/usr/sbin/sysctl']);
+    expect(started).toEqual(['/bin/sh', '/usr/sbin/sysctl', '/usr/sbin/sysctl']);
   });
 });
