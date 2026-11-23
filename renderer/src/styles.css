@@ -4196,7 +4196,7 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
 .palette-k .palette-ai-ask:disabled { opacity: .55; cursor: default; }
 .palette-k .palette-ai-modes { flex: none; display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: var(--radius); }
 .palette-k .palette-ai-modes button {
-  height: 22px; padding: 0 9px; border: none; border-radius: calc(var(--radius) - 2px); background: none; color: var(--text-faint); font-size: 12.5px; cursor: pointer;
+  height: 22px; padding: 0 9px; border: none; border-radius: var(--radius); background: none; color: var(--text-faint); font-size: 12.5px; cursor: pointer;
 }
 .palette-k .palette-ai-modes button.on { background: var(--bg); color: var(--text); box-shadow: 0 0 0 1px var(--line); }
 .palette-k .palette-item { justify-content: flex-start; align-items: center; gap: 12px; height: 38px; padding: 0 18px; font-size: 14.5px; color: var(--text-dim); }

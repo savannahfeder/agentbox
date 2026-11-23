@@ -523,9 +523,11 @@ export function paletteOrder(all: Command[], threads: Command[], phone = false, 
     ? [{ rows: people, label: 'People and groups' }, { rows: rest, label: 'Threads' }]
     : [{ rows: rest, label: 'Threads' }, { rows: people, label: 'People and groups' }];
   const found = sections.flatMap((s) => s.rows);
+  // The AI row alone, with nothing else listed, needs no heading: it says what it is.
+  const loneAsk = found.length === 1 && found[0].id === ASK_ROW;
   const heads = (at: number) => {
     for (const s of sections) {
-      if (s.rows.length) labels.set(at, s.label);
+      if (s.rows.length && !loneAsk) labels.set(at, s.label);
       at += s.rows.length;
     }
   };
@@ -751,6 +753,9 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findByDescri
                 </span>
                 : phone
                 ? <span className="palette-text"><span className="palette-label">{c.label}</span>{isThread(c) && c.hint && <span className="palette-sub">{c.hint}</span>}</span>
+                : c.sub && i < picks.length
+                // The AI's reason is its own words, not where the typed ones were found.
+                ? <span className="palette-text"><span className="palette-label">{c.label}</span><span className="palette-sub">{c.sub}</span></span>
                 : c.sub
                 ? <span className="palette-text"><span className="palette-label">{c.label}</span><span className="palette-sub">{markedWords(c.sub, query.trim()).map((run, j) => (run.hit ? <b className="hit" key={j}>{run.text}</b> : <span key={j}>{run.text}</span>))}</span></span>
                 : <span className="palette-label">{c.label}</span>}

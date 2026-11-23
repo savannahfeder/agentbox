@@ -122,6 +122,8 @@ describe('⌘K offers it', () => {
     expect(labels.get(2)).toBe('Threads');
     // With nothing else found, it is the first row and Enter asks.
     expect(paletteOrder([], [ask], false, 'the one about the camera').rows[0].id).toBe('find-by-description');
+    // Alone, it carries no Threads heading: no thread was found.
+    expect(paletteOrder([], [ask], false, 'the one about the camera').labels.size).toBe(0);
     // Threads found still come before it.
     const t = cmd('thread-p/w-1', 'Camera crash');
     expect(paletteOrder(commands, [t, ask], false, 'android camera crash thread').rows.map((r) => r.id).indexOf('thread-p/w-1')).toBe(0);
