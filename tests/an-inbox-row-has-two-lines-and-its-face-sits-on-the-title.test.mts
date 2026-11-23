@@ -120,9 +120,11 @@ describe('on the desktop', () => {
     expect(rule('.th-table .row:not(.th-head) .th-cell-state.has-card:hover')).toMatch(/z-index: 30;/);
   });
 
-  // Measured: the x-height of 14.5px Geist is centred 28px into the row, and so is the 6px dot at 25px.
-  it("an unread thread's dot stays in the gutter, level with the title's lowercase, not half way down two lines", () => {
-    expect(rule('.th-table .row.unread::before')).toMatch(/top: 25px;/);
+  // Picked out of four placements (inbox-two-lines-in-the-app-light-v3.png). The face's middle is
+  // 17 + 5 + 12 - 0.36 = 33.64px into the row, so the 6px dot starts at 30.64px. Measured by ink: the
+  // dot's middle within half a device pixel of the face's at 2.4 pixels a point.
+  it("an unread thread's dot stays in the gutter, level with the middle of the face beside it", () => {
+    expect(rule('.th-table .row.unread::before')).toMatch(/top: 30\.64px;/);
     expect(rule('.th-table .row.unread::before')).not.toMatch(/display: none/);
     expect(pages).toMatch(/:root \.th-table \.row\.unread \.subject \{ font-weight: 530; \}/);
   });
