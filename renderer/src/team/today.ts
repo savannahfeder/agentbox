@@ -94,7 +94,7 @@ const first = (name: string) => name.split(/\s+/)[0] || name;
 /** A teammate's name is its job ("Chief of staff"), so only a person is cut to a first name. */
 const quietName = (p: { kind: string; name: string }) => (p.kind === 'mate' ? p.name : first(p.name));
 const oneLine = (s: string) => {
-  const line = withoutFiles(s).split('\n').find((l) => l.trim())?.trim() || 'Sent a file';
+  const line = withoutFiles(s).replace(/\[([^\]\n]+)\]\([^)\s]+\)/g, '$1').split('\n').find((l) => l.trim())?.trim() || 'Sent a file';
   return line.length > 110 ? `${line.slice(0, 108).replace(/\s+\S*$/, '')}…` : line;
 };
 
