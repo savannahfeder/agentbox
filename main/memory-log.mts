@@ -19,6 +19,7 @@
 // dev server that renamed itself and hid its environment.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { listProcesses } from './leftovers.mts';
@@ -26,6 +27,8 @@ import type { ProcessRecord } from './leftovers.mts';
 import { readMacPressure } from './memory-gate-server.mts';
 import { pressureFrom } from './memory-gate.mts';
 import type { PressureReading } from './memory-gate.mts';
+import { overAllowance, standing, SETTLE_MS } from './memory-allowance.mts';
+import type { StampedStanding } from './memory-allowance.mts';
 
 /** Days of files kept, today included. */
 export const KEEP_DAYS = 7;
@@ -45,6 +48,8 @@ export interface MemoryLogOptions {
   own?: () => unknown;
   keepDays?: number;
   footprints?: () => Promise<Map<number, number>> | Map<number, number>;
+  /** This computer's memory, which the allowance is a share of (main/memory-allowance.mts). */
+  ramMb?: number;
 }
 
 const UNIT: Record<string, number> = { B: 1 / 1048576, K: 1 / 1024, M: 1, G: 1024 };
@@ -174,18 +179,27 @@ export class MemoryLog {
   declare own: MemoryLogOptions['own'];
   declare keepDays: number;
   declare footprints: NonNullable<MemoryLogOptions['footprints']>;
+  declare ramMb: number;
   declare _pruned: string | null;
   declare _busy?: boolean;
   declare _listedAt?: number;
+  declare _standings: StampedStanding[];
 
   constructor({
     dir, appPid = process.pid, list = listProcesses, readPressure = readMacPressure,
     now = Date.now, facts = () => ({}), own, keepDays = KEEP_DAYS,
     // Footprints are by pid of this Mac, so they only belong over its own listing.
     footprints = list === listProcesses ? readFootprints : () => new Map(),
+    ramMb = os.totalmem() / 1048576,
   }: MemoryLogOptions) {
-    Object.assign(this, { dir, appPid, list, readPressure, now, facts, own, keepDays, footprints });
+    Object.assign(this, { dir, appPid, list, readPressure, now, facts, own, keepDays, footprints, ramMb });
     this._pruned = null;
+    this._standings = [];
+  }
+
+  /** Whether the app and its agents are over their allowance, on the listings of the last minutes. */
+  overAllowance(now: number = this.now()): boolean {
+    return overAllowance(this._standings, now);
   }
 
   /** Writes this minute's line. Never throws: a log that breaks the app is worse than a gap in the log. */
@@ -209,7 +223,16 @@ export class MemoryLog {
         ]);
         this._listedAt = at;
         const procs = fp.size ? listed.map((p) => (fp.has(p.pid) ? { ...p, mb: fp.get(p.pid)! } : p)) : listed;
-        line = { ...summarizeMemory(procs, { appPid: this.appPid, at, reading }), measure: fp.size ? 'footprint' : 'rss', ...facts };
+        const summed = summarizeMemory(procs, { appPid: this.appPid, at, reading });
+        line = { ...summed, measure: fp.size ? 'footprint' : 'rss', ...facts };
+        // Resident sizes leave out what is compressed or swapped, so they read
+        // lowest exactly when the computer is short: only footprints are judged.
+        const sum = (list: { mb: number }[]) => list.reduce((n, p) => n + p.mb, 0);
+        const stands = fp.size ? standing({ ramMb: this.ramMb, appMb: summed.app.mb, tasksMb: sum(summed.tasks), othersMb: sum(summed.others) }) : null;
+        if (stands) {
+          line.allowance = stands;
+          this._standings = [...this._standings.filter((s) => at - s.at <= SETTLE_MS), { ...stands, at }];
+        }
       }
       if (this.own) { try { line.own = this.own() ?? null; } catch { line.own = null; } }
       fs.mkdirSync(this.dir, { recursive: true });

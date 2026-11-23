@@ -38,6 +38,7 @@ import { CommandHistory } from './memory-gate-history.mts';
 import type { Verdict } from './memory-gate-history.mts';
 import { etimeSeconds } from './leftovers.mts';
 import { readMacPressure } from './mac-pressure.mts';
+import { gatePressure } from './memory-allowance.mts';
 
 export const PROTOCOL = 1;
 export const DEFAULT_LOCK_PORT = 47263;
@@ -163,6 +164,8 @@ export interface MemoryGateServerOptions {
   ownerOf?: ((session: string) => { item?: unknown; product?: string | null } | null | undefined) | null;
   urgentFor?: ((product: string | null, item: string | null) => unknown) | null;
   readPressure?: () => Promise<PressureReading>;
+  /** Whether the app and its agents are over their allowance (main/memory-allowance.mts). */
+  overAllowance?: () => boolean;
   sampleProcesses?: () => Promise<ProcessSample[]>;
   parentOf?: (pid: number) => number | null;
   pollMs?: number;
@@ -191,6 +194,7 @@ export class MemoryGateServer {
   declare ownerOf: MemoryGateServerOptions['ownerOf'];
   declare urgentFor: MemoryGateServerOptions['urgentFor'];
   declare readPressure: () => Promise<PressureReading>;
+  declare overAllowance: () => boolean;
   declare sampleProcesses: () => Promise<ProcessSample[]>;
   declare parentOf: (pid: number) => number | null;
   declare pollMs: number;
@@ -238,6 +242,7 @@ export class MemoryGateServer {
     // a worker's own request can make its command urgent.
     urgentFor = null,
     readPressure = readMacPressure,
+    overAllowance = () => false,
     sampleProcesses = listProcesses,
     parentOf = readParentPid,
     pollMs = 2_000,
@@ -273,6 +278,7 @@ export class MemoryGateServer {
     this.ownerOf = ownerOf;
     this.urgentFor = urgentFor;
     this.readPressure = readPressure;
+    this.overAllowance = overAllowance;
     this.sampleProcesses = sampleProcesses;
     this.parentOf = parentOf;
     this.pollMs = pollMs;
@@ -580,11 +586,16 @@ export class MemoryGateServer {
     this.pollTimer.unref?.();
   }
 
+  /** A question that throws is not a reason to hold. */
+  _over(): boolean {
+    try { return this.overAllowance() === true; } catch { return false; }
+  }
+
   async _read() {
     try {
       this.reading = await this.readPressure();
       this.readAt = this.clock();
-      this.gate.setPressure(pressureFrom(this.reading, GATE_LINES));
+      this.gate.setPressure(gatePressure(pressureFrom(this.reading, GATE_LINES), this._over()));
       // Processes are only looked at while something is granted: nothing
       // else needs them, and each look costs a `ps`.
       if (this.grants.size) this._sample(await this.sampleProcesses());

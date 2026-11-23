@@ -8573,6 +8573,7 @@ export class Supervisor {
       lastStartAt: this._lastStartAt ?? 0,
       heldSince: this._memHeldSince ?? null,
       roomy: autoAgents({ ...this._machine(), gated: false, nudge: this.config.agentsNudge }),
+      over: this._overAllowance(),
     });
     if (d.start) {
       if (d.why === 'off' || d.why === 'normal' || d.why === 'no-reading') this._memHeldSince = null;
@@ -8645,6 +8646,12 @@ export class Supervisor {
   }
 
   _readPressure() { return readMacPressure(); }
+
+  /** Whether the app and its agents are over their memory allowance, by the minute log's own listings (main/memory-allowance.mts). */
+  _overAllowance(): boolean {
+    if (!this._memoryGateOn()) return false;
+    try { return this._memoryLog?.overAllowance() === true; } catch { return false; }
+  }
 
   /** The fleet-wide brake, as a clock rather than a state. */
   _spawnBraked() {
@@ -14825,6 +14832,7 @@ export class Supervisor {
       scoreFor: (product, itemId) => this.memoryGateScore(product, itemId),
       ownerOf: (sessionId) => this.memoryGateOwner(sessionId),
       urgentFor: (product, itemId) => this.memoryGateUrgent(product, itemId),
+      overAllowance: () => this._overAllowance(),
       log: (line) => console.log(`zero: ${line}`),
     });
     this._memoryGate = server;
