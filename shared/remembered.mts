@@ -6,6 +6,8 @@
 export function rememberedFor<O extends object, R>(work: (o: O) => R): (o: O) => R {
   const kept = new WeakMap<O, R>();
   return (o) => {
+    // Nothing to keep it by: worked out as it always was.
+    if (typeof o !== 'object' || o === null) return work(o);
     if (kept.has(o)) return kept.get(o)!;
     const answer = work(o);
     kept.set(o, answer);

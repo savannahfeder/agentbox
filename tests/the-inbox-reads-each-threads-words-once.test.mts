@@ -87,6 +87,12 @@ describe('what is kept', () => {
     expect(worked).toBe(2);
   });
 
+  it('by a thread works out anything that is not one as it always did, rather than failing', () => {
+    const f = rememberedFor((o: unknown) => typeof o);
+    expect(f('a string' as never)).toBe('string');
+    expect(f(null as never)).toBe('object');
+  });
+
   it('works each text out once', () => {
     let worked = 0;
     const f = remembered((s: string) => { worked += 1; return s.length; }, 3);
