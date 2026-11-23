@@ -97,6 +97,17 @@ describe('the ask is found and laid out', () => {
     expect(l.after).toContain('npm run deploy');
   });
 
+  // Three times on one day a power tester's Codex ended on a choice that named
+  // nobody, and it read as a report (2026-11-23).
+  it('a choice between two things is an ask though it names nobody', () => {
+    expect(sessionLayout('I updated the booking button.\n\nShould the button say Book now or Book a visit?').bold).toBe('Should the button say Book now or Book a visit?');
+    expect(sessionLayout('Before I write it: who is the signup page for, current customers or new prospects?').kind).toBe('asks');
+  });
+  it('but an "or" in a sentence that does not ask is still a report', () => {
+    expect(sessionLayout('Done. The page works on phones or laptops alike.').kind).toBe('plain');
+    expect(sessionLayout('The open question was whether to cache or recompute? We cache now.').kind).toBe('plain');
+  });
+
   it('"e.g." does not cut a question in two', () => {
     const l = sessionLayout('Done.\n\nWant me to keep going on anything else, e.g. the picker or the scorecard, or park it here?');
     expect(l.bold).toBe('Want me to keep going on anything else, e.g. the picker or the scorecard, or park it here?');

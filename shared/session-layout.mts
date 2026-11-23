@@ -102,14 +102,18 @@ function sentences(s: string): string[] {
 const ASKING = /^(?:(?:so|then|and|or|otherwise|now|also|separately|finally|for now)[,:]?\s+)?(?:want|should|shall|may|can|could|would|do|does this|did|are you|is (?:it|this|that) (?:ok|okay|fine|right|good|alright)|is there|which|what(?:'s| is| would| do| should| can| did| happened)?\b|how (?:would|should|do|did)|ready|ok(?:ay)? to|any (?:preference|thoughts|objection)|where|when|who|anything)\b/i;
 const ADDRESSED = /\b(you|your|I|me|my|we|us|happened)\b/i;
 
+// "Should the button say Book now or Book a visit?" names no one, and is still
+// a choice only the person makes.
+const CHOICE = /\bor\b/i;
+
 function isQuestion(raw: string): boolean {
   const s = plain(raw);
   if (!/\?["”’')\]*]*$/.test(s)) return false;
-  if (ASKING.test(s) && (ADDRESSED.test(s) || /^which\b/i.test(s))) return true;
+  if (ASKING.test(s) && (ADDRESSED.test(s) || CHOICE.test(s) || /^which\b/i.test(s))) return true;
   const colon = s.lastIndexOf(': ');
   if (colon < 0) return false;
   const tail = s.slice(colon + 2);
-  return ASKING.test(tail) && /\b(I|me|we|you want|you prefer)\b/.test(tail);
+  return ASKING.test(tail) && (/\b(I|me|we|you want|you prefer)\b/.test(tail) || CHOICE.test(tail));
 }
 
 /**

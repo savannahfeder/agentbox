@@ -23,13 +23,24 @@ export interface SessionChat {
   last: string;
 }
 
+// The write-up reads the first 1,500 characters (main/catch-up.mts), and it is
+// the newest messages it most needs: the first says what it was for.
+const BUDGET = 1400;
+function keepNewest(theirs: string[]): string {
+  if (theirs.join('\n\n').length <= BUDGET) return theirs.join('\n\n');
+  const tail: string[] = [];
+  let left = BUDGET - theirs[0].length;
+  for (let i = theirs.length - 1; i > 0 && left - theirs[i].length > 0; i -= 1) { tail.unshift(theirs[i]); left -= theirs[i].length + 2; }
+  return [theirs[0].slice(0, BUDGET), ...(tail.length < theirs.length - 1 ? ['…'] : []), ...tail].join('\n\n');
+}
+
 /** Null for a session with nothing to file it under, which an import could not tell apart from another. */
 export function chatFromSession(agent: AgentLike | null | undefined): SessionChat | null {
   const id = String(agent?.sessionId ?? '').trim();
   if (!agent || !id) return null;
   // Every message the person typed, so the write-up knows what they already answered.
   const theirs = (agent.asked ?? []).map((t) => theirWords(t?.text)).filter(Boolean);
-  const first = theirs.join('\n\n') || theirWords(agent.lastAsked ?? '');
+  const first = keepNewest(theirs) || theirWords(agent.lastAsked ?? '');
   // What it is stopped on is part of where it stands, though no message says it.
   const pending = agent.approval
     ? `${agent.approval.reason}\n\n\`${agent.approval.command}\``

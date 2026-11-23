@@ -64,6 +64,13 @@ describe('what a session is filed as', () => {
     expect(chatFromSession(codex('/x', { asked }))?.prompt).toBe('write the waitlist headline\n\nclinic operations teams');
     expect(chatFromSession(claude('/x', { asked, about: '' }))?.title).toBe('write the waitlist headline');
   });
+  it('and when they typed a lot, the first and the newest of it', () => {
+    const asked = [{ at: 1, text: 'build the waitlist page' }, ...Array.from({ length: 30 }, (_, i) => ({ at: i + 2, text: `change number ${i + 1} to the copy, said at some length so it fills the room` })), { at: 99, text: 'ship it' }];
+    const prompt = chatFromSession(codex('/x', { asked }))!.prompt;
+    expect(prompt.startsWith('build the waitlist page\n\n…\n\n')).toBe(true);
+    expect(prompt.endsWith('ship it')).toBe(true);
+    expect(prompt.length).toBeLessThanOrEqual(1500);
+  });
   it('named by what was asked when it has no name of its own', () => {
     expect(chatFromSession(claude('/x', { about: '' }))?.title).toBe('the receipts page is slow for big stores, can you find out why');
   });
