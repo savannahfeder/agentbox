@@ -19,8 +19,8 @@ const appearance = pages.slice(pages.indexOf('<Group label="Theme">'), pages.ind
 const SAME = [
   ['Stop programs agents leave behind', pages, 'Dev servers and test runs an agent started stop when you close its task or memory runs short. Your own apps never do.'],
   ['Bring in new chats', pages, 'A Claude Code or Codex chat in one of your projects comes in after ten quiet minutes.'],
-  ['Agents you started yourself', pages, 'label="Show while they run"'],
-  ['Agents you started yourself, None', pages, "off: 'Each is still in its project’s sidebar.'"],
+  ['Terminal sessions', pages, 'label="Show while they run"'],
+  ['Terminal sessions, Never', pages, "off: 'Each is still in its project’s sidebar.'"],
   ['Let agents start the tasks they file here', project, 'A task an agent writes here starts at once instead of waiting for your yes. Questions and reviews still wait.'],
   ['Archive this project, while agents run', project, "', and the agents running now finish'"],
   ['Claude account', project, "label: 'The account in use'"],

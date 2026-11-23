@@ -30,7 +30,6 @@ const CALLS = new Set(['spawn', 'spawnSync', 'execFile', 'execFileSync', 'exec',
 
 // Each is a file and the start of the call, as the source spells it.
 const SHOWS_A_WINDOW = [
-  { file: 'main/agents.mts', call: "execFile('/usr/bin/open', ['-a'", why: 'brings the app a worker runs in to the front' },
   { file: 'main/open-in-browser.mts', call: 'execFile(cmd, args, opts', why: 'opens a page in the browser' },
   { file: 'main/os-folder-window.mts', call: 'execFile(cmd, args', why: "the system's file chooser, waiting on a person" },
   { file: 'main/open-source-file.mts', call: 'spawn(notepad', why: 'opens a source file in Notepad' },
