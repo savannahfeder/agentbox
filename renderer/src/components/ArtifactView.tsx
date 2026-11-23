@@ -21,6 +21,7 @@ import { quotesKey } from '../selection-bar';
 import { SelectionBar } from './SelectionBar';
 import { pressedInTheFindBox } from '../find-in-page';
 import { paletteIsOpen, pressedInThePalette } from '../palette-rows';
+import { composerIsOpen, pressedInTheComposer, startsAThread } from '../over-a-big-view';
 import { ArtifactStage, StageLink, StageProject, StageThread, type StageFiles, type StageGo } from './ArtifactStage';
 import { keepCommentDraft, openCommentDraft, readLooseDraft, type Holding, type MovedDraft } from '../comment-drafts';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
@@ -663,7 +664,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   // on its way up, so the thread behind stays still.
   useEffect(() => {
     const escape = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || pressedInTheFindBox(e.target) || paletteIsOpen(document) || document.querySelector('[data-own-escape]')) return;
+      if (e.key !== 'Escape' || pressedInTheFindBox(e.target) || paletteIsOpen(document) || composerIsOpen(document) || document.querySelector('[data-own-escape]')) return;
       e.stopImmediatePropagation();
       e.preventDefault();
       if (link) setLink(null);
@@ -674,13 +675,14 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
       else leave();
     };
     const rest = (e: KeyboardEvent) => {
-      if (pressedInThePalette(e.target)) return;
+      if (pressedInThePalette(e.target) || pressedInTheComposer(e.target)) return;
       const at = e.target as HTMLElement | null;
       const typing = at?.tagName === 'TEXTAREA' || !!at?.isContentEditable;
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !typing && !e.defaultPrevented && unsent.ids.length) {
         e.preventDefault(); e.stopPropagation(); void sendAll(); return;
       }
       if (e.metaKey || e.ctrlKey) return;
+      if (startsAThread({ key: e.key, chord: e.altKey, inABox: keyIsOn(e.target) === 'box' })) return;
       e.stopPropagation();
       if (letterGoesToTheNote({ key: e.key, chord: e.altKey, on: keyIsOn(e.target), boxThere: !!box.current })) { box.current!.focus(); return; }
       if (typing || followsTheFile || pressedInTheFindBox(e.target)) return;
@@ -737,7 +739,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     if (asking && askingFor.length) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setAsking({ ...asking, sel: (asking.sel + 1) % askingFor.length }); return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); setAsking({ ...asking, sel: (asking.sel - 1 + askingFor.length) % askingFor.length }); return; }
-      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); nameInto(askingFor[asking.sel]); return; }
+      if ((e.key === 'Enter' && !e.metaKey && !e.ctrlKey) || e.key === 'Tab') { e.preventDefault(); nameInto(askingFor[asking.sel]); return; }
     }
     const does = noteBoxKey({ key: e.key, chord: e.metaKey || e.ctrlKey, shift: e.shiftKey, composing: e.nativeEvent.isComposing, typed: !!words.trim() || !!pictures.length, waiting: unsent.ids.length });
     if (does === 'leave') return;

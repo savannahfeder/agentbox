@@ -7,6 +7,7 @@ import { doubleTapScale, onPhone } from '../phone-screen';
 import { CrossIcon } from './CrossIcon';
 import { focusTheReplyBox } from '../focus-at-end';
 import { pressedInThePalette } from '../palette-rows';
+import { pressedInTheComposer, startsAThread, typesInto } from '../over-a-big-view';
 import { opening, seenAt } from '../picture';
 import { fetchableFileUrl } from '../phone-files';
 
@@ -166,7 +167,8 @@ export function PictureView({ pictures, start, resolve, onClose, onBeside, onPre
   useEffect(() => {
     dialog.current?.focus();
     const key = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || pressedInThePalette(e.target)) return;
+      if (e.metaKey || e.ctrlKey || pressedInThePalette(e.target) || pressedInTheComposer(e.target)) return;
+      if (startsAThread({ key: e.key, chord: e.altKey, inABox: typesInto(e.target) })) return;
       e.stopImmediatePropagation();
       wake();
       if (e.key === 'Escape') { e.preventDefault(); onClose(); requestAnimationFrame(() => focusTheReplyBox()); }

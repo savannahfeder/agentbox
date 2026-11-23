@@ -5,6 +5,7 @@ import { RowCells } from '../../threads/Pages';
 import type { StatusCell } from '../../status-word';
 import { STATE_WORD } from '../../threads/summary-rules';
 import { dayAndTime, firstRealLine } from '../../format';
+import { messageOnRow } from '../../list-rules';
 import { Face } from '../people';
 import { I } from './icons';
 
@@ -24,7 +25,7 @@ export function MentionRows({ mentions, faces, now, onOpen, selected = null }: {
       <span className="mark" aria-hidden="true" />
       <RowCells status={m.until ? PUT_OFF : WAITING}
         who={{ face: <Face person={who} />, name: `${m.byName || 'Someone'}${m.thread ? ` in ${m.thread === 'yours' ? 'your' : 'a'} thread` : ''}` }}
-        title={firstRealLine(m.body) || 'Sent a file'}
+        title={messageOnRow(firstRealLine(m.body)) || 'Sent a file'}
         where={<span className="rm-where">{I.hash()}{m.roomName}</span>}
         priority={null} updatedAt={m.at} now={now} when={m.until ? dayAndTime(m.until) : undefined} />
     </div>;
@@ -37,7 +38,7 @@ export function MentionCards({ mentions, onOpen, selected = null }: {
 }) {
   return <>{mentions.map((m) => (
     <button type="button" key={m.id} className={`th-card rm-mention-card${selected === m.id ? ' selected' : ''}`} onClick={() => onOpen(m)}>
-      <div className="t"><b className="th-msg-who">{m.byName || 'Someone'}</b> {m.thread ? `in ${m.thread === 'yours' ? 'your' : 'a'} thread: ` : ''}{firstRealLine(m.body) || 'sent a file'}</div>
+      <div className="t"><b className="th-msg-who">{m.byName || 'Someone'}</b> {m.thread ? `in ${m.thread === 'yours' ? 'your' : 'a'} thread: ` : ''}{messageOnRow(firstRealLine(m.body)) || 'sent a file'}</div>
       <div className="m"><span className="p">#{m.roomName}</span></div>
     </button>
   ))}</>;
