@@ -23,6 +23,8 @@ export interface SessionChat {
   last: string;
 }
 
+const STILL_WORKING = 'It was still working on your newest message in its terminal when it moved here.';
+
 // The write-up reads the first 1,500 characters (main/catch-up.mts), and it is
 // the newest messages it most needs: the first says what it was for.
 const BUDGET = 1400;
@@ -45,8 +47,9 @@ export function chatFromSession(agent: AgentLike | null | undefined): SessionCha
   const pending = agent.approval
     ? `${agent.approval.reason}\n\n\`${agent.approval.command}\``
     : (agent.question ?? []).map((q) => [q.question, ...q.options.map((o, i) => `${i + 1}. ${o}`)].join('\n')).join('\n\n');
-  const said = [String(agent.lastSaid ?? '').trim(), pending].filter(Boolean).join('\n\n')
-    || (agent.status === 'busy' ? 'It was still working in its terminal when it moved here.' : '');
+  // Moved mid-task, its last answer is to an earlier message, and says so.
+  const working = agent.status === 'busy' && !pending;
+  const said = [String(agent.lastSaid ?? '').trim(), pending, working ? STILL_WORKING : ''].filter(Boolean).join('\n\n');
   const title = String(agent.about ?? '').trim() || (theirs[0] ?? first).slice(0, 80) || String(agent.name ?? '').trim() || 'Session';
   return {
     id,

@@ -122,8 +122,15 @@ describe('moving it in', () => {
     w.store.answerItem(w.slug, cl, { status: 'open' });
     expect(w.store.listItems().find((i) => i.id === cl)).toMatchObject({ status: 'open', result: 'Fixed. Want me to add an index too?' });
   });
-  it('a session still working when it moved says so, rather than that it never answered', () => {
-    expect(chatFromSession(codex('/x', { status: 'busy', approval: null, lastSaid: '' }))?.last).toBe('It was still working in its terminal when it moved here.');
+  // Two power testers moved a session mid-task and its thread opened on the
+  // answer to the message before, as if that answered the newest one.
+  it('a session still working when it moved says so, after any earlier answer', () => {
+    expect(chatFromSession(codex('/x', { status: 'busy', approval: null, lastSaid: '' }))?.last).toBe('It was still working on your newest message in its terminal when it moved here.');
+    expect(chatFromSession(codex('/x', { status: 'busy', approval: null, lastSaid: 'The bundle is 412 KB.' }))?.last).toBe('The bundle is 412 KB.\n\nIt was still working on your newest message in its terminal when it moved here.');
+  });
+  it('but a finished one, or one stopped on a prompt, does not', () => {
+    expect(chatFromSession(codex('/x', { status: 'idle', approval: null, lastSaid: 'The bundle is 412 KB.' }))?.last).toBe('The bundle is 412 KB.');
+    expect(chatFromSession(codex('/x', { status: 'busy' }))?.last).toBe('May I install it?\n\n`npm install date-fns`');
   });
   it('a Claude Code session is never taken for a Codex one with the same id, nor the other way', async () => {
     const w = await world();
