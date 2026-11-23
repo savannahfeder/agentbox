@@ -295,6 +295,8 @@ export interface TeamStore {
 export interface TeamDisk extends SyncDisk {
   setLineAuthor(personId: string | null): void;
   readWorkItems(dir: string): PhoneItem[];
+  /** The same frozen rows until a thread changes, for a reader that writes into none of them. */
+  readWorkItemRows?(dir: string): PhoneItem[];
   updateWorkItem(dir: string, id: string, patch: Record<string, unknown>, opts?: { source?: string; now?: number }): unknown;
 }
 
@@ -477,6 +479,8 @@ export function createTeamService({
   function products() {
     try { return store.listProducts(); } catch { return []; }
   }
+  // A pass reads every project's threads several times, every few seconds: shared rows, not a copy each.
+  const rowsOf = (dir: string): PhoneItem[] => disk.readWorkItemRows?.(dir) ?? disk.readWorkItems(dir);
 
   const asks = createAsks({
     file: path.join(path.dirname(stateFile), '.team-asks.json'),
@@ -727,7 +731,7 @@ export function createTeamService({
         set(withCards(cards, { lastSyncAt: Date.now(), error: null, people, me: me ?? state.me, ...(info ? { team: info } : {}), ...(await readSeen()) }));
         if (state.team) {
           noticeEndedWaits({
-            products: products(), read: (p: TeamProduct) => disk.readWorkItems(p.dir), cards, now: now(), me: state.me?.id ?? null,
+            products: products(), read: (p: TeamProduct) => rowsOf(p.dir), cards, now: now(), me: state.me?.id ?? null,
             nameOf: (id: string) => people.find((p) => p.id === id)?.name ?? 'Someone',
             write: (dir: string, id: string, patch: Record<string, unknown>) => disk.updateWorkItem(dir, id, patch, { source: 'system' }),
           });
@@ -955,7 +959,7 @@ export function createTeamService({
     // goes up, and what was up comes down as a private thread's card does.
     // A team without Pro shares nothing either.
     const listCards = (): SyncCard[] => (!sharing() || state.pro === false ? [] : [
-      ...cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds(), wontStart: wontStart() }),
+      ...cardsFor({ products: products(), readItems: (p) => rowsOf(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds(), wontStart: wontStart() }),
       ...(ownMates() ?? []).map((t) => mateCard(t, { now: t.now ?? null, running: !!t.running, at: t.updatedAt ?? t.createdAt ?? 0 })),
     ]);
     threadShare = createThreadShare({
@@ -969,7 +973,7 @@ export function createTeamService({
         const threads = new Map<string, { item: PhoneItem; product: TeamProduct }>();
         for (const product of products()) {
           if (product.team?.direct) continue;
-          for (const item of disk.readWorkItems(product.dir)) threads.set(item.id, { item, product });
+          for (const item of rowsOf(product.dir)) threads.set(item.id, { item, product });
         }
         return threads;
       },
