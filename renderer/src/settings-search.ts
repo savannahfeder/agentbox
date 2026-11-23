@@ -87,7 +87,7 @@ const ENTRIES: Entry[] = [
   { page: 'running', label: 'Hold heavy work when memory is short', anchor: 'at-once', words: 'ram tests builds slow memory' },
   { page: 'running', label: 'Stop programs agents leave behind', anchor: 'at-once', words: 'leftovers left running finished dev servers background jobs processes cleanup kill ram memory' },
   { page: 'running', label: 'Something felt slow', anchor: 'at-once', words: 'slow fewer agents throttle struggling' },
-  { page: 'running', label: 'Terminal sessions', anchor: 'outside', words: 'agents you started yourself terminal outside sessions inbox your own claude code codex' },
+  { page: 'running', label: 'Terminal sessions', anchor: 'outside', words: 'agents you started yourself terminal outside sessions inbox your own' },
   { page: 'running', label: 'Bring in new chats', anchor: 'outside', words: 'import chats conversations automatic' },
   { page: 'instructions', label: 'Instructions for every agent', words: 'rules prompt claude.md how agents write to you' },
   { page: 'projects', label: 'Projects', words: 'order priority archive new project' },
