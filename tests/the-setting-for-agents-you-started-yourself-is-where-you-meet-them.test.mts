@@ -107,3 +107,17 @@ describe('When they need you', () => {
     expect(reachesInbox(s({ lastSaid: 'Done. The waitlist page is live and the tests pass.' }), NOW, 'all')).toBe(true);
   });
 });
+
+// The same tester typed a session's exact title into ⌘K and was told nothing
+// matched while the row sat behind the search (2026-11-23).
+describe('⌘K finds a terminal session by the name its row wears', () => {
+  it('searches those rows with the threads', () => {
+    expect(read('renderer/src/App.tsx')).toContain('searchThreads([...items, ...agentList], q, searchContext)');
+  });
+  it('and a row shaped like one is found by its title', async () => {
+    const { searchThreads } = await import('../renderer/src/threads/search.ts');
+    const row = { id: 'agent:codex:cx-9', product: 'web', productName: 'Website', status: 'open', title: 'Codex: Ask waitlist audience', body: 'Codex in a terminal', kind: 'agent', labels: [], priority: 5, epoch: 0, claim: null, createdAt: 1, updatedAt: 1 };
+    const hits = searchThreads([row] as never, 'Ask waitlist audience', { products: [], people: [], me: 'self' } as never);
+    expect(hits.map((h: { item: { id: string } }) => h.item.id)).toEqual(['agent:codex:cx-9']);
+  });
+});

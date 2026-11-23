@@ -3277,7 +3277,8 @@ export default function App() {
       run: () => { setModal(null); if (search !== null) closeSearch(); openRepeatRef.current?.(rule); },
     })),
     ...(() => {
-      const found = searchThreads(items, q, searchContext);
+      // Sessions started outside Agentbox are found by the names their rows wear too.
+      const found = searchThreads([...items, ...agentList], q, searchContext);
       const summaries = new Map(found.map(({ item, summary }) => [item, summary]));
       const now = Date.now();
       return withoutRunsOf(found.map(({ item }) => item), ruled).map((item) => ({
@@ -3294,7 +3295,7 @@ export default function App() {
       run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(null); openTeammateCard(card); },
     })),
     ];
-  }, [repeats, items, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard]);
+  }, [repeats, items, agentList, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard]);
   // J AND K FROM AN OPEN THREAD OR AN OPEN TEAMMATE CARD (w-fb16bcaeba): open
   // the next stop, whoever's it is. Yours opens as your thread, theirs as
   // their card, exactly as a click on its row would.
