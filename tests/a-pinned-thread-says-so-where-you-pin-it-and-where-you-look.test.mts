@@ -33,6 +33,14 @@ describe('pinning from a menu says so', () => {
 
 const css = ['styles.css', 'home/home.css', 'threads/pages.css']
   .map((f) => readFileSync(new URL(`../renderer/src/${f}`, import.meta.url), 'utf8')).join('\n');
+
+describe('every pin in the app wears one ink', () => {
+  it('a conversation\'s pin in Messages is drawn as a thread\'s and a teammate\'s are', () => {
+    const rooms = readFileSync(new URL('../renderer/src/team/rooms/rooms.css', import.meta.url), 'utf8');
+    const ink = (sheet, cls) => new RegExp(`\\${cls} \\{[^}]*color: var\\((--[a-z-]+)\\)`).exec(sheet)?.[1];
+    expect([ink(css, '.th-pin'), ink(css, '.hm-pin'), ink(rooms, '.rm-conv-pin')]).toEqual(['--text-dim', '--text-dim', '--text-dim']);
+  });
+});
 const stand_in = `
   const call = () => Promise.resolve(Object.assign([], { ok: true }));
   window.zero = new Proxy({}, { get: (_, k) => (typeof k === 'string' && k.startsWith('on') ? () => () => {} : call) });`;
