@@ -1869,6 +1869,7 @@ declare global {
       teamThreadWork(p: { personId: string; threadId: string }): Promise<TeammateThreadWork>;
       findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number }; opened?: Record<string, number> }): Promise<FoundInThreads>;
       warmFindInThreads(): Promise<boolean>;
+      findByDescription?(p: { description: string; candidates: import('../../shared/find-by-description.mts').FindCandidate[] }): Promise<import('../../shared/find-by-description.mts').FindAnswer>;
       fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
       fileNewVersion?(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }>;
       teamMarkFile(p: { personId: string; threadId: string; mark: ArtifactMark }): Promise<TeamCallResult>;

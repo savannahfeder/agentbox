@@ -4186,6 +4186,19 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
 .palette-k .palette-input::placeholder { color: var(--agent-ink); }
 .palette-k .palette-esc { flex: none; cursor: pointer; line-height: 1; }
 .palette-k .palette-esc:hover { color: var(--text); }
+.palette-k .palette-ai-ask {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 4px 0 8px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim); font-size: 12.5px; cursor: pointer;
+}
+.palette-k .palette-ai-ask svg { width: 14px; height: 14px; color: currentColor; }
+.palette-k .palette-ai-ask .palette-key { margin-left: 2px; height: 18px; min-width: 0; }
+.palette-k .palette-ai-ask:hover:not(:disabled) { color: var(--text); border-color: var(--line-strong); }
+.palette-k .palette-ai-ask:disabled { opacity: .55; cursor: default; }
+.palette-k .palette-ai-modes { flex: none; display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--line); border-radius: var(--radius); }
+.palette-k .palette-ai-modes button {
+  height: 22px; padding: 0 9px; border: none; border-radius: calc(var(--radius) - 2px); background: none; color: var(--text-faint); font-size: 12.5px; cursor: pointer;
+}
+.palette-k .palette-ai-modes button.on { background: var(--bg); color: var(--text); box-shadow: 0 0 0 1px var(--line); }
 .palette-k .palette-item { justify-content: flex-start; align-items: center; gap: 12px; height: 38px; padding: 0 18px; font-size: 14.5px; color: var(--text-dim); }
 .palette-k .palette-item.selected { color: var(--text); }
 .palette-k .palette-glyph { flex: none; width: 18px; height: 18px; display: grid; place-items: center; color: var(--text-faint); }
