@@ -281,7 +281,7 @@ import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from '.
 import { setupLook } from './setup-split';
 import { startProTrial } from './pro-trial';
 import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme, wearsInboxSky } from './home/sky';
-import { engineLetter, engineName, greeting, hideMate, homeRowOpens, pinMate, readTeamCardChoice, rowEngine, showMate, somethingCoversTheList, teamCard, teamRowLine, teamRowState, unpinMate, weekCounts, writeTeamCardChoice, type TeamCardChoice } from './home/home-model';
+import { engineLetter, engineName, greeting, hideMate, homeRowOpens, pinMate, readTeamCardChoice, rowEngine, showMate, somethingCoversTheList, teamCard, teamRowLine, teamRowState, undoHide, unpinMate, weekCounts, writeTeamCardChoice, type TeamCardChoice } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
 import { onInboxPage, stopOnScreen, useBackAndForward, type Screen as TrailScreen, type Stop as TrailStop } from './back-and-forward';
@@ -7456,9 +7456,10 @@ export default function App() {
   }), teamChoice);
   const changeTeamChoice = (change: (c: TeamCardChoice) => TeamCardChoice) => setTeamChoice((c) => { const next = change(c); writeTeamCardChoice(next); return next; });
   const onMate = (key: string, act: MateAct) => {
+    const before = teamChoice;
     changeTeamChoice((c) => (act === 'pin' ? pinMate(c, key) : act === 'unpin' ? unpinMate(c, key) : act === 'hide' ? hideMate(c, key) : showMate(c, key)));
     const name = members.find((m) => m.key === key)?.name ?? 'Them';
-    if (act === 'hide') pushUndo({ label: `${name} is back on Home`, undoes: `put ${name} back on Home`, run: async () => { changeTeamChoice((c) => showMate(c, key)); } });
+    if (act === 'hide') pushUndo({ label: `${name} is back on Home`, undoes: `put ${name} back on Home`, run: async () => { changeTeamChoice((c) => undoHide(c, key, before)); } });
   };
   const homeProgress: ProgressRow[] = homeShown && !teamMode ? progressTab.slice(0, 60).map((i) => {
     const engine = rowEngine(i, engineFacts);

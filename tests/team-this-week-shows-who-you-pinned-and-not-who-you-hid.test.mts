@@ -4,7 +4,7 @@
 // Needs you was from it. Measured on the rules Home draws the card with.
 import { describe, it, expect } from 'vitest';
 import {
-  hideMate, pinMate, readTeamCardChoice, showMate, teamCard, teamRowLine, unpinMate, writeTeamCardChoice,
+  hideMate, pinMate, readTeamCardChoice, showMate, teamCard, teamRowLine, undoHide, unpinMate, writeTeamCardChoice,
   type TeamCardChoice, type TeamRowState,
 } from '../renderer/src/home/home-model.ts';
 
@@ -76,6 +76,24 @@ describe('pinning and hiding', () => {
     const c = { pinned: ['a', 'b'], hidden: ['c', 'd'] };
     expect(unpinMate(c, 'a')).toEqual({ pinned: ['b'], hidden: ['c', 'd'] });
     expect(showMate(c, 'd')).toEqual({ pinned: ['a', 'b'], hidden: ['c'] });
+  });
+});
+
+// A tester pinned a teammate, hid them and pressed Z: they came back unpinned.
+describe('undoing a hide', () => {
+  it('brings a pinned teammate back pinned, in the place they had (the reported case)', () => {
+    const before = { pinned: ['a', 'person:lena', 'b'], hidden: [] };
+    expect(undoHide(hideMate(before, 'person:lena'), 'person:lena', before)).toEqual(before);
+  });
+  it('brings an unpinned teammate back unpinned', () => {
+    const before = { pinned: ['a'], hidden: ['c'] };
+    expect(undoHide(hideMate(before, 'person:lena'), 'person:lena', before)).toEqual(before);
+  });
+  it('keeps what changed since, and does not pin twice', () => {
+    const before = { pinned: ['person:lena'], hidden: [] };
+    const since = pinMate(hideMate(hideMate(before, 'person:lena'), 'person:theo'), 'b');
+    expect(undoHide(since, 'person:lena', before)).toEqual({ pinned: ['person:lena', 'b'], hidden: ['person:theo'] });
+    expect(undoHide(before, 'person:lena', before).pinned).toEqual(['person:lena']);
   });
 });
 

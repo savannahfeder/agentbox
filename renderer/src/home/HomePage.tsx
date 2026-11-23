@@ -17,8 +17,9 @@ export type TeamRow = { key: string; name: string; letter: string; ai: boolean; 
 export type MateAct = 'pin' | 'unpin' | 'hide' | 'show';
 
 const stroke = { viewBox: '0 0 24 24', width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true } as const;
+const eyeOff = (size = 16) => <svg {...stroke} width={size} height={size}><path d="M4 4l16 16" /><path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c4.9 0 8.4 4 9.5 6-.5.9-1.4 2.1-2.6 3.3M6.7 7.7C4.7 9 3.2 10.8 2.5 12c1.1 2 4.6 6 9.5 6 1.5 0 2.9-.4 4.1-1" /><path d="M9.9 10a2.8 2.8 0 0 0 4 4" /></svg>;
 const EYE = <svg {...stroke}><path d="M2.5 12C3.6 10 7.1 6 12 6s8.4 4 9.5 6c-1.1 2-4.6 6-9.5 6s-8.4-4-9.5-6z" /><circle cx="12" cy="12" r="2.8" /></svg>;
-const EYE_OFF = <svg {...stroke}><path d="M4 4l16 16" /><path d="M10.6 6.1A9.6 9.6 0 0 1 12 6c4.9 0 8.4 4 9.5 6-.5.9-1.4 2.1-2.6 3.3M6.7 7.7C4.7 9 3.2 10.8 2.5 12c1.1 2 4.6 6 9.5 6 1.5 0 2.9-.4 4.1-1" /><path d="M9.9 10a2.8 2.8 0 0 0 4 4" /></svg>;
+const EYE_OFF = eyeOff();
 const DOTS = <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="6" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="18" cy="12" r="1.5" /></svg>;
 const CHEVRON = <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>;
 
@@ -79,7 +80,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
       onContextMenu={onMate ? (e) => { e.preventDefault(); setMenu({ m, at: new DOMRect(e.clientX, e.clientY, 0, 0) }); } : undefined}>
       <button type="button" className="hm-row hm-mate" onClick={() => onMember(m.key)}>
         {face(m, !gone)}
-        <span className="hm-text"><span className="hm-name"><b>{m.name}</b>{m.pinned && <span className="hm-pin" aria-label="Pinned"><PinMark size={13} /></span>}</span><small>{m.line}</small></span>
+        <span className="hm-text"><span className="hm-name"><b>{m.name}</b>{m.pinned && <span className="hm-pin" aria-label="Pinned"><PinMark size={13} /></span>}{m.hidden && !gone && <span className="hm-pin" aria-label="Hidden from Home" title="Hidden from Home">{eyeOff(13)}</span>}</span><small>{m.line}</small></span>
         {m.total > 0 && !gone && <span className="hm-week"><Bars week={m.week} /><span>{m.total} done</span></span>}
       </button>
       {onMate && (gone

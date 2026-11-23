@@ -147,6 +147,16 @@ export function showMate(c: TeamCardChoice, key: string): TeamCardChoice {
   return { pinned: [...c.pinned], hidden: without(c.hidden, key) };
 }
 
+/** Z after a hide: shown again, and pinned again in the place they had if they were. */
+export function undoHide(c: TeamCardChoice, key: string, before: TeamCardChoice): TeamCardChoice {
+  const shown = showMate(c, key);
+  const at = before.pinned.indexOf(key);
+  if (at < 0 || shown.pinned.includes(key)) return shown;
+  const pinned = [...shown.pinned];
+  pinned.splice(Math.min(at, pinned.length), 0, key);
+  return { pinned, hidden: shown.hidden };
+}
+
 type Marked<T> = T & { pinned: boolean; hidden: boolean };
 
 /** Team this week as drawn: whoever waits on you, even someone you hid, then

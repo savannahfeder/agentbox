@@ -28,7 +28,7 @@ beforeAll(async () => {
       import { HomePage } from './renderer/src/home/HomePage';
       const z = [0, 0, 0, 0, 0, 0, 0];
       const mate = (key, name, extra = {}) => ({ key, name, letter: name[0], ai: false, line: 'Nothing running', state: 'quiet', week: z, total: 0, ...extra });
-      const team = [mate('person:lena', 'Lena Ortiz', { pinned: true }), mate('person:sam', 'Sam Reyes')];
+      const team = [...(window.WAITS ? [mate('person:noor', 'Noor Haddad', { hidden: true, state: 'waiting', line: 'Waiting on you' })] : []), mate('person:lena', 'Lena Ortiz', { pinned: true }), mate('person:sam', 'Sam Reyes')];
       const hidden = window.HIDDEN ? [mate('person:theo', 'Theo Brandt', { hidden: true }), mate('person:priya', 'Priya Raman', { hidden: true })] : [];
       window.ACTS = [];
       createRoot(document.getElementById('root')).render(
@@ -43,12 +43,12 @@ beforeAll(async () => {
 }, 60_000);
 afterAll(async () => { await browser?.close(); });
 
-async function open({ hidden = false, noMenu = false } = {}) {
+async function open({ hidden = false, noMenu = false, waits = false } = {}) {
   const page = await browser.newPage({ viewport: { width: 1425, height: 884 } });
   page.setDefaultTimeout(5_000);
   await page.route('http://home.test/**', (r) => r.fulfill({ contentType: 'text/html', body: `<style>${css}</style><div id="root" style="height:884px"></div>` }));
   await page.goto('http://home.test/');
-  await page.addScriptTag({ content: `${stand_in} window.HIDDEN = ${hidden}; window.NO_MENU = ${noMenu};` });
+  await page.addScriptTag({ content: `${stand_in} window.HIDDEN = ${hidden}; window.NO_MENU = ${noMenu}; window.WAITS = ${waits};` });
   await page.addScriptTag({ content: bundle });
   await page.locator('.hm-mate').first().waitFor();
   return page;
@@ -106,6 +106,17 @@ describe.skipIf(!browserAvailable)('a teammate on Home is pinned or hidden from 
     await page.getByRole('button', { name: 'Show Theo Brandt on Home' }).click();
     expect(await acts(page)).toEqual([['show', 'person:theo']]);
     await row(page, 'Priya Raman').click({ button: 'right' });
+    expect(await menuWords(page)).toEqual(['Show on Home']);
+    await page.close();
+  }, 30_000);
+
+  // A tester hid a teammate who was waiting on them: the row rightly stayed, and nothing said the hide had taken.
+  it('marks a hidden teammate who stays because they wait on you, and offers to show them again', async () => {
+    const page = await open({ waits: true });
+    expect(await row(page, 'Noor Haddad').getByLabel('Hidden from Home').count()).toBe(1);
+    expect(await row(page, 'Lena Ortiz').getByLabel('Hidden from Home').count()).toBe(0);
+    await row(page, 'Noor Haddad').hover();
+    await row(page, 'Noor Haddad').locator('.hm-mate-act').click();
     expect(await menuWords(page)).toEqual(['Show on Home']);
     await page.close();
   }, 30_000);
