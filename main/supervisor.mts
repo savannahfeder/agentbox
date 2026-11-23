@@ -5730,6 +5730,15 @@ export class Supervisor {
     return 'rested';
   }
 
+  // A thread reopened by hand: its reply was heard before the close, and a
+  // close that stopped the run gave it back to the queue. Nothing starts until
+  // a new word, so the thread waits in Needs you (`stalled`).
+  keepReplyHeard(item: WorkItem) {
+    if (!item.answer || item.answer === '(withdrawn)') return;
+    this._handledAnswers.add(this._answerKey(item));
+    this._saveState();
+  }
+
   // Give an answer its delivery back: the mark is written at spawn, so a
   // worker that died before doing anything leaves it lying about delivery.
   redeliverAnswer(item: WorkItem, answer: string | null | undefined) {

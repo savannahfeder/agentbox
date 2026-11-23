@@ -4484,7 +4484,7 @@ export default function App() {
 
   const reopenDone = useCallback(async (item: WorkItem) => {
     const title = clipToSentence(item.title, TOAST_TITLE);
-    try { await api.answer({ product: item.product, id: item.id, status: 'open' }); } catch (err) { showToast(`Not reopened: ${(err as Error).message}`); return; }
+    try { await api.answer({ product: item.product, id: item.id, status: 'open', reopen: true }); } catch (err) { showToast(`Not reopened: ${(err as Error).message}`); return; }
     pushUndo({ label: `Done again: ${title}`, undoes: `mark “${title}” done again`, brings: item, run: async () => { await api.answer({ product: item.product, id: item.id, status: 'done' }); } });
     showToast(`Reopened: ${title}${SAYS_UNDO}`);
   }, [pushUndo, showToast]);
