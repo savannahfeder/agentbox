@@ -9,6 +9,7 @@
 // answers, so nothing on this machine is opened or focused.
 
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
 import { appOf, bringToFront, codexProcessFor, inTmux, parsePs, tabScript, ttyPath } from '../main/bring-to-front.mts';
 import { revealCodex } from '../main/codex-live.mts';
 
@@ -130,5 +131,18 @@ describe('a Codex row, end to end', () => {
 describe('the AppleScript', () => {
   it('quotes the device path it looks for', () => {
     expect(tabScript('iTerm', '/dev/ttys0"1')).toContain('"/dev/ttys0\\"1"');
+  });
+});
+
+// "I don't think you need to get specific, though. You can just say, 'Respond
+// in terminal.'" (the founder, 2026-11-23, on "Open its terminal to allow or deny it").
+describe('the bar that takes you there', () => {
+  const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', import.meta.url), 'utf8');
+  it('says only where to respond', () => {
+    expect(focus).toContain("const respondIn = agent?.app === 'Codex app' ? 'Respond in Codex' : agent?.app === 'Codex in your editor' ? 'Respond in your editor' : 'Respond in terminal';");
+    expect(focus).toContain('<span className="dock-pill-text">Respond in terminal</span>');
+  });
+  it('and no longer spells out what to do there', () => {
+    expect(focus).not.toMatch(/to allow or deny it|Answer this one in its own window\. A message from here would wait behind the box it is stuck on\.<\/span>\s*\{GO_MARK\}/);
   });
 });
