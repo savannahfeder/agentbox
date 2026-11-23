@@ -30,6 +30,7 @@ import { FileLinkBrowser } from './FileLinkBrowser';
 import { OpeningWait } from './OpeningWait';
 import { CrossIcon } from './CrossIcon';
 import { ArtifactControlGlyph } from './ArtifactControlGlyph';
+import { OpenWithMark } from './OpenWith';
 import { FocusControl } from './FocusControl';
 import { DocText } from './DocText';
 import { useLiveSession, useLiveTicket } from '../live/live-session';
@@ -82,7 +83,7 @@ function NameInTop({ shown, onRename }: { shown: string; onRename: (name: string
     }} />;
 }
 
-export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onBeside, below, files: fromElsewhere, typing = false, title, onRename }: {
+export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onNotice, onBeside, below, files: fromElsewhere, typing = false, title, onRename }: {
   /** The project the file belongs to, when it is not `product`'s own (a teammate's thread). */
   project?: string | null;
   /** The name a person gave the file in Files, shown over its name on disk. */
@@ -120,6 +121,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   editGoes?: string;
   onClose: () => void;
   onOutside?: (path: string) => void;
+  /** Where the header's open menu says a file did not open. */
+  onNotice?: (text: string) => void;
   /** Only where there is a chat to sit beside. */
   onBeside?: (path: string) => void;
   /** A line under the file, the full width of the window. */
@@ -835,7 +838,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
           {(thread ?? shareThread) && version && foundNow === 'open' && canShareFile(version.path) && (
             <ShareLink icon product={product} thread={(thread ?? shareThread)!} src={version.path} signedIn={!!me} />
           )}
-          {onOutside && version && foundNow === 'open' && <button type="button" className="doc-mark" aria-label="Open outside" title="Open outside" onClick={() => onOutside(version.path)}><ArtifactControlGlyph kind="open" /></button>}
+          {onOutside && version && foundNow === 'open' && <OpenWithMark product={product} src={version.path} title="Open outside" onFailed={onNotice}><ArtifactControlGlyph kind="open" /></OpenWithMark>}
           {/* The side pane has no versions to step, so it shows the newest. */}
           {onBeside && family && <FocusControl style="corners-bare" focused onClick={() => onBeside(family.versions[family.versions.length - 1].path)} />}
           <button type="button" className="doc-mark av-close" aria-label="Close" title="Close (esc)" onClick={leave}><ArtifactControlGlyph kind="close" /></button>

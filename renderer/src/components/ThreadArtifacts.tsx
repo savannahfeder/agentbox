@@ -104,6 +104,7 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onBeside, onNo
       return out.ok ? null : out.error ?? 'That did not save.';
     }}
     onOutside={(src) => { void api.openArtifactExternally({ product: item.product, src }).then((r) => { if (!r.ok) onNotice(r.error || `${src} could not be opened.`); }); }}
+    onNotice={onNotice}
     onClose={onClose}
     onBeside={onBeside}
   />;
