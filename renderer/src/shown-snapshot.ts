@@ -6,6 +6,8 @@
 // every thread. So each step from the answer to the screen hands back what it
 // had when what it was given is what it had.
 
+import { useRef } from 'react';
+
 type Snap<T> = { items: T[] };
 
 /** `view` over a snapshot's threads, the same object for the same snapshot and the same list for the same threads. */
@@ -19,6 +21,20 @@ export function shownSnapshots<T, S extends Snap<T>>(view: (items: T[]) => T[]):
     shown = { ...s, items };
     return shown;
   };
+}
+
+/** `next`, or `prev` when the two hold the same ids, so a list built from it is not worked out again. */
+export function keptSet<T>(prev: ReadonlySet<T> | null, next: ReadonlySet<T>): ReadonlySet<T> {
+  if (!prev || prev.size !== next.size) return next;
+  for (const id of next) if (!prev.has(id)) return next;
+  return prev;
+}
+
+/** A set worked out on every draw, the same object for as long as it holds the same ids. */
+export function useKeptSet<T>(next: ReadonlySet<T>): ReadonlySet<T> {
+  const kept = useRef<ReadonlySet<T> | null>(null);
+  kept.current = keptSet(kept.current, next);
+  return kept.current;
 }
 
 export interface Drawn<S, T> { from: S; items: T[]; shown: unknown }

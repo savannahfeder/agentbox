@@ -106,7 +106,7 @@ import { approvalAnswered, approvalAsker, approvalView, KEY_CARD_TOOL } from './
 // there is anything to confirm the card has closed.
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
-import { newToDraw, type Drawn } from './shown-snapshot';
+import { newToDraw, useKeptSet, type Drawn } from './shown-snapshot';
 import { agentOnOrComing, askPutOff, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, heldForHer, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
@@ -421,7 +421,10 @@ export default function App() {
   const drawn = useRef<Drawn<Snapshot, WorkItem> | null>(null);
   const snapOnScreen = useRef(snap);
   snapOnScreen.current = snap;
-  const [, setClock] = useState(0);
+  // THE LISTS' CLOCK. Each list is worked out over every thread, and it asked
+  // the time of each draw, so every key and every line an agent printed worked
+  // them all out again. It moves when the threads drawn change and on every poll.
+  const [listNow, setListNow] = useState(() => Date.now());
   // WHERE SHE WAS BEFORE ⌘R, read once, on the way in.
   //
   // A ref rather than state because it is never rendered and never changes: it
@@ -1535,7 +1538,9 @@ export default function App() {
     const items = next && overlayPins(overlayPlaces(worn!.items, unsavedPlaces.current), unsavedPins.current);
     if (next && !newToDraw(drawn.current, next, items!, snapOnScreen.current)) return next;
     const shown = next && { ...next, items: items! };
+    const newThreads = items !== drawn.current?.items;
     drawn.current = next && { from: next, items: items!, shown };
+    if (newThreads) setListNow(Date.now());
     setSnap(shown);
     return next;
   }, []);
@@ -1565,7 +1570,7 @@ export default function App() {
     // coming back from Later, are worked out as it draws.
     const tick = () => {
       const before = drawn.current;
-      refresh().then(() => { if (!gone && drawn.current === before) setClock(Date.now()); }, () => {});
+      refresh().then(() => { if (!gone && drawn.current === before) setListNow(Date.now()); }, () => {});
     };
     const poll = setInterval(tick, pollEvery(10_000, onPhone()));
     return () => { gone = true; clearTimeout(again); off(); clearInterval(poll); };
@@ -1646,7 +1651,7 @@ export default function App() {
   const agentRows = useMemo(() => {
     const live = (snap?.agents ?? []).filter(agentIsListed);
     return [...live].sort(byRecency).map((a) => {
-      const { title, body } = agentRow(a, now);
+      const { title, body } = agentRow(a, listNow);
       return {
         id: `agent:${a.pid}`,
         product: a.product ?? '',
@@ -1678,7 +1683,7 @@ export default function App() {
         agent: a,
       } as WorkItem;
     });
-  }, [snap?.agents, now]);
+  }, [snap?.agents, listNow]);
 
   const agentList = agentRows;
 
@@ -1769,7 +1774,7 @@ export default function App() {
   // at" — so silence has a deadline, and what comes back is the THREAD rather
   // than the agent-to-agent rows it filed. The rule respects a thread you
   // closed yourself; finishing by an agent still allows a reminder.
-  const owedAnAnswer = useMemo(() => threadsOwedAnAnswer(items, now), [items, now]);
+  const owedAnAnswer = useMemo(() => threadsOwedAnAnswer(items, listNow), [items, listNow]);
 
   const runningRows = useMemo(() => snap?.supervisor.running ?? [], [snap?.supervisor.running]);
   // THE THREADS AN AGENT IS ON RIGHT NOW: the turning mark (threads/Pages.tsx),
@@ -1778,7 +1783,8 @@ export default function App() {
   // list below reads it.
   const runningIds = useMemo(() => new Set(runningRows.map((r) => r.itemId)), [runningRows]);
   // The lists also hold a thread whose run is being started, so Try again moves it at once.
-  const liveIds = useMemo(() => agentOnOrComing({ running: runningRows, starting: snap?.supervisor.starting }), [runningRows, snap?.supervisor.starting]);
+  // The running rows change with every line an agent prints; who is running, far less.
+  const liveIds = useKeptSet(useMemo(() => agentOnOrComing({ running: runningRows, starting: snap?.supervisor.starting }), [runningRows, snap?.supervisor.starting]));
   // AND THE THREADS WHOSE AGENT IS STOPPED ON A PERMISSION REQUEST. Each
   // approval in the spool names the thread it came from, and that one fact
   // turns a Working row into a row that needs you, in both lists.
@@ -1817,7 +1823,7 @@ export default function App() {
   // they have shipped or gone back to their agent.
   const shippingIds = useMemo(() => new Set(snap?.supervisor.shipping ?? []), [snap?.supervisor.shipping]);
   // The threads nothing will start again on its own: Needs you, not In progress.
-  const stalledIds = useMemo(() => stoppedIds(snap?.supervisor ?? {}), [snap?.supervisor]);
+  const stalledIds = useKeptSet(useMemo(() => stoppedIds(snap?.supervisor ?? {}), [snap?.supervisor]));
   // AND THE THREADS A THREAD IS WAITING ON (w-5244c90c33). A waiting thread is
   // in Later and resumes by itself when they finish; only the window can see
   // the other rows, so it works this out and hands it to each list.
@@ -1878,10 +1884,10 @@ export default function App() {
     // Above the team branch, which answers before the rule does: a permission
     // request is not something a project's sharing has any view on. Your own
     // Later still holds it, as in the rule.
-    if (asking(i)) return !askPutOff(i, true, now);
-    if (shared === true) return i.status !== 'done' && !(hiddenAt(i) > now) && !isProposal(i) && !waitsInLater(i, waitingOn(i));
-    return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now, asking: asking(i), waitingOn: waitingOn(i), stopped: stalledIds.has(i.id), seen: seenAt[i.id] ?? unreadSince });
-  }), [items, hiddenAt, now, pendingIds, teamInbox, liveIds, shippingIds, stalledIds, asking, waitingOn, team, seenAt, myName, askedOut]);
+    if (asking(i)) return !askPutOff(i, true, listNow);
+    if (shared === true) return i.status !== 'done' && !(hiddenAt(i) > listNow) && !isProposal(i) && !waitsInLater(i, waitingOn(i));
+    return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now: listNow, asking: asking(i), waitingOn: waitingOn(i), stopped: stalledIds.has(i.id), seen: seenAt[i.id] ?? unreadSince });
+  }), [items, hiddenAt, listNow, pendingIds, teamInbox, liveIds, shippingIds, stalledIds, asking, waitingOn, team, seenAt, myName, askedOut]);
   // A task asked for in a chat answers in that chat: Needs you lists the chat
   // instead (team/answers-in-the-chat.ts), and closing the chat closes them.
   const liftedBy = useRef(new Map<string, WorkItem[]>());
@@ -1894,9 +1900,9 @@ export default function App() {
       const key = keyOf(i);
       if (hide.has(key)) return false;
       if (own.has(i)) return true;
-      return lift.has(key) && !pendingIds.has(i.id) && !(hiddenAt(i) > now);
+      return lift.has(key) && !pendingIds.has(i.id) && !(hiddenAt(i) > listNow);
     });
-  }, [items, inboxCandidates, asking, stalledIds, pendingIds, hiddenAt, now]);
+  }, [items, inboxCandidates, asking, stalledIds, pendingIds, hiddenAt, listNow]);
 
   // WHAT MATTERS MOST, ONE COPY, read by every list that claims to be in an
   // order. A product's place in her running order is worth a hundred item
@@ -1928,7 +1934,7 @@ export default function App() {
     // question is an interruption like any other and sorts like one; a quiet one
     // carries priority 1, so the whole sweep sits underneath everything that is
     // actually asking her something rather than on top of it.
-    const asking = agentList.filter((r) => !pendingIds.has(r.id) && r.agent && reachesInbox(r.agent, now, agentMode));
+    const asking = agentList.filter((r) => !pendingIds.has(r.id) && r.agent && reachesInbox(r.agent, listNow, agentMode));
     const rows = [...inboxWithChats, ...asking]
       .sort(byRunningOrder(score));
     // AND ABOVE ALL OF THEM, WHEN NOTHING IS RUNNING, THE ROW THAT SAYS SO.
@@ -1977,13 +1983,13 @@ export default function App() {
     // AND ABOVE THOSE, WHAT IS PAST ITS DEADLINE: a lift
     // for the same reason urgent is one.
     const me = team?.me ?? null;
-    const late = me ? rest.filter((i) => lateForMe(i, me, now)) : [];
+    const late = me ? rest.filter((i) => lateForMe(i, me, listNow)) : [];
     const onTime = late.length ? rest.filter((i) => !late.includes(i)) : rest;
     const urgent = onTime.filter(isUrgentRow);
     const ordinary = urgent.length ? onTime.filter((i) => !isUrgentRow(i)) : onTime;
     const top = [...(troubleItem ? [troubleItem] : []), ...fresh];
     return [...top, ...late, ...urgent, ...ordinary];
-  }, [inboxWithChats, agentList, agentMode, score, now, pendingIds, troubleItem, seen, team?.me]);
+  }, [inboxWithChats, agentList, agentMode, score, listNow, pendingIds, troubleItem, seen, team?.me]);
 
   // Every list of products the user picks from reads in their running order.
   // Anything nobody has placed follows it, oldest first, so a project made
@@ -2023,12 +2029,12 @@ export default function App() {
       if (askedOut.has(i.id) && i.status !== 'done') return true;
       if (handedOut.has(i.id)) return true;
       const deferredUntil = dueAt(i);
-      if (hiddenAt(i) > now && !liveIds.has(i.id)) return false;
+      if (hiddenAt(i) > listNow && !liveIds.has(i.id)) return false;
       // The grace window: the write waits for Z, the signal must not, because a
       // sent thing still sitting in the inbox reads as not sent. A deferred row
       // is the exception, and it has somewhere to be: Scheduled.
-      if (startingIds.has(i.id) && deferredUntil <= now) return true;
-      if (askPutOff(i, asking(i), now)) return false;
+      if (startingIds.has(i.id) && deferredUntil <= listNow) return true;
+      if (askPutOff(i, asking(i), listNow)) return false;
       // A message waits on whoever did not speak last, and the row names them, so
       // it never reads as an agent at work.
       if (isDirect(snap?.products.find((p) => p.slug === i.product)) && !isTaskRow(i)) return iSpokeLast(i, team?.products.get(i.product), team?.me ?? null);
@@ -2039,9 +2045,9 @@ export default function App() {
         const product = team.products.get(i.product);
         return i.status !== 'done' && !(isGivenTask(i, product) && inMyInbox(i, product, team.me));
       }
-      return belongsInProgress(i, { deferredUntil, now, live: liveIds.has(i.id), shipping: shippingIds.has(i.id), stopped: stalledIds.has(i.id) });
+      return belongsInProgress(i, { deferredUntil, now: listNow, live: liveIds.has(i.id), shipping: shippingIds.has(i.id), stopped: stalledIds.has(i.id) });
     }),
-    ...agentList.filter((r) => r.agent && progressAfterReply(r.agent, now, agentMode)),
+    ...agentList.filter((r) => r.agent && progressAfterReply(r.agent, listNow, agentMode)),
     // IN THE ORDER THEY WILL RUN IN, which is the one thing this list is for.
     // It sorted by `updatedAt` alone until 2026-08-20, so it read as "most
     // recently touched", and a row waiting its turn is by definition the least
@@ -2056,7 +2062,7 @@ export default function App() {
     // threads/page-rules.ts): a queued row is told by its Status cell, and
     // what you just sent is on top.
   ].sort(byRunningOrder(score)),
-  [items, agentList, agentMode, startingIds, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, stalledIds, askedOut, handedOut, asking]);
+  [items, agentList, agentMode, startingIds, dueAt, hiddenAt, score, listNow, team, teamProgress, liveIds, shippingIds, stalledIds, askedOut, handedOut, asking]);
 
   // AND THE TAB COUNTS EACH THREAD ONCE: the list, less what Needs you holds,
   // the way `tabState` below has it for the board and `done` for the archive.
@@ -2137,13 +2143,13 @@ export default function App() {
     // AND A FIFTH (w-5244c90c33): a thread waiting on another one, unless a
     // session, the run queue or the ship queue has it, which is In progress. A put-off one too.
     ...items.filter((i) => !queuedTeammateRun(i) && (notStarted(i) || isProposal(i)
-        || putOffInLater(i, { hiddenUntil: hiddenAt(i), now, waitingOn: waitingOn(i), runOnIt: liveIds.has(i.id) || queuedIds.has(i.id) || shippingIds.has(i.id) || pendingIds.has(i.id) })
+        || putOffInLater(i, { hiddenUntil: hiddenAt(i), now: listNow, waitingOn: waitingOn(i), runOnIt: liveIds.has(i.id) || queuedIds.has(i.id) || shippingIds.has(i.id) || pendingIds.has(i.id) })
         // A run waiting on you is not moving, so Later holds it (`askPutOff`).
-        || (askPutOff(i, asking(i), now) && !pendingIds.has(i.id)))
+        || (askPutOff(i, asking(i), listNow) && !pendingIds.has(i.id)))
       && (i.status !== 'done' || i.wrote?.status?.source !== 'founder')
 ),
-    ...agentList.filter((r) => (r.runAt ?? 0) > now),
-  ].sort((a, b) => whenShown(a) - whenShown(b)), [items, agentList, hiddenAt, whenShown, waitingOn, liveIds, queuedIds, shippingIds, pendingIds, asking, now]);
+    ...agentList.filter((r) => (r.runAt ?? 0) > listNow),
+  ].sort((a, b) => whenShown(a) - whenShown(b)), [items, agentList, hiddenAt, whenShown, waitingOn, liveIds, queuedIds, shippingIds, pendingIds, asking, listNow]);
 
   // Repeating tasks. They are RULES, on their own channel, which is why nothing
   // in the item list rules has to know they exist. They are read up here, ahead
@@ -3201,7 +3207,9 @@ export default function App() {
     ];
     // With the inbox they arrived in, which the phone's alert counts on its icon.
     if (arrivals.length) window.zero?.notify?.(arrivals, inbox.filter((i) => i.product).map((i) => ({ id: i.id, product: i.product as string })));
-  }, [snap, inbox, runningRows]);
+    // Not every snapshot: a line an agent prints changes none of these, and
+    // each run sends the whole of Needs you to the corner tag.
+  }, [!snap, inbox, snap?.approvals, runningRows.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The corner tag's "Turn off…" lands on the switch that turns it off.
   useEffect(() => {

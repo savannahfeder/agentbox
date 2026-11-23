@@ -5,6 +5,7 @@ import { teammateIdOf } from '../../shared/teammates.mts';
 import { answerSettled, filedByThePerson, wakesItselfAt, wordWaits } from '../../shared/answers.mts';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import { asksToClose } from '../../shared/asks-to-close.mts';
+import { rememberedFor } from '../../shared/remembered.mts';
 import { notShippedLine } from '../../shared/not-shipped.mts';
 import { closedByItsShip } from '../../shared/ship-closes-its-thread.mts';
 import { setByPerson } from '../../shared/thread-waits.mts';
@@ -130,10 +131,9 @@ export function gaveUpOnTheAnswer(i: InboxItem): boolean {
 }
 
 // Her last words asked for the close and the agent's done came after them:
-// that done is hers, as if she had pressed E.
-function closedAsSheAsked(i: InboxItem): boolean {
-  return asksToClose(liveAnswer(i)) && (i.wrote?.status?.ts ?? 0) >= (i.wrote?.answer?.ts ?? Infinity);
-}
+// that done is hers, as if she had pressed E. Kept per thread, as optionsFrom is.
+const closedAsSheAsked = rememberedFor((i: InboxItem): boolean => (
+  asksToClose(liveAnswer(i)) && (i.wrote?.status?.ts ?? 0) >= (i.wrote?.answer?.ts ?? Infinity)));
 
 // Who deferred a row decides what the deferral means. A future runAt an agent
 // wrote stops workers respawning (`isDue` in shared/work-items.mts) but does

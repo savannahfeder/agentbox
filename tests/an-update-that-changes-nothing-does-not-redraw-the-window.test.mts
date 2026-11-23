@@ -19,7 +19,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { snapshotSender, snapshotReader } from '../shared/snapshot-delta.mts';
 import { shownSnapshots } from '../renderer/src/shown-snapshot.ts';
-import { newToDraw } from '../renderer/src/shown-snapshot.ts';
+import { newToDraw, keptSet } from '../renderer/src/shown-snapshot.ts';
 
 const row = (id, extra = {}) => ({ id, product: 'p', title: `Thread ${id}`, status: 'open', labels: [], ...extra });
 const whole = (items, rest = {}) => ({ products: [{ slug: 'p' }], supervisor: { running: [] }, ...rest, items });
@@ -48,6 +48,16 @@ describe('the reader', () => {
     expect(again).not.toBe(first);
     expect(again.supervisor.running[0].saying).toBe('reading files');
     expect(again.items).toBe(first.items);
+  });
+
+  it('keeps every piece of a changed part that did not change', () => {
+    const order = ['p', 'q'];
+    const { first, next } = pair([row('a')], { supervisor: { productOrder: order, queued: ['a'], running: [] } });
+    const again = next([row('a')], { supervisor: { productOrder: order, queued: ['a'], running: [{ itemId: 'a', helpers: 2 }] } });
+    expect(again.supervisor).not.toBe(first.supervisor);
+    expect(again.supervisor.running).toEqual([{ itemId: 'a', helpers: 2 }]);
+    expect(again.supervisor.productOrder).toBe(first.supervisor.productOrder);
+    expect(again.supervisor.queued).toBe(first.supervisor.queued);
   });
 
   it('makes a new list when a thread changed, keeping every thread that did not', () => {
@@ -121,6 +131,22 @@ describe('the refresh', () => {
   });
 });
 
+describe('a set of threads worked out on every draw', () => {
+  it('is the one it was while it holds the same threads', () => {
+    const was = new Set(['a', 'b']);
+    expect(keptSet(was, new Set(['b', 'a']))).toBe(was);
+  });
+
+  it('is the new one when a thread came or went', () => {
+    const was = new Set(['a', 'b']);
+    const more = new Set(['a', 'b', 'c']);
+    const other = new Set(['a', 'c']);
+    expect(keptSet(was, more)).toBe(more);
+    expect(keptSet(was, other)).toBe(other);
+    expect(keptSet(null, was)).toBe(was);
+  });
+});
+
 // No jsdom here, so the window's wiring is read from its source.
 describe('the window', () => {
   const read = (f) => fs.readFileSync(new URL(`../renderer/src/${f}`, import.meta.url), 'utf8');
@@ -142,6 +168,28 @@ describe('the window', () => {
   it('still draws the app on every poll, so ages and threads due back keep moving', () => {
     const poll = body('const off = api.onChanged(refresh);');
     expect(poll).toMatch(/setInterval\(tick, pollEvery\(10_000, onPhone\(\)\)\)/);
-    expect(poll).toMatch(/drawn\.current === before\) setClock\(/);
+    expect(poll).toMatch(/drawn\.current === before\) setListNow\(Date\.now\(\)\)/);
+  });
+
+  it('tells the dock and the corner tag only when Needs you, the asks or the count of agents changed', () => {
+    expect(app).toMatch(/window\.zero\?\.notify\?\.\(arrivals[^\n]*\n(?:\s*\/\/[^\n]*\n)*\s*\}, \[!snap, inbox, snap\?\.approvals, runningRows\.length\]\);/);
+  });
+
+  it('keeps who is running and who is stopped while they stay the same, as a line printed changes neither', () => {
+    expect(app).toMatch(/const liveIds = useKeptSet\(useMemo\(/);
+    expect(app).toMatch(/const stalledIds = useKeptSet\(useMemo\(/);
+  });
+
+  it('works its lists out by the lists\' clock, which moves when the threads drawn change and on each poll', () => {
+    const refresh = body('const refresh = useCallback(async () => {');
+    expect(refresh).toMatch(/const newThreads = items !== drawn\.current\?\.items;/);
+    expect(refresh).toMatch(/if \(newThreads\) setListNow\(Date\.now\(\)\);\s*setSnap\(shown\)/);
+    for (const list of ['const agentRows = useMemo(', 'const inboxCandidates = useMemo(', 'const inboxWithChats = useMemo(', 'const inbox = useMemo(', 'const snoozed = useMemo(', 'const owedAnAnswer = useMemo(']) {
+      const at = app.indexOf(list);
+      expect(at, list).toBeGreaterThan(-1);
+      const memo = app.slice(at, app.indexOf(']);', at) + 3).replace(/\/\/.*$/gm, '');
+      expect(memo, list).toMatch(/\blistNow\b/);
+      expect(memo, list).not.toMatch(/(?<![\w.])now(?![\w:])/);
+    }
   });
 });

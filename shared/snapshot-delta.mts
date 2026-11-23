@@ -71,6 +71,16 @@ function deepSame(a: unknown, b: unknown): boolean {
 
 const sameList = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((x, i) => x === b[i]);
 
+/** `next`, with every piece of it that is the same as in `prev` being prev's own. */
+function sharing(prev: unknown, next: unknown): unknown {
+  if (prev === next || deepSame(prev, next)) return prev;
+  if (!prev || !next || typeof prev !== 'object' || typeof next !== 'object' || Array.isArray(prev) !== Array.isArray(next)) return next;
+  if (Array.isArray(next)) return next.map((v, i) => sharing((prev as unknown[])[i], v));
+  const out: Parts = {};
+  for (const [key, value] of Object.entries(next)) out[key] = sharing((prev as Parts)[key], value);
+  return out;
+}
+
 /** The computer's half: `answer(whole, since)` for each ask. */
 export function snapshotSender({ keep = 16 }: { keep?: number } = {}): SnapshotSender {
   // The window, a browser tab and a phone each ask with their own token. An
@@ -156,7 +166,8 @@ export function snapshotReader({ keep = 6 }: { keep?: number } = {}): SnapshotRe
       for (const key of delta.removed ?? []) byKey.delete(key);
       for (const item of delta.changed ?? []) byKey.set(keyOf(item), item);
       const order = delta.order ?? base.order;
-      const parts: Parts = { ...base.parts, ...rest };
+      const parts: Parts = { ...base.parts };
+      for (const [name, value] of Object.entries(rest)) parts[name] = sharing(base.parts[name], value);
       for (const name of delta.gone ?? []) delete parts[name];
       const items = sameRows ? (base.snapshot as { items: Row[] }).items : order.map((key) => byKey.get(key)).filter(Boolean);
       return remember(token!, { byKey, order, parts }, { ...parts, items } as T);
