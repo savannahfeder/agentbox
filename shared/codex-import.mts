@@ -38,6 +38,8 @@ export interface CodexThreadLike {
   short?: string;
   startedAt?: number;
   lastActive?: number;
+  /** When Codex last said something. */
+  saidAt?: number;
   turns?: number;
   images?: number;
   live?: boolean;

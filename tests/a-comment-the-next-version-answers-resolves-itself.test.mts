@@ -105,6 +105,16 @@ describe('the resolve mark names the version that answered it', () => {
     expect(resolvedInWords({ n: 3, by: SOFIA, edited: true }, { me: MAYA, nameOf })).toBe('Resolved by Sofia in v3');
     expect(resolvedInWords({ n: 3, by: MAYA, agent: 'Ada' }, { me: MAYA, nameOf })).toBe('Resolved by Ada in v3');
   });
+
+  // Seen 2026-11-21 by a tester reviewing a teammate's thread: Theo's agent's v2
+  // carried no maker on her copy, so it read "Resolved by your agent in v2".
+  it("names the thread's owner when the version says nobody, and you when it is yours", () => {
+    const nameOf = (id) => (id === SOFIA ? 'Sofia' : 'Maya');
+    expect(resolvedInWords({ n: 2, by: null, agent: '' }, { me: MAYA, nameOf, owner: SOFIA })).toBe("Resolved by Sofia's agent in v2");
+    expect(resolvedInWords({ n: 2, by: null, agent: '' }, { me: MAYA, nameOf, owner: MAYA })).toBe('Resolved by your agent in v2');
+    expect(resolvedInWords({ n: 2, by: null, agent: '' }, { me: MAYA, nameOf })).toBe('Resolved by your agent in v2');
+    expect(resolvedInWords({ n: 2, by: MAYA, agent: '' }, { me: MAYA, nameOf, owner: SOFIA })).toBe('Resolved by your agent in v2');
+  });
 });
 
 let store, dir, thread;

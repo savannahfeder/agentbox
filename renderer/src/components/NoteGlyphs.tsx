@@ -14,6 +14,7 @@ const PATHS = {
   lock: <><rect x="3.5" y="7" width="9" height="6.5" rx="1.5" /><path d="M5.5 7V5.2a2.5 2.5 0 0 1 5 0V7" /></>,
   link: <path d="M6.8 9.2a2.6 2.6 0 0 0 3.7 0l2-2a2.6 2.6 0 0 0-3.7-3.7l-.6.6M9.2 6.8a2.6 2.6 0 0 0-3.7 0l-2 2a2.6 2.6 0 0 0 3.7 3.7l.6-.6" />,
   out: <path d="M9.5 3.5h3v3M12.5 3.5 7.5 8.5M11 9.5v2.2a.8.8 0 0 1-.8.8H4.3a.8.8 0 0 1-.8-.8V5.8a.8.8 0 0 1 .8-.8h2.2" />,
+  agent: <><rect x="2.5" y="2.5" width="11" height="11" rx="1.5" /><path d="M2.5 6.3h11M6.3 6.3v7.2" /></>,
 } as const;
 
 export type GlyphName = keyof typeof PATHS;

@@ -84,7 +84,7 @@ function NameInTop({ shown, onRename }: { shown: string; onRename: (name: string
     }} />;
 }
 
-export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, withYourReply = false, onNewVersion, editGoes, missingSays, onClose, onOutside, onNotice, onBeside, below, files: fromElsewhere, typing = false, title, onRename }: {
+export function ArtifactView({ product, project = null, thread, draftsAcross, shareThread, lines, numbers, marks: given, me, people, open, ownerOfRow, talkingWith = [], write, withAgent = false, withYourReply = false, onHandToAgent, onNewVersion, editGoes, missingSays, onClose, onOutside, onNotice, onBeside, below, files: fromElsewhere, typing = false, title, onRename }: {
   /** The project the file belongs to, when it is not `product`'s own (a teammate's thread). */
   project?: string | null;
   /** The name a person gave the file in Files, shown over its name on disk. */
@@ -118,6 +118,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   withAgent?: boolean;
   /** A teammate's review is on you: a note waits for your reply to them, addressed to nobody on its own. */
   withYourReply?: boolean;
+  /** Where no agent hears these notes: starts one with them and the file's newest version, by its path. */
+  onHandToAgent?: (files: string[]) => void;
   /** Posts edited words as the next version of a document. Null when it went, else why not. */
   onNewVersion?: (name: string, text: string, path: string, id: string, since?: string | null) => Promise<string | null>;
   /** Said after a save that only becomes a version on someone else's computer. */
@@ -472,6 +474,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   const sendAll = () => handOver(unsent.ids);
   const sendBeside = sendAllBesideTheNotes(kind);
   const canSendAll = offers.comment && unsent.ids.length > 0;
+  const handable = !!onHandToAgent && !withAgent && !!family && openNotes.length > 0;
   const sendNotes = withAgent && version ? notesToSendTheAgent(marks, withItsAgent(family!.versions, version), family!.versions.length, people, me) : [];
   const pressSend = () => handOver(sendNotes);
   const waitingHere = offers.comment ? openNotes.filter((n) => sendNotes.includes(n.id)) : [];
@@ -802,7 +805,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
   };
   const answeredBy = (n: FileNote): string | null => {
     const v = n.resolved && n.resolvedIn ? flat.find((x) => x.v.id === n.resolvedIn)?.v : undefined;
-    return v ? resolvedInWords(v, { me, nameOf }) : null;
+    return v ? resolvedInWords(v, { me, nameOf, owner: ownerOfRow }) : null;
   };
   const card = (n: FileNote) => (
     <FileNoteCard key={n.id} note={n} product={product} answeredBy={answeredBy(n)} wordsGone={goneQuotes.includes(n.id)} active={n.id === activeId} settling={n.id === undo} person={person} me={me} onGo={() => pickNote(n)} onSettle={(r) => void settle(n, r)} nameOf={nameOf}
@@ -916,7 +919,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
         </div>
         {(foundNow === 'looking' || offers.comment || openNotes.length > 0 || settled.length > 0 || linkNotes.comments.length > 0) && <aside className="av-side" aria-label="Notes">
           <NotesHead count={openNotes.length} faces={authors.length > 0 && authors.map((id) => <Face key={id ?? 'me'} person={person(id)} name={person(id) ? undefined : nameOf(id)} me={!!me && id === me} />)} />
-          {(offers.approve || othersApproved.length > 0 || earlier || ((canSendAll || barSays) && sendBeside)) && (
+          {(offers.approve || othersApproved.length > 0 || earlier || ((canSendAll || barSays) && sendBeside) || handable) && (
             <div className="av-verdict">
               <span className="av-verdict-who" title={earlier ? approvalSince(family, at!.vi, marks.approvals, nameOf) ?? undefined : undefined}>
                 {othersApproved.length > 0 ? `${othersApproved.map((a) => nameOf(a.by)).join(', ')} approved`
@@ -927,6 +930,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
                   {barSays === 'sending' ? 'Sending…' : barSays === 'sent' ? <><NoteGlyph name="check" />Sent</> : <>Send all<kbd>{SEND}</kbd></>}
                 </button>
               )}
+              {handable && <button type="button" className="av-btn" onClick={() => onHandToAgent!([family!.versions.at(-1)!.path])}><NoteGlyph name="agent" />Hand to an agent</button>}
               {/* In a review your reply is the answer, so there is no approving a picture on its own. */}
               {offers.approve && !withYourReply && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
             </div>

@@ -23,7 +23,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, firstRowStaysFirst, type CursorMark, type CursorWait } from './cursor-follows';
 import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
+import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, FileNote, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import type { ReplyPick } from './reply-pick';
 import { api } from './api';
 import { setClaudeModels, setCodexFreePlan, setFurtherHarnesses } from './models';
@@ -247,7 +247,9 @@ import { shippedAtOf, shownToTeam } from '../../shared/thread-cards.mts';
 import { setByPerson, waitChoices as waitChoicesOf, waitWords } from '../../shared/thread-waits.mts';
 import { blockChoices, blockedWords, dayDeadline, dueSaid, lateForMe } from '../../shared/team-tasks.mts';
 import type { ArtifactOpen } from './components/ArtifactView';
-import { fileNewsFor, newestOfFamily, stillWaiting } from '../../shared/artifact-marks.mts';
+import { familyOfName, fileNewsFor, newestOfFamily, shownName, stillWaiting } from '../../shared/artifact-marks.mts';
+import { commentsToHand, withComments, type HandedComment } from './threads/comments-to-hand';
+import { notesOnThread } from './threads/thread-notes';
 import { helpedWhen, isTheAskOn, teammateThreadsFound } from './threads/teammate-thread';
 import { chatsFound } from './team/chats-found';
 import { insideGroups, NOTHING_INSIDE, type InsideFound, type InsideGroupKey, type InsideRow } from './found-inside';
@@ -783,32 +785,83 @@ export default function App() {
     setFocused(convo);
     setModal('reply');
   }, []);
-  const handToAgent = useCallback((item: WorkItem, message?: AgentTurn) => {
+  // Who wrote a comment, by first name, on its line in a hand-over's words.
+  const commenter = useCallback((id: string | null) => teamView(snap?.team ?? null, snap?.products ?? [], snap?.alpha?.multiplayer)?.byId.get(id ?? '')?.name?.split(/\s+/)[0] || 'A teammate',
+    [snap?.team, snap?.products, snap?.alpha?.multiplayer]);
+  // `files`: only the comments on these, when a file's own notes asked.
+  const handToAgent = useCallback((item: WorkItem, message?: AgentTurn, files?: string[]) => {
     const seen = teamView(snap?.team ?? null, snap?.products ?? [], snap?.alpha?.multiplayer);
+    // The comments the notes panel shows, other copies of the same files included.
+    const comments = notesOnThread(item);
     // A task's files sit in the record it rides in, which a new thread cannot
     // read, so they go on the card and the links come out of the words.
     if (isTaskRow(item)) {
       const from = item.createdBy ? seen?.byId.get(item.createdBy)?.name : null;
       // As main's taskBrief does to the brief, so the two still match.
       if (message?.text && askOf(item)) message = { ...message, text: withoutAskLead(message.text) };
-      void api.teamTaskBrief({ product: item.product, id: item.id })
-        .then((b) => {
+      void Promise.all([api.teamTaskBrief({ product: item.product, id: item.id }), comments])
+        .then(([b, notes]) => {
           const { attachments, ...start } = taskHandOff({ from, brief: b, message: message ?? null, nameOf: (id) => seen?.byId.get(id)?.name?.split(/\s+/)[0],
             handFrom: { product: item.product, id: item.id, message: message?.uid ?? 'first' }, offered: snap?.products ?? [], cards: snap?.team?.cards ?? [] });
-          setComposeInitial({ ...start, ...(attachments.length ? { attachments } : {}) });
+          const handed = commentsToHand(notes, { me: seen?.me ?? null, files: files ?? null });
+          setComposeInitial({ ...start, ...(attachments.length ? { attachments } : {}), ...(handed.length ? { comments: handed, body: withComments(start.body, handed, { nameOf: commenter }), caret: [0, 0] as [number, number] } : {}) });
           setModal('compose');
         })
         .catch((err) => showToast(String(err?.message ?? err)));
       return;
     }
     const dir = snap?.products.find((p) => p.slug === item.product)?.dir ?? null;
-    setComposeInitial(handOffStart({
+    const words = message?.text ?? (files?.length ? files.map((f) => `[${shownName(f)}](${f})`).join('\n') : item.body ?? item.title);
+    const start = handOffStart({
       product: item.product, id: item.id, dir,
-      message: { uid: message?.uid, at: message?.at, text: message?.text ?? item.body ?? item.title, by: message?.by ?? item.createdBy },
+      message: { uid: message?.uid, at: message?.at, text: words, by: message || !files?.length ? message?.by ?? item.createdBy : null },
       nameOf: (id) => seen?.byId.get(id)?.name?.split(/\s+/)[0],
-    }));
-    setModal('compose');
-  }, [snap?.team, snap?.products]);
+    });
+    // The files a message carries are the ones whose comments go with it.
+    const linked = files ?? start.attachments.map((a) => a.srcPath.slice((dir?.length ?? 0) + 1));
+    // From a file's notes there is no message to carry, so the thread is named for
+    // the file and carries it, wherever its newest version is kept.
+    const named = !message && files?.length ? {
+      body: `Changes from the comments on ${[...new Set(files.map((f) => shownName(f)))].join(', ')}\n\n`,
+      attachments: files.map((f) => ({ name: shownName(f), srcPath: f.startsWith('/') || !dir ? f : `${dir}/${f}`, image: /\.(png|jpe?g|gif|webp)$/i.test(f) })),
+    } : {};
+    void comments.then((notes) => {
+      const handed = linked.length ? commentsToHand(notes, { me: seen?.me ?? null, files: linked }) : [];
+      const words = (named as { body?: string }).body ?? start.body;
+      setComposeInitial({ ...start, ...named, ...(handed.length ? { comments: handed, body: withComments(words, handed, { nameOf: commenter }), caret: [0, 0] as [number, number] } : {}) });
+      setModal('compose');
+    });
+  }, [snap?.team, snap?.products, commenter]);
+  useEffect(() => {
+    const ask = (e: Event) => {
+      const { product, id, files } = (e as CustomEvent<{ product: string; id: string; files: string[] }>).detail ?? {};
+      const row = snap?.items.find((i) => i.product === product && i.id === id);
+      if (row) handToAgent(row, undefined, files);
+    };
+    window.addEventListener('zero:hand-comments', ask);
+    return () => window.removeEventListener('zero:hand-comments', ask);
+  }, [snap?.items, handToAgent]);
+  // A file opened outside any thread of yours (a chat's, or one in Files): a new
+  // thread with the file and its comments written into the words.
+  useEffect(() => {
+    const ask = (e: Event) => {
+      const { name, srcPath, product, src, notes } = (e as CustomEvent<{ name: string; srcPath?: string | null; product?: string; src?: string; notes: FileNote[] }>).detail ?? {};
+      const me = teamView(snap?.team ?? null, snap?.products ?? [], snap?.alpha?.multiplayer)?.me ?? null;
+      void (srcPath ? Promise.resolve(srcPath) : api.resolveDoc({ product: product ?? '', src: src ?? '' }).then((r) => r.opened ?? null)).then((path) => {
+        const handed = commentsToHand(notes, { me, files: [name] });
+        setComposeInitial({
+          to: 'agent',
+          body: withComments(`Changes from the comments on ${name}`, handed, { nameOf: commenter }),
+          caret: [0, 0],
+          ...(handed.length ? { comments: handed } : {}),
+          ...(path ? { attachments: [{ name, srcPath: path, image: /\.(png|jpe?g|gif|webp)$/i.test(name) }] } : {}),
+        });
+        setModal('compose');
+      });
+    };
+    window.addEventListener('zero:hand-file-comments', ask);
+    return () => window.removeEventListener('zero:hand-file-comments', ask);
+  }, [snap?.team, snap?.products, snap?.alpha?.multiplayer, commenter]);
   // ADD PEOPLE on an open conversation: New thread, with everyone already in
   // that conversation in To. Nothing is written to the conversation on screen,
   // because adding somebody makes the group's conversation and leaves this one
@@ -2440,11 +2493,19 @@ export default function App() {
     setFocused(null);
     openTeammateCard(card);
   }, [weekCards, openTeammateCard]);
-  const continueTeammateThread = useCallback((card: ThreadCard) => {
+  // `files`: from one file's notes, which carries that file's newest version and no other.
+  const continueTeammateThread = useCallback((card: ThreadCard, comments: HandedComment[] = [], files?: string[]) => {
     void api.teamContinueBrief({ personId: card.personId, threadId: card.threadId })
-      .then((b) => { setComposeInitial(continueStart(b, card, snap?.products ?? [])); setModal('compose'); })
+      .then((b) => {
+        const start = continueStart(b, card, snap?.products ?? []);
+        const families = new Set((files ?? []).map((f) => familyOfName(f)));
+        const ofTheFile = start.attachments.filter((a) => families.has(familyOfName(a.name)));
+        const attachments = files?.length && ofTheFile.length ? { attachments: ofTheFile.slice(-1) } : {};
+        setComposeInitial({ ...start, ...attachments, ...(comments.length ? { comments, body: withComments(start.body, comments, { nameOf: commenter }), caret: [0, 0] as [number, number] } : {}) });
+        setModal('compose');
+      })
       .catch((err) => showToast(String(err?.message ?? err)));
-  }, [snap?.products]);
+  }, [snap?.products, commenter]);
   const [teamBody, setTeamBody] = useState<HTMLElement | null>(null);
   // The card on screen is the newest one, and once its owner takes it back it
   // is not on screen at all: words they made private must not stay up.
@@ -7918,7 +7979,7 @@ export default function App() {
                   }}
                   backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}
                   onBack={() => { setOpenCard(null); setTeamOpen(false); }}
-                  onContinue={() => continueTeammateThread(openCard)}
+                  onContinue={(comments, files) => continueTeammateThread(openCard, comments, files)}
                   onMessage={() => messageAbout(openCard.personId, openCard.title)} />
               </div>
             ) : (

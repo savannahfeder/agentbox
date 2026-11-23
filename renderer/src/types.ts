@@ -318,6 +318,8 @@ export interface PlacedFile {
   name: string;
   /** The name a person gave it in Files; `name` stays its name on disk. */
   title?: string;
+  /** The icon a person picked for its tile. */
+  icon?: string;
   kind: FileKind | null;
   /** Made in Files and nothing written in it yet. */
   blank?: boolean;
@@ -372,6 +374,7 @@ export type FileFolderAct =
   | { do: 'rename'; id: string; name: string }
   | { do: 'move'; key: string; folder: string | null }
   | { do: 'name'; key: string; name: string }
+  | { do: 'icon'; key: string; icon: string }
   | { do: 'remove'; id: string }
   | { do: 'restore'; ids: string[] };
 
@@ -423,7 +426,7 @@ export interface FilesPlaceView {
 type LedgerLineShape = { ts: number; by?: string | null; source?: string; patch?: Record<string, unknown> };
 
 /** What a comment or approval in the thread links to. */
-export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string; /** A comment still waiting for Send. */ unsent?: true }
+export interface FileMarkLink { kind: 'note' | 'approved' | 'edited'; file: string; id?: string; place?: string; /** The file's one name and version, for the words. */ shown?: string; /** A comment still waiting for Send. */ unsent?: true; /** A reply under a comment, not a comment of its own. */ reply?: true }
 
 /** A comment on a thread, or a note on one of its files (main/team/thread-share.mts `talk`), for the person's page. */
 export interface ThreadTalk {
