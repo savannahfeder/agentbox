@@ -107,9 +107,23 @@ describe('on the desktop', () => {
     expect(rule('.th-table .row:not(.th-head) .th-slot :is(.tm-av, .tq, .th-mate, .harness-mark, .agent-face)')).toMatch(/width: 24px; height: 24px;/);
   });
 
-  it('every face has the agents\' semi-rounded corner and one soft edge', () => {
+  it('every face has the agents\' semi-rounded corner, and a photo one soft edge', () => {
     expect(rule('.th-table .row:not(.th-head) .th-slot :is(.tm-av, .tq, i.mate-face, .harness-mark)')).toMatch(/border-radius: 7px;/);
     expect(desk).toMatch(/--face-ring: color-mix\(in srgb, var\(--text\) 8%, transparent\);/);
+    expect(rule('.th-table .row:not(.th-head) .th-slot img.tm-av')).toMatch(/border-color: var\(--face-ring\);/);
+  });
+
+  // Picked on the thread (claude-tile-2-white-light-v6.png): the grey tile read as orange behind the
+  // starburst, so Claude Code's and Codex's marks stand on the page with no tile, drawn 22px so they look
+  // as big as a 24px face, and a teammate's initials sit on a white tile whose edge still shows.
+  it("Claude Code's and Codex's marks have no tile, and draw 22px with their top on the title's capitals", () => {
+    expect(rule('.th-table .row:not(.th-head) .th-slot .harness-mark')).toMatch(/background: none; border: 0; overflow: visible;/);
+    // The mark is 11/16 of its svg: a 32px svg draws it 22px, 5px in, so -5px on top puts its top where a face's is.
+    expect(rule('.th-table .row:not(.th-head) .th-slot .harness-mark > svg')).toMatch(/width: 32px; height: 32px; margin: -5px -4px -3px;/);
+  });
+
+  it("a teammate's initials sit on a white tile with an edge that shows on white", () => {
+    expect(rule('.th-table .row:not(.th-head) .th-slot span.tm-av')).toMatch(/background: var\(--surface\); border-color: color-mix\(in srgb, var\(--text\) 14%, transparent\);/);
   });
 
   it('status, project, priority and time span both lines and sit in their middle', () => {
