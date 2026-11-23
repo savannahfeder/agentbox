@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { threadMenuRows } from '../renderer/src/threads/ThreadMenu.tsx';
 import { DisplayMenu } from '../renderer/src/threads/Pages.tsx';
 import { OUTSIDE_MODES, OUTSIDE_SAID, OUTSIDE_TITLE, outsideCommands, outsideLabel } from '../renderer/src/outside-agents.ts';
+import { reachesInbox } from '../shared/agents.mts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p: string) => fs.readFileSync(path.join(root, p), 'utf8');
@@ -86,5 +87,23 @@ describe('one set of words', () => {
   });
   it('a toast for each, without a colon', () => {
     for (const m of OUTSIDE_MODES) expect(OUTSIDE_SAID[m.value]).not.toContain(':');
+  });
+});
+
+// A power tester set it to When they need you and watched a session that had
+// just asked "who is the waitlist for?" leave the inbox (2026-11-23): the mode
+// had only counted a session frozen on a prompt.
+describe('When they need you', () => {
+  const NOW = Date.parse('2026-11-23T09:00:00Z');
+  const s = (over: object) => ({ pid: 1, sessionId: 's', name: 'shop', cwd: '/x', about: 'Waitlist', status: 'idle', startedByZero: false, lastActiveAt: NOW - 60_000, ...over });
+  it('takes a session stopped on a prompt', () => {
+    expect(reachesInbox(s({ status: 'waiting', waitingFor: 'permission prompt' }), NOW, 'waiting')).toBe(true);
+  });
+  it('and one whose newest message asks you something', () => {
+    expect(reachesInbox(s({ lastSaid: 'I drafted three versions of the waitlist page.\n\nWhich do you want?' }), NOW, 'waiting')).toBe(true);
+  });
+  it('but not one that only reports what it did', () => {
+    expect(reachesInbox(s({ lastSaid: 'Done. The waitlist page is live and the tests pass.' }), NOW, 'waiting')).toBe(false);
+    expect(reachesInbox(s({ lastSaid: 'Done. The waitlist page is live and the tests pass.' }), NOW, 'all')).toBe(true);
   });
 });

@@ -440,7 +440,8 @@ export function reachesInbox(agent: AgentLike, now: number = Date.now(), mode: A
   // An idle session with no title has nothing to show, and closing it does not
   // help: a throwaway session gets a fresh pid each time.
   if (!asksSomething(agent) && !whatItIs(agent)) return false;
-  if (mode === 'waiting' && !asksSomething(agent)) return false;
+  // When they need you: stopped on a prompt, or its newest message asks her something.
+  if (mode === 'waiting' && !asksSomething(agent) && agentLayout(agent).kind !== 'asks') return false;
   return !putOff(agent, now) && !putAway(agent);
 }
 
