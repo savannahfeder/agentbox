@@ -156,6 +156,16 @@ describe('every way to an agent carries them', () => {
     expect(app).toContain("window.addEventListener('zero:hand-file-comments', ask)");
     expect(app.match(/caret: \[0, 0\]/g)?.length).toBeGreaterThanOrEqual(4);
   });
+  // A review of 747da8461: Files named the file for its family's first version while it carried the
+  // newest, so the agent got first-visit.png holding v3's bytes. Measured by reading what Files sends.
+  it('a file in Files goes by the name of the version it carries', () => {
+    const place = fs.readFileSync(new URL('../renderer/src/files/FilesPlace.tsx', import.meta.url), 'utf8');
+    const sent = /'zero:hand-file-comments', \{ detail: \{ ([^}]*) \} \}/.exec(place)?.[1] ?? '';
+    expect(sent).toContain('src: paths[0]');
+    expect(sent).toContain('name: nameOfPath(paths[0])');
+    expect(sent).not.toContain('view?.name');
+    expect(place).toMatch(/import \{[^}]*shownName as nameOfPath[^}]*\} from '\.\.\/\.\.\/\.\.\/shared\/artifact-marks\.mts'/);
+  });
   // Rerun 5: a designer sent a comment she meant to leave out, because it sat below
   // the six lines the box showed.
   it('the box is tall enough to show the comments it opens with', () => {

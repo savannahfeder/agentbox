@@ -8,6 +8,7 @@ import { fitMenu } from '../keep-in-window';
 import { ago } from '../format';
 import { firstName, TeamContext } from '../team/people';
 import { ArtifactView, NO_MARKS } from '../components/ArtifactView';
+import { shownName as nameOfPath } from '../../../shared/artifact-marks.mts';
 import { FileCover } from '../components/FileCover';
 import { SearchIcon } from '../components/SearchIcon';
 import { SAYS_UNDO } from '../toast-parts';
@@ -420,7 +421,7 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice, onRenam
     withAgent={!!view?.sentIn.some((p) => p.kind === 'thread' && p.product === product)}
     onHandToAgent={(paths) => {
       onClose();
-      window.dispatchEvent(new CustomEvent('zero:hand-file-comments', { detail: { name: view?.name ?? paths[0], product, src: paths[0], notes: view?.marks.notes ?? [] } }));
+      window.dispatchEvent(new CustomEvent('zero:hand-file-comments', { detail: { name: nameOfPath(paths[0]), product, src: paths[0], notes: view?.marks.notes ?? [] } }));
     }}
     write={(mark) => api.filesPlaceMark({ key: fileKey, mark })}
     onNewVersion={editsTo ? async (_name, text) => {
