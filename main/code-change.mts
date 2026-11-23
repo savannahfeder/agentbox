@@ -301,31 +301,76 @@ function collector({ roots = [] }: { roots?: readonly string[] } = {}) {
   };
 }
 
+/** One line of the transcript, added to the tally if it holds an edit of this run's. */
+function addLine(into: ReturnType<typeof collector>, raw: string, since: number): void {
+  // Only a tool call can be an edit, and most of a long thread is not one:
+  // what its tools printed is skipped here without being parsed.
+  if (!raw.includes('"tool_use"')) return;
+  let row: TranscriptRow | null;
+  try { row = JSON.parse(raw); } catch { return; }
+  if (row?.type !== 'assistant') return;
+  const content = row?.message?.content;
+  if (!Array.isArray(content)) return;
+  const stamp = Date.parse(row?.timestamp ?? '') || 0;
+  if (since && stamp && stamp < since) return;
+  const said = proseFrom(content);
+  for (const block of content) {
+    if (block?.type !== 'tool_use' || !EDIT_TOOLS.has(block.name)) continue;
+    // THE ABSOLUTE PATH IS KEPT BESIDE THE SHORT ONE, because a line she
+    // types into the change has to be written back to the file it came from,
+    // and `renderer/src/api.ts` on its own does not say which checkout that
+    // is. The short path is still what the tree and the crumb draw; this is
+    // never shown.
+    const abs = block?.input?.file_path ?? block?.input?.notebook_path ?? '';
+    for (const rows of hunksFromCall(block.input)) into.add(abs, rows, { said, stamp });
+  }
+}
+
 export function changeFromTranscript(text: string | null | undefined, { roots = [], since = 0 }: { roots?: readonly string[]; since?: number } = {}): TranscriptChange {
   const into = collector({ roots });
+  for (const raw of String(text ?? '').split('\n')) addLine(into, raw, since);
+  return into.done();
+}
 
-  for (const raw of String(text ?? '').split('\n')) {
-    if (!raw.trim()) continue;
-    let row: TranscriptRow | null;
-    try { row = JSON.parse(raw); } catch { continue; }
-    if (row?.type !== 'assistant') continue;
-    const content = row?.message?.content;
-    if (!Array.isArray(content)) continue;
-    const stamp = Date.parse(row?.timestamp ?? '') || 0;
-    if (since && stamp && stamp < since) continue;
-    const said = proseFrom(content);
-    for (const block of content) {
-      if (block?.type !== 'tool_use' || !EDIT_TOOLS.has(block.name)) continue;
-      // THE ABSOLUTE PATH IS KEPT BESIDE THE SHORT ONE, because a line she
-      // types into the change has to be written back to the file it came from,
-      // and `renderer/src/api.ts` on its own does not say which checkout that
-      // is. The short path is still what the tree and the crumb draw; this is
-      // never shown.
-      const abs = block?.input?.file_path ?? block?.input?.notebook_path ?? '';
-      for (const rows of hunksFromCall(block.input)) into.add(abs, rows, { said, stamp });
+const READ_BYTES = 1024 * 1024;
+const TOOL_CALL = Buffer.from('"tool_use"');
+
+/**
+ * The same reading, off the file and a piece at a time. A long thread's
+ * transcript holds every run it ever had, hundreds of megabytes of it, and as
+ * one string it cost several times its length in memory at each run's end.
+ * A file that is not there, or stops being readable, is what was read so far.
+ */
+export function changeFromTranscriptFile(file: string, { roots = [], since = 0 }: { roots?: readonly string[]; since?: number } = {}): TranscriptChange {
+  const into = collector({ roots });
+  let fd: number;
+  try { fd = fs.openSync(file, 'r'); } catch { return into.done(); }
+  try {
+    const buffer = Buffer.allocUnsafe(READ_BYTES);
+    // Looked for in the bytes, so a line with no tool call is never made text.
+    const line = (bytes: Buffer) => { if (bytes.includes(TOOL_CALL)) addLine(into, bytes.toString('utf8'), since); };
+    // A line longer than one piece is joined once, when its end arrives.
+    let held: Buffer[] = [];
+    for (let n = fs.readSync(fd, buffer, 0, READ_BYTES, null); n > 0; n = fs.readSync(fd, buffer, 0, READ_BYTES, null)) {
+      const piece = buffer.subarray(0, n);
+      let from = 0;
+      for (let end = piece.indexOf(0x0a); end !== -1; end = piece.indexOf(0x0a, from)) {
+        const tail = piece.subarray(from, end);
+        if (held.length) {
+          line(Buffer.concat([...held, tail]));
+          held = [];
+        } else {
+          line(tail);
+        }
+        from = end + 1;
+      }
+      // Copied, because the next read writes over this one.
+      if (from < n) held.push(Buffer.from(piece.subarray(from)));
     }
+    if (held.length) line(Buffer.concat(held));
+  } catch { /* what was read so far stands */ } finally {
+    try { fs.closeSync(fd); } catch { /* already closed */ }
   }
-
   return into.done();
 }
 
@@ -449,12 +494,7 @@ export function writeChangeForRun({ transcript, docsDir, itemId, roots = [], sin
 }): string | null {
   if (!docsDir || !itemId) return null;
   const allRoots = [...roots, ...repos.map((r) => r?.root).filter(Boolean) as string[]];
-  let said = prepared;
-  if (!said) {
-    let text = '';
-    try { text = fs.readFileSync(transcript, 'utf8'); } catch { text = ''; }
-    said = changeFromTranscript(text, { roots: allRoots, since });
-  }
+  const said = prepared ?? changeFromTranscriptFile(transcript, { roots: allRoots, since });
   const change = mergeChange(said, repos, { roots: allRoots });
   // THROUGH THE HOME, NOT INTO HER FOLDER. This line used to be
   // `path.join(docsDir, ...)`, which is the one writer the move in

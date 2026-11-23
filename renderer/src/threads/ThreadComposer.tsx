@@ -49,6 +49,8 @@ import { readLastRecipient, writeLastRecipient } from './recipient';
 import { conversationWith } from './page-rules';
 import { attachProblem, fromPaste, persistAttachments, useAttaching, type PendingAttachment } from '../attachments';
 import { AttachRow } from '../components/AttachRow';
+import { handedIn, type HandedComment } from './comments-to-hand';
+import { rememberHanded } from './send-back';
 import { Listening, MicButton, useWebDictation } from '../components/WebDictation';
 import { AGENT_DECIDES, PRIORITIES, choiceLabelOf, priorityValueOf, sentPriority, startingPriority, type PriorityChoice } from '../priority';
 import { cardPick, clearComposeDraft, composeDraftIsEmpty, dropComposeDraft, markComposeDraftSending, openingComposeDraft, readComposeDraft, restoreComposeDraft, saveComposeDraft, type ComposeDraft } from '../drafts';
@@ -126,6 +128,8 @@ export interface ComposeStart {
   caret?: [number, number];
   /** Files already on disk that go with it: what a handed-over message or task carries. */
   attachments?: PendingAttachment[];
+  /** The comments on the files it carries, which go to the agent unless unticked. */
+  comments?: HandedComment[];
   /** The message this card was opened from, when it was handed to an agent. */
   handFrom?: HandFrom;
   /** The task's name, which the thread keeps while its first line still says it. */
@@ -295,6 +299,9 @@ export function ThreadComposer({
   const [dropped, setDropped] = useState(0);
   const { attaching, collect } = useAttaching();
   const onThisWork = initial?.handFrom ? agentOnThisWork(items, initial.handFrom) : null;
+  // The comments are lines of the words; the ones still there when it is sent are the ones it carried.
+  const comments = initial?.comments ?? [];
+  const commenter = (id: string | null) => firstName(team?.byId.get(id ?? '') ?? null) || 'A teammate';
 
   /* ----------------------------- project -------------------------------- */
   const offered = useMemo(() => projectsOffered(products), [products]);
@@ -696,6 +703,7 @@ export function ThreadComposer({
           ...(scripted ? { labels: scripted.labels } : {}),
         });
         dropComposeDraft(taken, undefined, place);
+        if (made?.id && !person) rememberHanded(product.slug, made.id, handedIn(typed, comments, { nameOf: commenter }));
         if (initial?.continueFrom) void api.teamContinued(initial.continueFrom);
         // The person who handed it over can follow the work to where it went (round two of the team test).
         const startedAt = initial?.handFrom && made?.id && team?.me ? threadLink(team.me, made.id) : null;
@@ -1500,7 +1508,7 @@ export function ThreadComposer({
         <PhoneStatus message={statusLine} className="tc-note tc-connection-status" />
         <textarea
           ref={textRef}
-          className={`tc-text ${named.over}`}
+          className={`tc-text ${named.over}${comments.length && !person ? ' tc-text-tall' : ''}`}
           rows={inline ? 1 : undefined}
           value={text}
           onChange={(e) => { talk.typed(); setText(e.target.value); setCaret(e.target.selectionStart); named.track(e.target); }}

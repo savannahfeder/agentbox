@@ -314,6 +314,8 @@ contextBridge.exposeInMainWorld('zero', {
   // Everything that happened on one task, as the ledger lines it happened as.
   itemHistory: (payload) => ipcRenderer.invoke('zero:item-history', payload),
   openArtifact: (payload) => ipcRenderer.invoke('zero:open-artifact', payload),
+  // The apps the open mark's menu offers for a file.
+  openWith: (payload) => ipcRenderer.invoke('zero:open-with', payload),
   // The pictures in a folder a message names on its own line (main/folder-pictures.mts).
   folderPictures: (payload) => ipcRenderer.invoke('zero:folder-pictures', payload),
   // The document pane's own two: the text of a file it has open, and her edit

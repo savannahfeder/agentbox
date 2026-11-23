@@ -122,6 +122,9 @@
 .rm-cm .h { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text); line-height: 18px; }
 .rm-cm .h em { font: normal 10.5px var(--mono); color: var(--text-faint); }
 .rm-cm .tx { font-size: 13.5px; line-height: 20px; color: var(--text); margin-top: 3px; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* A comment on one of the chat's files, at the chat's own sizes. */
+.rm-cm .h .comment-on { font-size: inherit; min-width: 0; }
+.rm-cm .comment-quote { margin: 4px 0 0; font-size: 13px; line-height: 19px; }
 .rm-cm .tx b { font-weight: 400; background: var(--wash-strong); padding: 0 3px; }
 .rm-cm.cont { padding-top: 0; }
 .rm-cm.cont .tx { margin-top: 0; }

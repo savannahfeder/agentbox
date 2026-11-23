@@ -426,6 +426,10 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice, onRenam
     open={opened}
     ownerOfRow={null}
     withAgent={!!view?.sentIn.some((p) => p.kind === 'thread' && p.product === product)}
+    onHandToAgent={(paths) => {
+      onClose();
+      window.dispatchEvent(new CustomEvent('zero:hand-file-comments', { detail: { name: view?.name ?? paths[0], product, src: paths[0], notes: view?.marks.notes ?? [] } }));
+    }}
     write={(mark) => api.filesPlaceMark({ key: fileKey, mark })}
     onNewVersion={editsTo ? async (_name, text) => {
       const out = await api.filesPlaceEdit({ key: fileKey, text });
@@ -438,6 +442,7 @@ function OpenFile({ fileKey, typing = false, onClose, onPlace, onNotice, onRenam
     missingSays={(by) => (view?.coming ? 'is on its way back from the cloud.' : missingWords(by && by !== team?.me && team?.byId.get(by) ? firstName(team.byId.get(by)!) : null))}
     editGoes={editsTo?.kind === 'shared' ? `Sent to ${team?.byId.get(editsTo.ownerId ?? '') ? firstName(team.byId.get(editsTo.ownerId!)!) : 'whoever made it'}.` : undefined}
     onOutside={(src) => { void api.openArtifactExternally({ product, src }).then((r) => { if (!r.ok) onNotice(r.error || 'That file could not be opened.'); }); }}
+    onNotice={onNotice}
     onClose={onClose}
     below={below}
     typing={typing}

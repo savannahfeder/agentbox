@@ -342,7 +342,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
           fileMark: { kind: 'note', file: mark.file ?? '', id: mark.id, place: placeWords({ place: mark.place, pin: n }), ...(versionWords.has(mark.file ?? '') ? { shown: versionWords.get(mark.file ?? '') } : {}), ...(mark.wait && !sentNotes.has(mark.id) && !(mark.mentions ?? []).some((m) => m !== line.by) ? { unsent: true as const } : {}) },
         });
       } else if (mark.do === 'reply' && typeof mark.on === 'string') {
-        events.push({ at, who: 'you', said: 'Replied', words: mark.text ?? '', message: true, fileMark: { kind: 'note', file: mark.file ?? '', id: mark.on } });
+        events.push({ at, who: 'you', said: 'Replied', words: mark.text ?? '', message: true, fileMark: { kind: 'note', file: mark.file ?? '', id: mark.on, reply: true, ...(versionWords.has(mark.file ?? '') ? { shown: versionWords.get(mark.file ?? '') } : {}) } });
       } else if (mark.do === 'approve' && mark.file) {
         events.push({ at, who: 'you', said: 'You approved', words: fileShownName(mark.file), fileMark: { kind: 'approved', file: mark.file } });
       } else if (mark.do === 'edit' && mark.path) {

@@ -5,7 +5,9 @@
 // at a counter; every caller in this process feeds the same meter, which is
 // why the reading lives here and not in each of them.
 
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import type { ChildProcessByStdio } from 'node:child_process';
+import type { Readable, Writable } from 'node:stream';
 import type { PressureReading } from './memory-gate.mts';
 
 const NAMES = [
@@ -73,14 +75,109 @@ export class SwapMeter {
 
 const meter = new SwapMeter();
 
+const ASK_MS = 5_000;
+
+// A name this Mac lacks makes sysctl exit non-zero after printing the rest,
+// so its output is kept whatever the exit.
+function sysctlOnce(): Promise<string> {
+  return new Promise((resolve) => {
+    execFile('/usr/sbin/sysctl', NAMES, { timeout: ASK_MS, windowsHide: true }, (_err, stdout) => resolve(String(stdout ?? '')));
+  });
+}
+
+// ONE SMALL SHELL RUNS SYSCTL, SO THE APP'S OWN THREAD STARTS NOTHING. Starting
+// a program holds the thread that starts it, longer the bigger the process,
+// and this is asked every two seconds while agents run commands. The shell
+// runs sysctl once per line it is sent, and ends when the app's end of the
+// pipe closes, however the app ends.
+const END = '--read--';
+const LOOP = `while IFS= read -r _; do /usr/sbin/sysctl ${NAMES.join(' ')} 2>/dev/null; echo ${END}; done`;
+// A helper that failed this many times running is not started again; each
+// reading then starts sysctl itself.
+const HELPER_TRIES = 3;
+type Helper = ChildProcessByStdio<Writable, Readable, null>;
+let helper: Helper | null = null;
+let failed = 0;
+let asking: Promise<string> | null = null;
+
+function letGoOf(child: Helper) {
+  if (helper === child) helper = null;
+  try { child.stdin.end(); } catch { /* already closed */ }
+}
+
+/** The helper, started if there is none; null when it will not start. */
+function theHelper(): Helper | null {
+  if (helper) return helper;
+  let child: Helper;
+  try {
+    child = spawn('/bin/sh', ['-c', LOOP], { stdio: ['pipe', 'pipe', 'ignore'], windowsHide: true });
+  } catch {
+    return null;
+  }
+  helper = child;
+  child.stdout.setEncoding('utf8');
+  // A write to a helper that has gone is answered by its exit.
+  child.stdin.on('error', () => {});
+  child.once('exit', () => letGoOf(child));
+  child.once('error', () => letGoOf(child));
+  // Nothing here keeps the app open.
+  child.unref();
+  for (const pipe of [child.stdin, child.stdout] as { unref?: () => void }[]) pipe.unref?.();
+  return child;
+}
+
+/** One reading from the helper, or null when it could not give one. */
+function fromHelper(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const asked = theHelper();
+    if (!asked) {
+      resolve(null);
+      return;
+    }
+    let out = '';
+    const done = (text: string | null) => {
+      clearTimeout(late);
+      asked.stdout.off('data', onData);
+      asked.off('exit', onGone);
+      asked.off('error', onGone);
+      resolve(text);
+    };
+    const onData = (chunk: string) => {
+      out += chunk;
+      const at = out.indexOf(END);
+      if (at !== -1) done(out.slice(0, at));
+    };
+    const onGone = () => { letGoOf(asked); done(null); };
+    const late = setTimeout(() => { asked.kill(); onGone(); }, ASK_MS);
+    late.unref?.();
+    asked.stdout.on('data', onData);
+    asked.once('exit', onGone);
+    asked.once('error', onGone);
+    asked.stdin.write('\n');
+  });
+}
+
 function sysctl(platform: NodeJS.Platform): Promise<string> {
   // Only macOS has these names; elsewhere sysctl answers none of them.
   if (platform !== 'darwin') return Promise.resolve('');
-  // A name this Mac lacks makes sysctl exit non-zero after printing the rest,
-  // so its output is kept whatever the exit.
-  return new Promise((resolve) => {
-    execFile('/usr/sbin/sysctl', NAMES, { timeout: 5_000, windowsHide: true }, (_err, stdout) => resolve(String(stdout ?? '')));
-  });
+  asking ??= (async () => {
+    if (failed < HELPER_TRIES) {
+      const text = await fromHelper();
+      if (text !== null) {
+        failed = 0;
+        return text;
+      }
+      failed += 1;
+    }
+    return sysctlOnce();
+  })().finally(() => { asking = null; });
+  return asking;
+}
+
+/** Ends the helper; the next reading starts another. */
+export function stopReadingMacPressure(): void {
+  if (helper) letGoOf(helper);
+  failed = 0;
 }
 
 /** This Mac's pressure now. Nulls for whatever it cannot read; never throws. */
