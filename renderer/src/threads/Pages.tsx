@@ -457,7 +457,7 @@ export function DisplayMenu({ page, display, onDisplay, products, items = [], sh
     </span></div>
     {/* Not a filter of this view: it is what comes into the inbox at all, so
         Clear filters leaves it and it lights no dot. */}
-    {outside && <><div className="rule" /><div className="line"><span className="lab lab-two">Outside Agentbox</span><span className="opts">
+    {outside && <><div className="rule" /><div className="line"><span className="lab lab-two">Outside {Name}</span><span className="opts">
       {OUTSIDE_MODES.map((m) => <button type="button" key={m.value} className={outside.mode === m.value ? 'on' : ''} onClick={() => outside.onMode(m.value)}>{m.label}</button>)}
     </span></div></>}
     <div className="rule" />
