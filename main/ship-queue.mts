@@ -32,6 +32,7 @@ import { notPushedNote, pushNeedsGitHubSignIn } from '../shared/github-push-sign
 import { conflictBrief, earlyConflictNote } from './ship-conflict-brief.mts';
 import type { ConflictThread } from './ship-conflict-brief.mts';
 import { redOnMain } from './main-went-red.mts';
+import { pushRun } from './github-push-sign-in.mts';
 import { waitingForMemory } from '../shared/notes-for-the-agent.mts';
 import type { GateAnswer, GateRequest, GateReply } from './memory-gate.mts';
 
@@ -94,9 +95,9 @@ export interface ShipQueueOptions {
   isLive: (item: ShipItem) => boolean;
   liveSince?: (item: ShipItem) => number | null;
   handBack?: (item: ShipItem, reply: string) => void;
-  run?: (script: string, cwd: string, options?: { timeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][]; base?: string | null }) => Promise<ShipRun>;
-  // The GitHub sign-in saved on this computer, for the push (main/github-push-sign-in.mts).
-  pushSignIn?: () => { env: Record<string, string>; config: [string, string][] } | null;
+  run?: (script: string, cwd: string, options?: { timeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][]; base?: string | null; stdin?: string }) => Promise<ShipRun>;
+  // The GitHub token saved on this computer, for the push (main/github-push-sign-in.mts).
+  pushSignIn?: () => { token: string } | null;
   afterShip?: (shipped: { item: ShipItem; product: ShipProduct; sha: string | null }) => void;
   memoryGate?: () => ShipGate | null;
   shipScore?: (item: ShipItem) => number;
@@ -392,7 +393,7 @@ export function stopShips() {
   for (const [pid, markQuit] of runningShips) { markQuit(); signalShip(pid, 'SIGTERM'); }
 }
 
-export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, wholeSuiteTimeout = WHOLE_SUITE_SHIP_MS, env = process.env, gitConfig = [], graceMs = 5000, base = null }: { timeout?: number; wholeSuiteTimeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][]; graceMs?: number; base?: string | null } = {}): Promise<ShipRun> {
+export async function runScript(script: string, cwd: string, { timeout = SHIP_MS, wholeSuiteTimeout = WHOLE_SUITE_SHIP_MS, env = process.env, gitConfig = [], graceMs = 5000, base = null, stdin }: { timeout?: number; wholeSuiteTimeout?: number; env?: NodeJS.ProcessEnv; gitConfig?: [string, string][]; graceMs?: number; base?: string | null; stdin?: string } = {}): Promise<ShipRun> {
   const node = env.npm_node_execpath && fs.existsSync(env.npm_node_execpath) ? env.npm_node_execpath : 'node';
   const gate = await baseHooksPath(cwd, base);
   if (!gate) return { code: 1, out: 'ship: this task folder is not a worktree of the checkout that ships it, so it was not shipped.' };
@@ -404,7 +405,8 @@ export async function runScript(script: string, cwd: string, { timeout = SHIP_MS
     try {
       // Its own process group, so a stop reaches the hook's test run and not
       // only this script.
-      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: ['ignore', 'pipe', 'pipe'], detached: ownGroup, windowsHide: true });
+      child = spawn(node, [script], { cwd, env: { ...env, GIT_TERMINAL_PROMPT: '0', ...baseGate }, stdio: [stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'], detached: ownGroup, windowsHide: true });
+      if (stdin !== undefined) { child.stdin!.on('error', () => {}); child.stdin!.end(stdin); }
     } catch (e) {
       resolve({ code: 1, out: String((e as Error)?.message ?? e) });
       return;
@@ -604,9 +606,10 @@ export class ShipQueue {
     let signIn: ReturnType<ShipQueue['pushSignIn']> = null;
     try { signIn = this.pushSignIn(); } catch (e) { this.log.warn?.('zero: could not read the GitHub sign-in:', (e as Error).message); }
     try {
-      const env = { ...(red.length ? { AGENTBOX_RED_ON_MAIN: red.join('\n') } : {}), ...signIn?.env };
+      const push = signIn ? pushRun(script, signIn.token) : null;
+      const env = { ...(red.length ? { AGENTBOX_RED_ON_MAIN: red.join('\n') } : {}), ...push?.env };
       const base = product?.repoPath ? path.resolve(product.repoPath) : null;
-      ran = await this.run(script, cwd, { base, ...(Object.keys(env).length ? { env: { ...process.env, ...env }, ...(signIn ? { gitConfig: signIn.config } : {}) } : {}) });
+      ran = await this.run(script, cwd, { base, ...(Object.keys(env).length ? { env: { ...process.env, ...env } } : {}), ...(push ? { gitConfig: push.gitConfig, ...(push.stdin ? { stdin: push.stdin } : {}) } : {}) });
     } finally {
       giveBack?.();
     }

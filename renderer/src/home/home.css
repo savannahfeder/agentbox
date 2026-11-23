@@ -167,9 +167,11 @@
   mask-image: linear-gradient(to top, #000 0, #000 46px, transparent 90px); }
 /* Words over the sky sit in a soft patch of the sky's own dark, and controls
    are filled with it, so the streak never runs through a word on any sky.
-   --sky-under is set by InboxSky. */
-.app.sky-shown:not(.home-shown) > .topbar :is(h1, button), .app.sky-shown:not(.home-shown) :is(.tm-tab, .th-col-h, .th-col-empty, .td-top, .fp-bar, .cx-search, .pl-head, :is(.td-top, .fp-bar, .fp-tools, .cx-search, .pl-head) :is(button, input)) {
+   A menu opened from there sits on its own solid card, where the patch
+   reads as a black glow. --sky-under is set by InboxSky. */
+.app.sky-shown:not(.home-shown) > .topbar :is(h1, button):not([role="menu"] *, [role="dialog"] *), .app.sky-shown:not(.home-shown) :is(.tm-tab, .th-col-h, .th-col-empty, .td-top, .fp-bar, .cx-search, .pl-head, :is(.td-top, .fp-bar, .fp-tools, .cx-search, .pl-head) :is(button, input)):not([role="menu"] *, [role="dialog"] *) {
   text-shadow: 0 0 1px var(--sky-under, var(--bg)), 0 0 3px var(--sky-under, var(--bg)), 0 0 6px var(--sky-under, var(--bg)), 0 0 10px var(--sky-under, var(--bg)), 0 0 16px var(--sky-under, var(--bg)); }
+.app.sky-shown:not(.home-shown) :is([role="menu"], [role="dialog"]) { text-shadow: none; }
 .app.sky-shown:not(.home-shown) :is(.th-new, .th-disp, .fp-find, .cx-search, .pl-btn):not(:hover):not([aria-expanded="true"]) {
   background-color: color-mix(in srgb, var(--sky-under, var(--bg)) 82%, transparent);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
