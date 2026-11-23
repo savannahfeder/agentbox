@@ -9,7 +9,7 @@ import { readTeam } from '../../../renderer/src/phone-team';
 import { cardOpens } from '../../../renderer/src/team/everything/whose-board';
 import { updatedWords } from '../../../renderer/src/threads/page-rules';
 import type { ThreadCard, WorkItem } from '../../../renderer/src/types';
-import { cardsDrawn, cardsShown, CARDS_PER_ROW, mateRunsOf, personCardsOf, phoneMembers, teamRunsOf, THREAD_CARDS_SELECT, threadCardOf, type Member, type ThreadCardRow } from '../lib/everything';
+import { cardWord, cardsDrawn, cardsShown, CARDS_PER_ROW, mateRunsOf, personCardsOf, phoneMembers, teamRunsOf, THREAD_CARDS_SELECT, threadCardOf, type Member, type ThreadCardRow } from '../lib/everything';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
 import { useGroups } from '../state/groups';
@@ -25,7 +25,7 @@ const CARDS_EVERY_MS = 30_000;
 
 /** A person's initials, an AI teammate's dashed letter, a chat's faces. */
 function MemberFace({ m, s }: { m: Member; s: number }) {
-  if (m.kind === 'mate') return <TeammateMark t={{ letter: m.letter ?? '', name: m.name }} size={s} />;
+  if (m.kind === 'mate') return <TeammateMark t={{ letter: m.letter ?? '', name: m.name, face: m.face ?? null }} size={s} />;
   if (m.kind === 'chat') {
     const faces = m.faces ?? [];
     if (!faces.length) return <View style={{ width: s, height: s, borderRadius: s * 0.28, borderWidth: 1, borderColor: color.lineStrong, alignItems: 'center', justifyContent: 'center' }}><T style={{ fontFamily: font.mono, fontSize: Math.round(s * 0.3), color: color.dim }}>#</T></View>;
@@ -41,11 +41,13 @@ function MemberFace({ m, s }: { m: Member; s: number }) {
   return <Face name={m.faceName || m.name} size={s} />;
 }
 
-const agentsShort = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
+// The bar's words (team/everything/TeamStrip.tsx `AgentsLine`).
+const agentsWords = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'} working`;
 const small = () => ({ fontFamily: font.mono, fontSize: 10.5, lineHeight: 14, letterSpacing: 0.735, textTransform: 'uppercase' as const, color: color.faint });
 
 function Card({ m, on, pick }: { m: Member; on: boolean; pick: () => void }) {
-  const chat = m.kind === 'chat' && !(m.team && m.agents != null);
+  const chat = m.kind === 'chat' && !(m.team && m.agents);
+  const { word, live } = cardWord(m);
   return (
     <Pressable onPress={pick} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={m.name}
       style={({ pressed }) => ({ flex: 1, minWidth: 0, gap: 14, paddingTop: 14, paddingHorizontal: 14, paddingBottom: 13, borderWidth: 1, borderRadius: corner.card, overflow: 'hidden',
@@ -55,17 +57,13 @@ function Card({ m, on, pick }: { m: Member; on: boolean; pick: () => void }) {
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
           <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 14, lineHeight: 19 }}>{m.name}</T>
         </View>
-        {chat ? (
+        {word ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-            {m.unread && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.dim }} />}
-            <T numberOfLines={1} style={small()}>{m.unread ? 'New messages' : 'Chat'}</T>
+            {chat && m.unread && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: color.dim }} />}
+            {live && <LiveMark />}
+            <T numberOfLines={1} style={small()}>{word}</T>
           </View>
-        ) : m.agents == null ? <T style={small()}> </T> : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-            <LiveMark still={!m.agents && !m.starting} />
-            <T numberOfLines={1} style={small()}>{m.agents ? agentsShort(m.agents) : m.starting ? 'Starting' : 'Not running'}</T>
-          </View>
-        )}
+        ) : <T style={small()}> </T>}
       </View>
     </Pressable>
   );
@@ -99,7 +97,7 @@ function Bar({ m, onMessage, onShipped, tabs }: { m: Member; onMessage?: () => v
       {m.kind !== 'me' && m.agents != null && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <LiveMark still={!m.agents && !m.starting} />
-          <T style={{ fontSize: 13, color: color.dim }}>{m.agents ? agentsShort(m.agents) : m.starting ? 'Starting' : 'Not running'}</T>
+          <T style={{ fontSize: 13, color: color.dim }}>{m.agents ? agentsWords(m.agents) : m.starting ? 'Starting' : m.kind === 'person' ? `${m.inProgress ?? 0} in progress` : 'Not running'}</T>
         </View>
       )}
       {onMessage && (

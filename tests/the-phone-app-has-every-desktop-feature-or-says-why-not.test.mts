@@ -40,12 +40,14 @@ const READS_ON_THE_PHONE = [
   'mobile/src/lib/rooms-settings.ts',
   'mobile/src/lib/thread-offers.ts',
   'mobile/src/lib/unread.ts',
+  'mobile/src/ui/FilesPlace.tsx',
   'mobile/src/ui/Filters.tsx',
   'mobile/src/ui/Pickers.tsx',
   'mobile/src/ui/SettingsHome.tsx',
   'mobile/src/ui/SettingsPages.tsx',
   'mobile/src/ui/TeamPage.tsx',
   'mobile/src/ui/ThreadMenu.tsx',
+  'mobile/src/ui/ThreadParts.tsx',
 ];
 
 describe('the desktop and the phone', () => {

@@ -4,6 +4,7 @@
 // about the Mac's own keys, and Cloud sells plans, which the phone app does not
 // (docs/mobile/PLAN.md, 3.1). Appearance is here, for the phone's own look.
 import Constants from 'expo-constants';
+import { useState } from 'react';
 import { router } from '../lib/router';
 import { accountsAside, cloudOnlyAccounts, computerAccounts } from '../lib/cloud-accounts';
 import { computerLine, versionLine } from '../lib/computer-line';
@@ -13,6 +14,7 @@ import { useLook } from '../state/look';
 import { useSettings, type SettingsState } from '../state/settings';
 import { GROUPS, SETTINGS_PAGES, type PageId } from './SettingsPages';
 import { Aside, Button, Group, NavRow, Row } from './SettingsParts';
+import { Sheet, SheetHead, SheetRow, SheetSep } from './parts';
 
 export { computerLine };
 
@@ -33,11 +35,18 @@ export function PageList() {
   const s = useSettings();
   const { look } = useLook();
   const email = c.cloud?.session()?.user.email ?? undefined;
+  const [askingOut, setAskingOut] = useState(false);
   return (
     <>
       <Group label="Account">
-        <Row first label={email ?? 'Signed in'} control={<Button title="Sign out" onPress={() => { c.signOut(); router.replace('/sign-in'); }} />} />
+        <Row first label={email ?? 'Signed in'} control={<Button title="Sign out" onPress={() => setAskingOut(true)} />} />
       </Group>
+      <Sheet open={askingOut} close={() => setAskingOut(false)}>
+        <SheetHead>Sign out of this phone?</SheetHead>
+        <SheetRow label="Sign out" onPress={() => { setAskingOut(false); c.signOut(); router.replace('/sign-in'); }} />
+        <SheetSep />
+        <SheetRow label="Stay signed in" onPress={() => setAskingOut(false)} />
+      </Sheet>
       {GROUPS.map((g) => {
         const pages = SETTINGS_PAGES.filter((p) => p.group === g && p.shown(s));
         return pages.length ? (

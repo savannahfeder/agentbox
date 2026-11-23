@@ -11,6 +11,7 @@ import path from 'node:path';
 import { listProjects, createProject, loadProjectAt, patchProjectAt, readIndex, readJson, starterNotesDoc, saveCreation } from '../../main/store/project.mts';
 import { readWorkItems } from '../../main/store/work-items.mts';
 import { resolveProduct } from './account.mts';
+import { personSaid, threadOfThisRun } from './repeats.mts';
 import { SCHEMA_VERSION } from '../../shared/contracts.mts';
 import type { WorkItem } from '../../shared/work-items.mts';
 
@@ -100,10 +101,16 @@ export function createProduct(name: string, { oneLiner = null, repoPath = null }
 // were the one just changed. Nothing errored. Keeping the resolved directory is
 // what makes the read and the write name the same product, and it is the only
 // lookup that still works when two products share an id.
-export function updateProduct(ref: string, patch: ProductPatch = {}): ProductSummary {
+const NOT_ASKED_TO_MOVE = 'The code folder was not changed: every later agent in that project works in it, so it needs the person\'s own words on this thread naming or agreeing to the folder, quoted exactly in askedBecause. If they did, send it again with their words; if not, ask them.';
+
+export function updateProduct(ref: string, patch: ProductPatch = {}, askedBecause?: unknown, run: { env?: NodeJS.ProcessEnv | Record<string, string | undefined>; now?: number } = {}): ProductSummary {
   const project = resolveProduct(ref);
   const clean = cleanPatch(patch);
   if (!Object.keys(clean).length) throw new Error(`nothing to update (recognized fields: ${PRODUCT_FIELDS.join(', ')})`);
+  if (clean.repoPath && clean.repoPath !== loadProjectAt(project.dir)?.repoPath) {
+    const thread = threadOfThisRun(run);
+    if (thread !== undefined && !personSaid(thread, askedBecause)) throw new Error(NOT_ASKED_TO_MOVE);
+  }
   patchProjectAt(project.dir, clean);
   return describe({ ...project, ...loadProjectAt(project.dir) });
 }

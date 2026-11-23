@@ -49,8 +49,8 @@ describe('reading your team', () => {
       'GET team_members': [],
       'POST rpc/pending_invites': [{ team_id: 't-9', team_name: 'Kestrel', invited_by_name: 'Zed' }],
     });
-    expect(await readTeam(c)).toEqual({ team: null, invites: [{ teamId: 't-9', teamName: 'Kestrel', invitedBy: 'Zed' }] });
-    expect(asked.map((a) => a.key)).toEqual(['GET team_members', 'POST rpc/pending_invites']);
+    expect(await readTeam(c)).toEqual({ team: null, invites: [{ teamId: 't-9', teamName: 'Kestrel', invitedBy: 'Zed' }], multiplayer: false, pro: null });
+    expect(asked.map((a) => a.key).filter((k) => k !== 'POST rpc/i_have_multiplayer')).toEqual(['GET team_members', 'POST rpc/pending_invites']);
   });
 });
 

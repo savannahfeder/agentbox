@@ -132,7 +132,33 @@ export function standingFrom(change: unknown): Standing {
  * `onlyFiles` is `onlyNamedFiles`: set, everything loose is a file the thread
  * already shows.
  */
-export function shipOfferFor(stands: Standing, onlyFiles?: readonly string[] | null): { ask: string; options: ParsedOption[]; headed: boolean } | null {
+// THE PERSON SAID NOT TO. Two rounds of team testers asked an agent not to merge or
+// deploy and were shown "Ship it (recommended)" under its answer. Both choices stay;
+// neither is recommended over their own words.
+const HOLD_IT = /\b(?:do not|don['’]t|dont|never|without)\s+(?:merg(?:e|ing)|ship(?:ping)?|deploy(?:ing)?|push(?:ing)?)\b/i;
+export const saidNotToShip = (...words: readonly (string | null | undefined)[]): boolean => words.some((w) => HOLD_IT.test(w ?? ''));
+
+// And the agent saying the change is not ready. Its usual "committed without pushing" is not that.
+const NOT_READY = new RegExp([
+  String.raw`\bnot (?:yet )?(?:production[- ]ready|ready to (?:ship|merge|deploy|go out))\b`,
+  String.raw`\brequired before (?:production|it ships|shipping)\b`,
+  String.raw`\bbefore (?:shipping|it ships|merging|deploying|(?:it )?goes to production|production)\b,? (?:I|we) (?:recommend|suggest|need|would)`,
+  String.raw`\bbefore (?:it )?goes to production\b`,
+  String.raw`\bsuite (?:has|had) (?:a |one |\d+ )?failures?\b`,
+  String.raw`\b(?:[1-9]\d*|one|two|three|four|five|several|some) (?:tests? )?(?:failed|fail|failing)\b`,
+  String.raw`\b(?:[1-9]\d*|a|an|one|two|three) (?:existing |remaining |pre-existing )?failures?\b`,
+  String.raw`\bsuite (?:still )?fails\b`,
+  String.raw`\b(?:can|could|may|will) (?:still )?(?:produce|return|give) (?:incorrect|wrong) results?\b`,
+  String.raw`\b(?:lost|lose|is lost|are lost) on (?:restart|deploy)\b`,
+].join('|'), 'i');
+export const agentSaidNotReady = (result: string | null | undefined): boolean => NOT_READY.test(result ?? '');
+
+export function shipOfferFor(stands: Standing, onlyFiles?: readonly string[] | null, { held = false }: { held?: boolean } = {}): { ask: string; options: ParsedOption[]; headed: boolean } | null {
+  const offer = shipOfferForStanding(stands, onlyFiles);
+  return offer && held ? { ...offer, options: offer.options.map((o) => ({ ...o, recommended: false })) } : offer;
+}
+
+function shipOfferForStanding(stands: Standing, onlyFiles?: readonly string[] | null): { ask: string; options: ParsedOption[]; headed: boolean } | null {
   if (stands.committed === false && stands.uncommitted === false) return null;
   if (stands.committed === false && stands.uncommitted === true) {
     if (stands.knowsYou === false) return { ask: NAME_YOURSELF_ASK, options: NAME_YOURSELF_OFFER, headed: true };
@@ -190,7 +216,9 @@ export function shipOfferLive(item: Finished, { change, running }: { change: boo
   // AND IT IS THE NEWEST WORD ON THE ROW, which is the one test that covers
   // all of: it has shipped (the queue writes its note after), its ship failed
   // (the same), and you have already answered it (a run is on its way).
-  if (at(item, 'result') < at(item, 'note') || at(item, 'result') < at(item, 'answer')) return false;
+  // A pick taken back with Z leaves '(withdrawn)', which answers nothing.
+  const answered = item.answer !== '(withdrawn)' && at(item, 'result') < at(item, 'answer');
+  if (at(item, 'result') < at(item, 'note') || answered) return false;
   if (NOTHING_LEFT.test(item.result ?? '')) return false;
   // The app's own word that the run stopped: the work is half done, and the
   // next run picks up from those loose edits.
@@ -200,4 +228,4 @@ export function shipOfferLive(item: Finished, { change, running }: { change: boo
 
 // The agent's last word that the work has landed or that no decision is left. The
 // change the run left says nothing about what happened to it after.
-const NOTHING_LEFT = /^\s*merged\b|\bnothing (?:is )?left (?:for you )?to (?:decide|do)\b|\bnothing (?:more )?for you to (?:decide|do)\b|\bno decision (?:is )?(?:needed|left)\b/i;
+const NOTHING_LEFT = /^\s*(?:\*\*)?\s*(?:merged|discarded|already on (?:main|master)\b)\b|\bno net (?:file )?changes\b|\bnothing (?:is )?left (?:for you )?to (?:decide|do)\b|\bnothing (?:more )?for you to (?:decide|do)\b|\bno decision (?:is )?(?:needed|left)\b/i;

@@ -17,7 +17,8 @@ import { resolveAccount } from './core/account.mts';
 import { listProducts, getProduct, createProduct, updateProduct, type ProductPatch } from './core/products.mts';
 import { listDocuments, nameOnThread, noteWrittenForRun, readDocument, writeDocument } from './core/documents.mts';
 import { listSkills, fetchSkill, fetchReference } from './core/skills.mts';
-import { listWorkItems, updateItem, createClaimRegistry, type AgentPatch, type ClaimAsk, type ItemFields, type WorkListFilter } from './core/work.mts';
+import { listWorkItems, updateItem, createClaimRegistry, startOnTheirWord, type AgentPatch, type ClaimAsk, type ItemFields, type WorkListFilter } from './core/work.mts';
+import { RUN_IT } from '../shared/answers.mts';
 import { createRepeatingTask, readStandingInstruction, setStandingInstruction, stopRepeatingTask, type NewRepeatingTask, type StopRepeatingTask } from './core/repeats.mts';
 import { teamPost, teamPass, teamRemember, teamSetup, teamRoster, teamPlaybook, teamMethod, teamHire, noteToAnotherThread } from './core/teammates.mts';
 import { documentVersion, documentsWithFolders, keepAsWritten, fileWrittenDocument, teamFile, teamTell, teamTask, teamThreads, teamRead, waitsNamed } from './core/reach.mts';
@@ -25,13 +26,14 @@ import { readTeammates, readTeamView, teamDir } from '../main/store/teammates-fi
 import { legacyRoot } from '../main/store/project.mts';
 import { listProductChats, readProductChat } from './core/chat.mts';
 import { lookAtPage } from './core/page.mts';
-import { askToSignIn, keepAfterSignIn, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
+import { askToSignIn, keepAfterSignIn, keyNamesFor, notToBeSaved, NOT_SAVED, waitForSignIn, WAIT_MS } from './core/sign-in.mts';
 import { WORK_ITEM_STATUSES } from '../shared/work-items.mts';
 import { CONTEXT_WORDS, DONE_STEPS, DONE_STEP_WORDS, SUMMARY_WORDS } from '../shared/thread-cards.mts';
 import { AGENT_CREATION_KINDS } from '../shared/contracts.mts';
 import { joinCause } from './core/causes.mts';
 import { addRuleToProduct } from './core/project-rules.mts';
 import { joinedWords } from '../shared/causes.mts';
+import { askToBringBack } from '../main/files-come-back.mts';
 // The descriptions below are read by every agent on every run, so the app is
 // named in them from the one place it is named. They said "the app" while this
 // server lived in that product's repo, which told every worker the wrong name
@@ -176,15 +178,16 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'update_product',
-      description: 'Change a product\'s name, one-liner, repo path, or archived flag.',
+      description: 'Change a product\'s name, one-liner, repo path, or archived flag. On a thread, a new repo path needs the person\'s own words there naming or agreeing to it, quoted in askedBecause.',
       schema: {
         product: z.string(),
         name: z.string().optional(),
         oneLiner: z.string().optional(),
         repoPath: z.string().optional(),
         archived: z.boolean().optional(),
+        askedBecause: z.string().optional().describe('for a new repoPath on a thread: the person\'s own words on it naming or agreeing to the folder, quoted exactly'),
       },
-      run: ({ product, ...patch }: { product: string } & ProductPatch) => json(updateProduct(product, patch)),
+      run: ({ product, askedBecause, ...patch }: { product: string; askedBecause?: string } & ProductPatch) => json(updateProduct(product, patch, askedBecause, thisRun())),
     },
 
     {
@@ -300,10 +303,14 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         runAt: z.number().int().optional().describe('epoch ms before which nothing happens with this item: it cannot be claimed and will not start. Use it when the work genuinely belongs to a later moment. A missed moment is not lost; the item simply becomes available once it passes.'),
         model: z.string().max(80).optional().describe(MODEL_WORDS),
         effort: z.string().optional().describe(EFFORT_WORDS),
+        startBecause: z.string().optional().describe('when this thread is work they asked for, a thread they told you to make, or one that does part of what they asked you to do: their own words asking for it, quoted exactly from the thread you are working for. It then starts at once, as if they had approved it. Leave it out for anything they did not ask for, such as something you noticed on the way, which waits for their yes'),
       },
-      run: ({ product, ...fields }: { product: string } & ItemFields & { model?: string; effort?: string }) => {
+      run: ({ product, startBecause, ...fields }: { product: string; startBecause?: string } & ItemFields & { model?: string; effort?: string }) => {
         runWords(fields);
-        return json(claims.file(product, fields));
+        if (startBecause === undefined) return json(claims.file(product, fields));
+        const filed = claims.file(product, fields);
+        const start = startOnTheirWord(filed, startBecause, { ownItem });
+        return json({ ...filed, ...('started' in start ? { answer: RUN_IT } : {}), ...start });
       },
     },
     {
@@ -326,7 +333,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'update_work_item',
-      description: 'Report progress on an item: set status to done when it is finished, blocked when it cannot proceed until something outside it changes, and leave a note saying where things stand. Keep the summary current with problem (shown as Context) and progress (shown as the Done list), which is all a teammate sees of the thread. A worker the app started for a row ends with its answer as its last message, and the app writes that message onto the row as the result, so such a worker does not pass result for its own row: the same answer written twice is what they then read twice. A row the founder wrote (labelled founder) is closed only when they asked for it: answering them is not finishing it, so the row stays open for them. To close one, pass closeBecause with their exact words asking you to; without them the rest of the write lands and the row is left open. A runAt you set starts this thread again at that moment, and until then it waits out of their inbox, unless your answer offers options, which keep it there. When they asked for it to be put off ("remind me Friday"), pass deferBecause with their exact words: the moment is then theirs, and it brings the row back to them without starting a run. Writing to a row this session is not holding takes the row first, so there is no need to claim before you speak; the write is only refused when another session is genuinely on it, and that refusal is kept rather than thrown away, parked where the error says and handed to whoever takes the row next. Finishing a row hands the claim straight back, and you can still answer on it afterwards. A note or result alone on another agent\'s thread that is not running reaches it as your words and starts a turn there, unless its owner stopped it; its own note is left as it was.',
+      description: 'Report progress on an item: set status to done when it is finished, blocked when it cannot proceed until something outside it changes, and leave a note saying where things stand. Keep the summary current with problem (shown as Context) and progress (shown as the Done list), which is all a teammate sees of the thread. A worker the app started for a row ends with its answer as its last message, and the app writes that message onto the row as the result, so such a worker does not pass result for its own row: the same answer written twice is what they then read twice. A row the founder wrote (labelled founder) is closed only when they asked for it: answering them is not finishing it, so the row stays open for them. To close one, pass closeBecause with their exact words asking you to; without them the rest of the write lands and the row is left open. A runAt you set starts this thread again at that moment, and until then it waits out of their inbox, unless your answer offers options, which keep it there. When they asked for it to be put off ("remind me Friday"), pass deferBecause with their exact words: the moment is then theirs, and it brings the row back to them without starting a run. Writing to a row this session is not holding takes the row first, so there is no need to claim before you speak; the write is only refused when another session is genuinely on it, and that refusal is kept rather than thrown away, parked where the error says and handed to whoever takes the row next. Finishing a row hands the claim straight back, and you can still answer on it afterwards. A note or result on another agent\'s thread reaches it as your words and starts a turn there, or when its current run ends, unless its owner stopped it or it is a filed thread still waiting for their yes; its own note and summary are left as they were.',
       schema: {
         id: z.string(),
         status: z.enum(WORK_ITEM_STATUSES).optional(),
@@ -349,7 +356,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       run: async ({ id, ...patch }: { id: string } & AgentPatch & { model?: string; effort?: string; blockedBy?: string[] }) => {
         runWords(patch);
         if (patch.blockedBy) patch.blockedBy = waitsNamed(patch.blockedBy);
-        return json(noteToAnotherThread(id, patch, { ownItem }) ?? await claims.update(id, patch));
+        return json(noteToAnotherThread(id, patch, { ownItem, mine: claims.knows(id) }) ?? await claims.update(id, patch));
       },
     },
     {
@@ -417,11 +424,11 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'stop_repeating_task',
-      description: 'Stop a repeating task for good, as Stop repeating on the person\'s own screen does: no more runs start, and runs already made are left as they are. Use it when the person asks for one to stop, be switched off or cancelled, rather than telling them to find it and stop it by hand. Name it as it is listed (such as "Daily security review") or by its id; a name not in this thread\'s product is looked for in every product, and a name two running tasks share is refused with both ids. On a thread it needs the person\'s own words there asking for it to stop, quoted in askedBecause.',
+      description: 'Stop a repeating task for good, as Stop repeating on the person\'s own screen does: no more runs start, and runs already made are left as they are. Use it when the person asks for one to stop, be switched off or cancelled, rather than telling them to find it and stop it by hand. Name it as it is listed (such as "Daily security review") or by its id; a name not in this thread\'s product is looked for in every product, and a name two running tasks share is refused with both ids. On a thread it needs the person\'s own words there asking for it to stop and naming it, quoted in askedBecause; on one of the task\'s own runs, words like "Switch it off" are enough.',
       schema: {
         which: z.string().describe('the task\'s name as it is listed, or its id (r-…)'),
         product: z.string().optional().describe('which product it is in, when you know; otherwise every product is searched'),
-        askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it asking for this to stop, quoted exactly, such as "Switch it off". Without them nothing is stopped'),
+        askedBecause: z.string().optional().describe('on a thread: the person\'s own words on it asking for this to stop, quoted exactly, such as "Stop the daily security review". Without them nothing is stopped'),
       },
       run: (ask: StopRepeatingTask) => json(stopRepeatingTask(ask, thisRun())),
     },
@@ -442,7 +449,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'team_pass',
-      description: 'Hand a piece of work to a teammate whose job it is, or hand an answer back to a teammate waiting on you. It goes to the thread they already have on this work, or starts one, and shows in the team chat. From a teammate it waits for the person\'s yes before they start, unless the person told the receiver it need not. On a thread that is not a teammate\'s run, use it when the person asks you to give something to one of their teammates (call team_roster first to see who is on the team). Put everything they need in the details: steps, files, links, what done looks like. Work in another project can go to yourself, with project set: it starts in a thread of its own there.',
+      description: 'Hand a piece of work to a teammate whose job it is, or hand an answer back to a teammate waiting on you. It goes to the thread they already have on this work, or starts one, and shows in the team chat. From a teammate it waits for the person\'s yes before they start, unless their own words opened this run or are its newest reply, or they told the receiver it need not. On a thread that is not a teammate\'s run, use it when the person asks you to give something to one of their teammates (call team_roster first to see who is on the team). Put everything they need in the details: steps, files, links, what done looks like. Work in another project can go to yourself, with project set: it starts in a thread of its own there.',
       schema: {
         to: z.string().describe('the teammate\'s name'),
         title: z.string().describe('the work, in a short line'),
@@ -453,8 +460,8 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'team_remember',
-      description: 'Keep a standing preference the person stated ("from now on", "always", "never", "I prefer") in a few words, in their terms. The person sees it in the team chat and can undo it. If you have a method file, put it there too: your method is what every later run reads.',
-      schema: { text: z.string().describe('the preference, in a few words') },
+      description: 'Note what the person taught you: a correction, approval, turn-down, decision or standing preference, in one line, in their words, with the date. Every later run reads your notes beside your method, and your look-back folds them into it, so a working run notes rather than rewriting its method. The person sees it in the team chat and can undo it.',
+      schema: { text: z.string().describe('the lesson, in one line') },
       run: ({ text: words }: { text: string }) => json(teamRemember({ text: words }, thisRun())),
     },
     {
@@ -477,7 +484,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
     },
     {
       name: 'team_method',
-      description: 'Write your method, the one file every run of yours reads whole: send text to write all of it, or old (one passage exactly as it reads now) and new (what replaces it) to change one part. Always use this rather than editing the file: a run in the cloud edits a copy that never comes back. The version it replaces is kept.',
+      description: 'Write your method, the one file every run of yours reads whole: send text to write all of it, or old (one passage exactly as it reads now) and new (what replaces it) to change one part. Use it when you set yourself up, in a look-back, or when the person asks you to change it; in a run doing work, note lessons with team_remember instead. Always use this rather than editing the file: a run in the cloud edits a copy that never comes back. The version it replaces is kept.',
       schema: {
         text: z.string().optional().describe('your whole method'),
         old: z.string().optional().describe('one passage of it, exactly as it reads now'),
@@ -640,12 +647,20 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       if (keep) {
         if (!ask) throw new Error('keep goes with the ask of a sign-in that worked');
         if (typeof keepCloudKey !== 'function') return json({ status: 'kept_here', message: 'On this computer the login keeps its own sign-in, so there is nothing to keep.' });
+        if (notToBeSaved(id, ask, { product })) return json({ status: 'not_saved', message: NOT_SAVED });
+        const said = (await waitForSignIn(id, asked.id, { product, waitMs: 0 })).status;
+        if (said === 'skipped' || said === 'replied') return json({ status: 'denied', message: 'They did not sign in here, so there is nothing to keep.' });
+        const names = keyNamesFor(asked.service);
+        // Off the list, the name would be the agent's own choice, and a blocklist of names keeps missing some.
+        if (!names) return json({ status: 'denied', message: `A ${asked.service} sign-in is not one ${Name} keeps. If later cloud runs need its key, ask for it with an AGENTBOX-NEEDS: key line, which they answer on a card.` });
+        if (!names.includes(keep.name)) return json({ status: 'denied', message: `A ${asked.service} sign-in is kept as ${names.join(' or ')}, not ${keep.name}.` });
         await keepCloudKey(keep.name, keep.value);
         return json({ status: 'kept', message: `Kept as ${keep.name} for every later cloud run.` });
       }
       const inCloud = typeof keepCloudKey === 'function';
       const withKeep = <T extends { message: string }>(out: T, finishing = false): T => {
         if (!inCloud) return out;
+        if (notToBeSaved(id, asked.id, { product })) return { ...out, message: `${out.message} ${NOT_SAVED}` };
         const k = keepAfterSignIn(asked.service, { finishing });
         return { ...out, ...(k.keep ? { keep: k.keep } : {}), message: `${out.message} ${k.message}` };
       };
@@ -653,6 +668,16 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
       const said = await waitForSignIn(id, asked.id, { product });
       return json(said.status === 'signed_in' ? withKeep(said) : said.status === 'landed' || said.status === 'code' ? withKeep(said, true) : said);
     },
+  });
+
+  // On a cloud machine the computer is asked with request_cloud_resource, which brings such a file back first.
+  if (typeof requestCloudResource !== 'function') tools.push({
+    name: 'bring_back_files',
+    description: `Bring back pictures, films and sound ${Name} moved to the cloud to free space on this computer. One nobody opened for a while leaves its folder, so a file or folder that should be there and is not may come back with this. Give the paths as you would open them, files or folders: a folder brings back everything that left it. Waits up to 45 seconds; call again with the same paths if some are still on their way.`,
+    schema: {
+      paths: z.array(z.string()).min(1).max(200).describe('the files or folders, written out in full or inside a project\'s folder (designs/w-…/shots)'),
+    },
+    run: async ({ paths }: { paths: string[] }) => json(await askToBringBack({ dir: path.join(account.root, '.files-cloud', 'asks'), paths, cwd: process.cwd() })),
   });
 
   if (typeof requestCloudResource === 'function') tools.push({

@@ -1,33 +1,40 @@
 import { useState } from 'react';
-import { comesBackTo } from '../../../shared/sign-in-ask.mts';
+import { comesBackTo, linkHost, linkIsTheService, serviceId } from '../../../shared/sign-in-ask.mts';
 import { logoOf, DARK_INK } from '../connections/logos';
 import './need-card.css';
 
-export interface SignInAsk { id: string; service: string; url: string; code?: string; why?: string; asksForCode?: true }
+export interface SignInAsk { id: string; service: string; url: string; code?: string; why?: string; asksForCode?: true; keep?: false }
 export type SignInSaid = { said: 'signed-in' | 'skipped' } | { said: 'landed'; url: string } | { said: 'code'; code: string };
 
 const arrow = <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M5 11l6-6M6 5h5v5" /></svg>;
 const key = <svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="8" cy="14" r="4" /><path d="M11 11l8-8M16 6l2 2M14 8l2 2" /></svg>;
+const tick = <svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2.5 6.2l2.3 2.3 4.7-5" /></svg>;
 
-const logoId = (service: string) => service.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const sentence = (s: string) => `${s[0].toUpperCase()}${s.slice(1)}${/[.!?]$/.test(s) ? '' : '.'}`;
 
 /** A service's own sign-in link, put here by an agent that waits for it (shared/sign-in-ask.mjs). */
-export function SignInCard({ ask, cloud, open, answer, copy }: {
+export function SignInCard({ ask, cloud, open, answer, copy, choose }: {
   ask: SignInAsk;
   // The agent runs on another machine, so a sign-in that sends the browser to localhost lands here.
   cloud: boolean;
   open: (href: string) => void;
   answer: (said: SignInSaid) => Promise<string | null>;
   copy: (text: string) => void;
+  /** Whether a cloud sign-in is saved for every cloud thread, written to the ask at once so a login that comes back by itself honours it too. */
+  choose: (keep: boolean) => Promise<string | null>;
 }) {
   const [busy, setBusy] = useState(false);
   const [said, setSaid] = useState<string | null>(null);
   const [pasting, setPasting] = useState(false);
   const [landed, setLanded] = useState('');
+  const [save, setSave] = useState(ask.keep !== false);
   const [pasted, setPasted] = useState('');
-  const id = logoId(ask.service);
-  const logo = logoOf(id);
+  // The agent names the service; the card names the address it opens, and
+  // draws the service's logo only when the address is that service's own.
+  const id = serviceId(ask.service);
+  const theirs = linkIsTheService(ask.service, ask.url);
+  const logo = theirs ? logoOf(id) : null;
+  const host = linkHost(ask.url);
   const back = cloud && !!comesBackTo(ask.url);
   const send = async (s: SignInSaid) => {
     setBusy(true); setSaid(null);
@@ -35,11 +42,16 @@ export function SignInCard({ ask, cloud, open, answer, copy }: {
     setBusy(false);
     if (out) setSaid(out);
   };
+  const toggle = async (next: boolean) => {
+    setSave(next); setSaid(null);
+    const out = await choose(next);
+    if (out) { setSave(!next); setSaid(out); }
+  };
   return <div className="need need-sign-in" data-need="sign-in" onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}>
     <div className="need-body">
       <span className={`need-mark${DARK_INK.has(id) ? ' need-mark-ink' : ''}`} aria-hidden="true">{logo ? <img src={logo} alt="" draggable={false} /> : key}</span>
       <div className="need-col">
-        <div className="need-title">Sign in to {ask.service}</div>
+        <div className="need-title">Sign in at {host}</div>
         {ask.why && <div className="need-why">{sentence(ask.why)}</div>}
         {ask.code && <div className="need-code-box">
           <span className="need-code-label">Enter this code</span>
@@ -47,18 +59,22 @@ export function SignInCard({ ask, cloud, open, answer, copy }: {
           <button type="button" className="need-link" onClick={() => copy(ask.code!)}>Copy</button>
         </div>}
         <div className="need-acts">
-          <button type="button" className="need-btn need-main" disabled={busy} onClick={() => open(ask.url)}>Open {ask.service}<span className="need-btn-arrow">{arrow}</span></button>
+          <button type="button" className="need-btn need-main" disabled={busy} onClick={() => open(ask.url)}>Open {host}<span className="need-btn-arrow">{arrow}</span></button>
           {!ask.asksForCode && <button type="button" className="need-btn" disabled={busy} onClick={() => void send({ said: 'signed-in' })}>I've signed in</button>}
           <button type="button" className="need-link need-skip" disabled={busy} onClick={() => void send({ said: 'skipped' })}>Not now</button>
         </div>
         {ask.asksForCode && <form className="need-form" onSubmit={(e) => { e.preventDefault(); if (pasted.trim() && !busy) void send({ said: 'code', code: pasted.trim() }); }}>
           <div className="need-row">
-            <input className="need-input" spellCheck={false} autoComplete="off" aria-label={`The code ${ask.service} shows`} placeholder={`Paste the code ${ask.service} shows`}
+            <input className="need-input" spellCheck={false} autoComplete="off" aria-label={`The code ${theirs ? ask.service : host} shows`} placeholder={`Paste the code ${theirs ? ask.service : host} shows`}
               onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); e.currentTarget.blur(); } }}
               value={pasted} onChange={(e) => { setPasted(e.target.value); setSaid(null); }} />
             <button type="submit" className="need-btn need-main" disabled={busy || !pasted.trim()}>Send</button>
           </div>
         </form>}
+        {cloud && <label className="need-check">
+          <input type="checkbox" checked={save} disabled={busy} onChange={(e) => void toggle(e.target.checked)} />
+          <span className="need-check-box" aria-hidden="true">{save && tick}</span>Save this sign-in for every cloud thread
+        </label>}
         {back && !pasting && <button type="button" className="need-link need-also" onClick={() => setPasting(true)}>Page did not load after signing in?</button>}
         {pasting && <form className="need-form" onSubmit={(e) => { e.preventDefault(); if (landed.trim() && !busy) void send({ said: 'landed', url: landed.trim() }); }}>
           <div className="need-row">

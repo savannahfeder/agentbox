@@ -111,6 +111,9 @@ export function stoppedByHer(item: Item): boolean {
 export function filedByThePerson(item: Item): boolean {
     return (item?.labels ?? []).includes('founder') && item?.wrote?.labels?.source !== 'agent';
 }
+// The answer that starts a thread an agent filed: what Approve writes, and what
+// a filing writes when the person had asked for it (mcp/core/work.mts).
+export const RUN_IT = 'Approved. Run it.';
 // The teammate whose words are this row's newest reply, or null when the
 // newest reply is the person's own.
 export function toldBy(item: Item): { name: string; teammate: string | null } | null {
@@ -136,6 +139,15 @@ export function wakesItselfAt(item: (AnsweredItem & { runAt?: number; kind?: str
         return 0;
     const at = item.runAt ?? 0;
     return at > (item.wrote?.result?.ts ?? 0) ? at : 0;
+}
+// What a word of hers takes off a Later thread for good (main/store.mts
+// answerItem): a time she set it to run and a time she put it away until. A
+// moment an agent set stays; `wordWaits` runs her word past it.
+export function laterHerWordLifts(item: (Item & { runAt?: number; snoozedUntil?: number }) | null | undefined, now = Date.now()): { runAt: boolean; snoozedUntil: boolean } {
+    return {
+        runAt: (item?.runAt ?? 0) > now && item?.wrote?.runAt?.source === 'founder',
+        snoozedUntil: (item?.snoozedUntil ?? 0) > now,
+    };
 }
 // A PERSON'S WORD WRITTEN AFTER THE MOMENT WAS SET, AND NOT YET ACTED ON, RUNS
 // NOW. The moment is for the run it was set for, not for everything said on

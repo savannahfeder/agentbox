@@ -37,8 +37,10 @@ describe('the board with a message to you', () => {
     expect(column(html, 'In progress')).not.toContain('Maya Chen');
   });
 
+  // An empty column is blank: "Nothing here." in every column was noise (2026-11-21).
   it('leaves an empty Needs you empty when there is no message', () => {
-    expect(column(board(undefined), 'Needs you')).toContain('Nothing here');
+    expect(column(board(undefined), 'Needs you')).not.toContain('th-card');
+    expect(column(board(undefined), 'Needs you')).not.toContain('Nothing here');
   });
 });
 

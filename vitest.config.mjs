@@ -45,7 +45,8 @@ export const WORKER_HEAP_MB = 1536;
 
 // .test.mjs still runs so a test written the old way is not skipped in silence;
 // tests/every-test-is-typescript fails until it is renamed.
-export const SUITE_INCLUDE = ['tests/**/*.test.mts', 'tests/**/*.test.mjs'];
+/** The last is the private repository's tests, where it is checked out (.agentbox/private.json). */
+export const SUITE_INCLUDE = ['tests/**/*.test.mts', 'tests/**/*.test.mjs', '.claude/skills/tests/**/*.test.mts'];
 
 export const SUITE_EXCLUDE = [
   ...configDefaults.exclude,

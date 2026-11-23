@@ -173,7 +173,9 @@ describe('a task whose login ran out rests until the reset', () => {
   it('is awake as soon as its own account is', () => {
     const sup = start(['default', second]);
     ranOutOn(sup, 'default');
-    sup._profileCooldown.default = 0;
+    // Back means its limit is gone: a bench lifted by a reply on another
+    // thread, with the reset still ahead, is not.
+    sup._clearProfileTrouble('default');
     expect(sup.restingUntil(item())).toBe(0);
   });
 });

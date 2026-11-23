@@ -1,14 +1,6 @@
-/* A THREAD'S SUMMARY, in the theme's own tokens so it wears every skin.
-   Approved in Ember Grid on 2026-10-01 (w-e731ca9376): round 7 drew the panel,
-   round 9 made the Summary button square and the teammate's card the summary's
-   fields and nothing else. The values below are the measured ones from those
-   drawings (scripts/scratch/draw-round7.mjs, draw-round9.mjs), renamed ts-.
-
-   SQUARE SHAPES ONLY. Every box here takes the skin's own --radius, which is
-   0 in Ember Grid, and nothing is a rounded pill. The menus are the app's own
+/* A THREAD'S STATE MARK, ITS BAR AND MENU, AND A TEAMMATE'S CARD, in the
+   theme's own tokens so they wear every skin. The menus are the app's own
    `.prio-menu` rather than a second popover shape. */
-
-.focus-pane { --ts-panel-w: 352px; --ts-rail-w: 48px; }
 
 /* the state's mark: filled when it waits on you, a ring when it waits on
    someone else, half filled while it runs, dashed while it is scheduled */
@@ -24,7 +16,6 @@
 .ts-st.live { animation: th-breathe 1.6s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .ts-st.live { animation: none; } }
 /* The list's cloud (pages.css .th-st-cloud), 14px wide, so the word starts where it does after a dot. */
-.ts-value .th-st-cloud { margin-right: 7px; }
 .ts-lead .th-st-cloud { margin-right: 6px; }
 .ts-st-sched { border: 1.5px dashed var(--text-faint); }
 .ts-st-done { background: var(--text-faint); }
@@ -45,31 +36,42 @@
    since w-a3482b8c2c nothing else (the Summary button moved onto the summary).
    It rides in the corner socket, which is display: contents, so this group is
    laid out by the corner row itself, and it ends on the bar's right edge. The
-   2 points above and below keep the row the 34 it was. */
-.ts-top { display: inline-flex; align-items: center; gap: 10px; margin: 2px 0; }
+   point above and below keeps the row the 34 it was. */
+.ts-top { display: inline-flex; align-items: center; gap: 10px; margin: 1px 0; }
 
-/* THE THREAD'S MENU (threads/ThreadMenu.tsx). A 30 point square with a
-   hairline, washing under the pointer. The menu is the app's
+/* THE THREAD'S MENU (threads/ThreadMenu.tsx). A 32 point square with the
+   Inbox bar's line (pages.css .th-disp), washing under the pointer. The menu is the app's
    own popover, `.th-menu` in pages.css, dropped from the button's right edge
    because the button is at the right of the window. */
 .ts-more-wrap { position: relative; display: inline-flex; gap: 10px; }
-.ts-more { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; color: var(--text-dim); cursor: pointer; }
+.ts-more { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 1px solid var(--line-strong); border-radius: var(--tag-radius); background: none; color: var(--text-dim); cursor: pointer; }
 .ts-more:hover, .ts-more[aria-expanded="true"] { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .ts-more:focus-visible { outline: 2px solid var(--underline); outline-offset: 2px; }
+/* Add people sits in this row too (team.css draws it 30 with a faint line). */
+.ts-top .crumb-aside .tm-add-people { width: 32px; height: 32px; border-color: var(--line-strong); }
 /* DONE, A BOX OF ITS OWN BESIDE THE DOTS (w-bca8a6466f). Same height, hairline
    and wash as the dots, never filled, and the bar's 10 point gap between them
    (the wrap's gap above). It was joined to the dots for one night and she
    asked for it apart. */
-.ts-done { display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px 0 9px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; color: var(--text-dim); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.ts-done { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 9px; border: 1px solid var(--line-strong); border-radius: var(--tag-radius); background: none; color: var(--text-dim); font: inherit; font-size: 13px; white-space: nowrap; cursor: pointer; }
 .ts-done:hover { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .ts-done:focus-visible { outline: 2px solid var(--underline); outline-offset: 2px; }
 /* WHERE IT RUNS, Done's box with its own words (threads/PlaceButton.tsx). The
    dot is the one accent: a thread the cloud handed back. */
 .ts-place-wrap { position: relative; display: inline-flex; }
 .ts-files-wrap { position: relative; display: inline-flex; }
-.ts-done.ts-files { height: 30px; min-width: 30px; padding: 0 9px; gap: 6px; justify-content: center; }
+.ts-done.ts-files { height: 32px; min-width: 32px; padding: 0 9px; gap: 6px; justify-content: center; }
 .ts-done.ts-code { gap: 8px; }
-.ts-done.ts-code[aria-pressed="true"] { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
+.ts-done.ts-handed { gap: 8px; }
+.ts-done.ts-handed:disabled { cursor: default; }
+/* Share wearing who can open it: faces stacked as the asks chip stacks them. */
+.ts-done.ts-share:has(.ts-share-faces) { gap: 8px; }
+.ts-share-faces { display: inline-flex; }
+.ts-share-faces > * + * { margin-left: -6px; }
+.ts-share-words { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.ts-handed-face { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--line-strong); font: 600 9px/1 var(--mono); letter-spacing: .02em; color: var(--text); }
+/* Pressed: the change open beside the thread, a teammate's thread followed or its About out. */
+.ts-done[aria-pressed="true"] { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
 .ts-code-figures { display: inline-flex; gap: 6px; font-family: var(--mono); font-size: 12.5px; font-weight: 560; letter-spacing: -0.015em; }
 .ts-files-n { font-weight: 400; font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--text-dim); }
 .ts-files-pop { width: 360px; max-height: min(440px, 70vh); overflow-y: auto; padding: 6px; }
@@ -78,7 +80,7 @@
 .ts-files-pop button:hover { background: var(--wash); }
 .ts-files-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ts-files-notes { flex: none; font-size: 12px; color: var(--text-faint); }
-.ts-done.ts-place { width: 30px; padding: 0; justify-content: center; position: relative; }
+.ts-done.ts-place { width: 32px; padding: 0; justify-content: center; position: relative; }
 .ts-done.ts-place .ts-place-dot { position: absolute; top: 4px; right: 4px; margin: 0; }
 .ts-done.ts-place-off svg { opacity: .7; }
 .ts-place.open { color: var(--text); border-color: var(--line-strong); background: var(--wash-strong); }
@@ -99,202 +101,26 @@
 .ts-wait-words input { flex: 1; min-width: 0; padding: 0; border: 0; background: none; font: inherit; color: var(--text); outline: none; }
 .ts-wait-words input::placeholder { color: var(--text-faint); }
 .ts-more-menu kbd { margin-left: 18px; font: 11px var(--mono); color: var(--text-faint); background: none; border: 0; padding: 0; }
+/* A row's value (its priority, who can open it) is words, not a key. */
+.ts-more-menu .ts-more-detail { margin-left: auto; padding-left: 18px; font-size: 12.5px; color: var(--text-faint); white-space: nowrap; }
 /* The figures on the code row are the ones that closed the line under the
    title, in the code pane's two colours. Here they are a detail of the row,
    not a control of their own, so they take the row's pointer. */
 .ts-more-menu .change-figures { margin-left: 18px; font-size: 12px; cursor: inherit; }
 .ts-more-menu .change-figures .code-plus, .ts-more-menu .change-figures .code-minus { font-size: 12px; }
 
-/* THE PANEL, on the right of the conversation. The conversation and the reply
-   dock both give up its width, so the words narrow beside it rather than run
-   under it, and it scrolls on its own. */
-.focus-pane[data-summary="open"] > .focus-scroll,
-.focus-pane[data-summary="open"] > .focus-dock { margin-right: var(--ts-panel-w); }
-/* A pane with its own band (no top bar to portal into) narrows that too, and
-   the band's inset is reckoned against the narrower column. */
-.focus-pane[data-summary="open"] > .keep-line { margin-right: var(--ts-panel-w); }
-/* So does the thread's terminal, in both placements (w-0ecaecb7ab): at the
-   bottom it narrows like the dock, and at the side, where it is pinned at
-   right 0, the margin moves it in to stand left of the panel. Without this it
-   ran under the panel and the two drew over each other. */
-.focus-pane[data-summary="open"] > .task-terminal { margin-right: var(--ts-panel-w); }
-.focus-pane[data-summary="open"] { --keep-inset: max(32px, calc((100% - var(--ts-panel-w) - var(--read-w)) / 2 + 32px)); }
-
-/* THE RAIL, the summary folded (w-a3482b8c2c). Everything that gives up the
-   panel's width gives up the rail's instead, for the same reasons. */
-.focus-pane[data-summary="rail"] > .focus-scroll,
-.focus-pane[data-summary="rail"] > .focus-dock,
-.focus-pane[data-summary="rail"] > .keep-line,
-.focus-pane[data-summary="rail"] > .task-terminal,
-.focus-pane[data-summary="over"] > .focus-scroll,
-.focus-pane[data-summary="over"] > .focus-dock,
-.focus-pane[data-summary="over"] > .keep-line,
-.focus-pane[data-summary="over"] > .task-terminal { margin-right: var(--ts-rail-w); }
-.focus-pane[data-summary="rail"],
-.focus-pane[data-summary="over"] { --keep-inset: max(32px, calc((100% - var(--ts-rail-w) - var(--read-w)) / 2 + 32px)); }
-/* OPENED WITHOUT ROOM, the panel lies over the conversation, which stays as
-   wide as it was under the rail, and the words under it dim. */
-.focus-pane[data-summary="over"] .ts-panel { background: var(--skin-solid, var(--bg)); z-index: 4; box-shadow: 0 18px 48px rgba(0, 0, 0, .45); }
-.ts-scrim { position: absolute; inset: 0; z-index: 3; background: rgba(0, 0, 0, .32); cursor: default; }
-:root[data-theme="light"] .ts-scrim { background: rgba(0, 0, 0, .12); }
-/* One button the height of the pane. Its marks stand in a column from the top,
-   the panel's icon first; the strip washes under the pointer like the
-   panel's own fields, and has no pressed look because it is never pressed:
-   pressing it opens the panel and it is gone. */
-.ts-rail { position: absolute; top: 0; right: 0; bottom: 0; width: var(--ts-rail-w); box-sizing: border-box; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 22px; padding: 22px 0; margin: 0; border: 0; border-left: 1px solid var(--line); border-radius: 0; background: none; font: inherit; color: var(--text-dim); cursor: pointer; transition: background-color .08s ease; }
-.ts-rail:hover, .ts-rail:focus-visible { background: var(--wash); outline: none; }
-.ts-rail-ic { display: grid; color: var(--text-faint); margin-bottom: 4px; }
-.ts-rail:hover .ts-rail-ic, .ts-rail:focus-visible .ts-rail-ic { color: var(--text); }
-.ts-rail-mark { display: grid; place-items: center; min-height: 16px; }
-.ts-rail .ts-st { margin: 0; }
-.ts-rail .ts-who { margin: 0; }
-.ts-rail .tm-av { margin: 0; }
-
-/* AND THE WAY BACK: the same icon, filled on its right, at the panel's top
-   right beside the title. Faint until the pointer is on it. */
-.ts-close { position: absolute; top: 22px; right: 20px; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--tag-radius); background: none; color: var(--text-faint); cursor: pointer; }
-.ts-close:hover, .ts-close:focus-visible { background: var(--wash-strong); color: var(--text); outline: none; }
-/* THE NAME IS WHAT SITS LEVEL WITH THE ICON since the words moved to the top
-   (w-922f66bb06), so the name keeps clear of it. Before that the Status row sat
-   there and its wash ran under the icon and took the pointer (w-febaf7b3d8);
-   the z-index above still gives the icon the pointer whatever sits beside it. */
-.ts-close + .ts-title { margin-right: 36px; }
-/* No fill of its own: it sits beside the words rather than over them, and a
-   fill would paint over the frame's corner marks.
-
-   A COLUMN, so the foot can be pushed to the bottom edge (w-922f66bb06): the
-   words take what they need from the top, the space under them grows, and
-   the properties sit at the foot, level with the reply box. When the words
-   run longer than the panel, it scrolls as before and the foot follows them. */
-.ts-panel { position: absolute; top: 0; right: 0; bottom: 0; width: var(--ts-panel-w); box-sizing: border-box; padding: 26px 28px 40px; border-left: 1px solid var(--line); background: none; overflow-y: auto; z-index: 2; display: flex; flex-direction: column; }
-.ts-panel > * { flex: none; }
-
-/* THE THREAD'S NAME, the row's own (list-rules.ts rowTitle), at the top of the
-   panel and directly over the three lines, so the words read as one block
-   (w-b38e975e2c, then first of all w-922f66bb06). 16px, her pick from
-   full-window shots of 16 to 24px: the weight sets it apart from the lines
-   under it, not the size. Medium since w-5391bb330f, picked from 300 to 600 in
-   Dark; light read too thin. Three lines at most; the conversation beside it
-   has the rest. A click renames it (w-ab3d51dc7d), so it answers the pointer
-   the way the lines under it do, with the pencil and nothing filled, and the
-   negative margin pays for the box's padding so the name sits exactly where
-   it did. */
-.ts-title { margin: 0 0 22px; font-size: 16px; font-weight: 500; line-height: 22px; letter-spacing: -.01em; color: var(--text); }
-/* THE CLAMP IS ON THE WORDS, NOT ON THE BOX AROUND THEM (w-c9da359466). It sat
-   on the h2, which is also the click target for a rename and so carries 6px of
-   padding, and `overflow: hidden` clips at the PADDING box: those 6px were a
-   window onto the line the clamp had just hidden. Three lines ending in "…"
-   and then the top third of a fourth, sliced through
-   (designs/w-811757c0b5/reply-cannot-switch-to-codex.jpg). Clipping an inner
-   span leaves the click box exactly the size it was. */
-.ts-title-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.ts-title[role="button"], .ts-title-edit { position: relative; box-sizing: border-box; margin: -7px -8px 15px; padding: 6px 28px 6px 8px; border: 1px solid transparent; border-radius: var(--radius); cursor: text; }
-.ts-title[role="button"]:focus-visible { outline: none; border-color: var(--line-strong); }
-/* The pencil follows the last word, rather than standing off at the edge. */
-.ts-title[role="button"] .ts-pen { position: static; display: inline-block; margin-left: 8px; vertical-align: -1px; }
-.ts-title[role="button"]:hover .ts-pen, .ts-title[role="button"]:focus-visible .ts-pen { opacity: 1; }
-.ts-close + .ts-title[role="button"] { margin-right: 28px; }
-.ts-edit.ts-title-edit { margin: -7px -8px 15px; font-size: 16px; font-weight: 500; line-height: 22px; letter-spacing: -.01em; cursor: text; }
-.ts-close + .ts-edit.ts-title-edit { width: calc(100% - 20px); margin-right: 28px; }
-
-/* THE FOOT: the hairline and the properties, at the bottom edge. It adds no
-   room of its own above the hairline (w-b51b2e1c86): under a long summary the
-   hairline sits one section's step under the words, 24px rather than 52px, so
-   more of them fit before the panel scrolls. */
-/* 6px of its own since w-54e9c7243f brought the parts to 12px apart, so the
-   hairline still sits 24px under the last words. */
-.ts-foot { margin-top: auto; padding-top: 6px; }
-.ts-props { display: grid; grid-template-columns: 92px minmax(0, 1fr); row-gap: 14px; font-size: 13.5px; line-height: 20px; margin: 0; }
-.ts-label { color: var(--text-faint); font-size: 13px; }
-.ts-value { color: var(--text); display: flex; align-items: center; min-width: 0; }
-.ts-value .tm-av { margin-right: 8px; }
-.ts-menu-anchor { position: relative; }
-/* A FIELD SHE CAN CHANGE ANSWERS THE POINTER (2026-10-01). A dotted underline
-   on hover was the only sign Priority could be changed, and it took a
-   deliberate click to find out. Now the whole value cell washes, the pointer
-   says it is pressable, and a caret at its right end says a menu opens. The
-   wash runs 8px past the words on each side, pulled back by the margin, so the
-   words still line up with the read-only values above them, which have no
-   hover of any kind. */
-.ts-prop-btn { flex: 1; min-width: 0; display: flex; align-items: center; margin: -3px -8px; padding: 3px 8px; font: inherit; color: inherit; background: none; border: 0; border-radius: var(--radius); cursor: pointer; text-align: left; transition: background-color .08s ease; }
-.ts-prop-btn .prio-bars, .ts-who { margin-right: 8px; flex: none; }
-.ts-who { color: var(--text-dim); }
-.ts-prop-btn:hover, .ts-prop-btn:focus-visible, .ts-prop-btn[aria-expanded="true"] { background: var(--wash); outline: none; }
-/* The caret and the pencil: there for the hand on the field, invisible to the
-   eye only reading it. */
-.ts-caret, .ts-pen { flex: none; color: var(--text-faint); opacity: 0; transition: opacity .08s ease; }
-.ts-caret { margin-left: auto; padding-left: 8px; box-sizing: content-box; }
-.ts-prop-btn:hover .ts-caret, .ts-prop-btn:focus-visible .ts-caret, .ts-prop-btn[aria-expanded="true"] .ts-caret { opacity: 1; }
-
-/* A label sits close over its words (w-54e9c7243f): with the line's own 6px
-   of padding that is 8px, against 18px between one part and the next, so a
-   label belongs to what is under it and not to what is above. */
+/* A label sits close over its words (w-54e9c7243f). */
 .ts-h { display: block; margin: 0 0 2px; font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
-/* THE LABEL LIGHTS UP while the words under it are being typed in: apricot,
-   and "· editing" beside it in the label's own faint grey (w-ab3d51dc7d). */
-.ts-sec:has(> .ts-edit) > .ts-h { color: var(--accent); }
-.ts-sec:has(> .ts-edit) > .ts-h::after { content: ' · editing'; color: var(--text-faint); }
-
-/* the status, priority and visibility menus rise from the row, since the rows
-   sit at the foot of the panel and a menu dropping from them would run off the
-   bottom of the window (w-922f66bb06) */
-.ts-panel .prio-menu.ts-menu { top: auto; bottom: calc(100% + 6px); left: -9px; }
-.ts-menu .prio-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* and each choice in them answers the pointer the way the field that opened it did */
-/* The same answer the new thread card's rows give (--wash-strong), now that
-   both menus float on the same grey: on --pop a 4% film was not visible. */
-.ts-panel .ts-menu .prio-menu-row:hover, .ts-panel .ts-menu .prio-menu-row:focus-visible { background: var(--wash-strong); color: var(--text); outline: none; }
-.ts-menu .ts-who { margin-right: 0; }
-.ts-menu-none { display: block; padding: 6px 9px 8px; font-size: 13px; color: var(--text-faint); }
-/* THE PEOPLE BEHIND "CHOSEN PEOPLE" (w-41ff964775). The list scrolls rather
-   than growing past the panel, and the find box only appears on a company big
-   enough to need it (Summary.tsx). */
-.ts-panel .prio-menu.ts-menu { max-height: 300px; overflow-y: auto; }
-.ts-find {
-  display: block; margin: 2px 6px 4px; padding: 5px 8px; box-sizing: border-box; width: calc(100% - 12px);
-  font: inherit; font-size: 13px; color: var(--text);
-  background: none; border: 1px solid var(--line); border-radius: var(--radius); outline: none;
-}
-.ts-find::placeholder { color: var(--text-faint); }
-.ts-find:focus { border-color: var(--line-strong); }
-.ts-menu .prio-menu-row .tm-av { margin-right: 8px; flex: none; }
-
-.ts-rule { height: 1px; background: var(--line); margin: 0 0 22px; }
-
-/* THE THREE LINES. Each one is its own text box the moment it is clicked, and
-   the box is the same shape as the line: same type, same padding, a border
-   that was there all along in transparent. Under the pointer a line washes
-   like the fields above it and shows a pencil at its top right, in room both
-   shapes keep clear on the right, so the words do not move when it opens. */
-.ts-sec { margin: 0 0 12px; }
-.ts-line, .ts-edit { display: block; box-sizing: border-box; width: calc(100% + 16px); margin: 0 -8px; padding: 6px 28px 6px 8px; border: 1px solid transparent; border-radius: var(--radius); font: inherit; font-size: 13.5px; line-height: 21px; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
-.ts-line { position: relative; cursor: text; }
-.ts-pen { position: absolute; top: 10px; right: 8px; }
-.ts-line:hover .ts-pen, .ts-line:focus-visible .ts-pen { opacity: 1; }
-.ts-line:focus-visible { outline: none; border-color: var(--line-strong); }
-.ts-line.dim { color: var(--text-dim); }
-/* WHAT EVERY RUN OF A REPEATING TASK IS TOLD (w-5e3f2e047f). An instruction
-   can run to a page, so at rest it shows its first eight lines and the whole
-   of it once clicked. */
-.ts-line-rule { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 8; overflow: hidden; color: var(--text-dim); }
-/* NO FILL AND NO BOX, ON HOVER OR WHILE TYPING (picked 2026-10-13,
-   w-ab3d51dc7d): the words stay exactly where they were and become typeable.
-   What says which field you are in is its label, lit apricot just above
-   (`.ts-sec:has(> .ts-edit) > .ts-h`). A grey wash and a bordered box read
-   as a form dropped on top of the page. */
-.ts-edit { resize: none; overflow: hidden; border-color: transparent; background: none; outline: none; caret-color: var(--accent); }
-/* THE DONE TRAIL (w-54e9c7243f): smaller and dimmer than the Context over it,
-   each step a dot joined to the next by a thin line, the newest dot a shade
-   brighter. Picked from full-window pictures as "the timeline view". */
-.ts-sec-done { margin-top: 6px; }
+/* THE DONE TRAIL (w-54e9c7243f), on a teammate's card: each step a dot joined
+   to the next by a thin line, the newest dot a shade brighter. The line leaves
+   3px under one dot and stops 3px over the next: 15 is the dot's 7 + 5 + 3,
+   and -10 reaches back over the step's 6px gap and the next dot's 7, less 3. */
 .ts-trail { list-style: none; margin: 0; padding: 0; font-size: 12.5px; line-height: 19px; color: var(--text-dim); white-space: normal; }
 .ts-step { position: relative; padding-left: 18px; margin: 0 0 6px; }
 .ts-step:last-child { margin-bottom: 0; }
 .ts-step::before { content: ""; position: absolute; left: 3px; top: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--text-faint); }
-.ts-step:not(:last-child)::after { content: ""; position: absolute; left: 5px; top: 14px; bottom: -8px; width: 1px; background: var(--line-strong); }
+.ts-step:not(:last-child)::after { content: ""; position: absolute; left: 5px; top: 15px; bottom: -10px; width: 1px; background: var(--line-strong); }
 .ts-step-last::before { background: var(--text-dim); }
-.ts-by { font-size: 12px; line-height: 18px; color: var(--text-faint); margin-top: 4px; }
-.ts-by-error { color: var(--text-dim); }
 
 /* THE MODEL, at the right end of the reply box's pill. A dotted underline
    says it opens something, the way every other word that opens a drawer in
@@ -325,20 +151,21 @@
 .ts-tk-state { display: inline-flex; align-items: center; margin-left: auto; color: var(--text-dim); }
 .ts-ticket-private .ts-tk-lead { margin-bottom: 4px; }
 
-/* "Message <name>": their face and the words, square, for the top bar */
-.ts-msgbtn { display: inline-flex; align-items: center; gap: 9px; height: 30px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; white-space: nowrap; }
-.ts-msgbtn:hover { background: var(--wash-strong); }
+/* "Message <name>", in Done's box: the face is 2px wider than a mark, so it starts 2px further left and the word lands where the others' do. */
+.ts-done.ts-msgbtn { padding-left: 7px; }
+.ts-msgbtn .tm-av { width: 18px; height: 18px; line-height: 16px; font-size: 7.5px; }
 
 /* THE THREAD'S BAR WHILE THE SUMMARY IS OPEN (w-922f66bb06, Summary.tsx
-   ThreadCrumb): thin, and one line in the app's mono capitals, "NEEDS YOU /
+   ThreadCrumb): one line in the app's mono capitals, "NEEDS YOU /
    THE NAME". The tab you came from is faint and the name a step brighter, so
-   the eye lands on where you are. 56 high against the full bar's 88. The name
+   the eye lands on where you are. 64 high, the Inbox bar's height, so the
+   arrows do not move between them; the full bar is 88. The name
    is already cut to whole words in crumb-rules.ts; the ellipsis here only
    catches a window too narrow for even that. The corner menu centres on the
    thinner bar. The crumb stays when the summary folds (w-20292d329f); a
    thread with no summary has no crumb, and these rules only hold while a
    crumb is in the bar. */
-.workspace-layout.workspace-task:has(.thread-crumb) > .topbar { height: 56px; min-height: 56px; flex-basis: 56px; padding-top: 0; padding-bottom: 0; }
+.workspace-layout.workspace-task:has(.thread-crumb) > .topbar { height: 64px; min-height: 64px; flex-basis: 64px; padding-top: 0; padding-bottom: 0; }
 /* The corner (2 of 3, Done, the menu) takes its own room in the row. Floated over
    it with a fixed 64px kept clear, a 260px corner sat on Add people. */
 .workspace-layout.workspace-task:has(.thread-crumb) > .topbar > .topbar-right { position: static; flex: none; margin-left: 16px; transform: none; }
@@ -360,6 +187,8 @@
 .thread-crumb-from { flex: none; }
 .thread-crumb-sep { flex: none; margin: 0 7px 0 5px; }
 .thread-crumb-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-dim); }
+/* A name that cannot be renamed (a teammate's thread) sits where a renamable one does. */
+span.thread-crumb-name { padding: 0 6px; white-space: nowrap; }
 button.thread-crumb-name { -webkit-app-region: no-drag; height: 28px; padding: 0 6px; border: 0; border-radius: var(--radius); background: none; font: inherit; letter-spacing: inherit; text-transform: inherit; white-space: nowrap; cursor: text; }
 button.thread-crumb-name:hover, button.thread-crumb-name:focus-visible { color: var(--text); outline: none; }
 .thread-crumb-with { flex: none; margin-left: 10px; color: var(--text-faint); }

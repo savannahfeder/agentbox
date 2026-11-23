@@ -17,5 +17,5 @@ export function laterPresets(now = Date.now()): LaterPreset[] {
   // On a Sunday the coming Monday is tomorrow, already offered.
   if (monday.getTime() === tomorrow.getTime()) monday.setDate(monday.getDate() + 7);
   list.push({ label: 'Next week', ts: monday.getTime() });
-  return list;
+  return list.sort((a, b) => a.ts - b.ts);
 }

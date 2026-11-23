@@ -19,9 +19,10 @@ describe('a key on an open thread with no box', () => {
     expect(keyOnAnOpenThread({ key: 'e', justChanged: false })).toBe('shortcut');
     expect(keyOnAnOpenThread({ key: 'L', justChanged: false })).toBe('shortcut');
   });
-  it('E and L right after a screen change are the start of a sentence, not a close', () => {
-    expect(keyOnAnOpenThread({ key: 'e', justChanged: true })).toBe('to the box');
-    expect(keyOnAnOpenThread({ key: 'l', justChanged: true })).toBe('to the box');
+  it('E and L right after a screen change wait to see if they start a sentence', () => {
+    expect(keyOnAnOpenThread({ key: 'e', justChanged: true })).toBe('wait');
+    expect(keyOnAnOpenThread({ key: 'l', justChanged: true })).toBe('wait');
+    expect(keyOnAnOpenThread({ key: 'e', justChanged: true, appMovedYou: true })).toBe('to the box');
   });
   it('walking and opening stay live, so J J J keeps walking', () => {
     for (const key of ['j', 'k', 'r', 'n', 'z', 'o', 'g', 's']) expect(keyOnAnOpenThread({ key, justChanged: true })).toBe('shortcut');
@@ -87,9 +88,11 @@ describe('search does not keep the keyboard behind a closed thing', () => {
 describe('a group chat with no box focused', () => {
   it('gives the key to its box, and R does not type itself', () => {
     const app = read('renderer/src/App.tsx');
-    const at = app.indexOf("querySelector<HTMLElement>('.rm-compose-input .ProseMirror')");
+    // The last is the Team page's; one opened from Needs you takes a thread's keys first.
+    const at = app.lastIndexOf("querySelector<HTMLElement>('.rm-compose-input .ProseMirror')");
     expect(at).toBeGreaterThan(-1);
     expect(app.slice(at - 200, at)).toContain("e.key === 'r'");
+    expect(app).toContain("else if (k === 'r') { e.preventDefault(); document.querySelector<HTMLElement>('.rm-compose-input .ProseMirror')?.focus(); }");
   });
 });
 

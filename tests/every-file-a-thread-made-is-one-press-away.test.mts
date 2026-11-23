@@ -59,6 +59,6 @@ describe('the Files button', () => {
   it('sits in the thread\'s top bar, the size of its other buttons', () => {
     expect(read('renderer/src/components/Focus.tsx')).toMatch(/files=\{<ThreadFilesButton /);
     expect(read('renderer/src/threads/ThreadMenu.tsx')).toMatch(/\{files\}/);
-    expect(read('renderer/src/threads/summary.css')).toMatch(/\.ts-done\.ts-files \{[^}]*height: 30px/);
+    expect(read('renderer/src/threads/summary.css')).toMatch(/\.ts-done\.ts-files \{[^}]*height: 32px/);
   });
 });

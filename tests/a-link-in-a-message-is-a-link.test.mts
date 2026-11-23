@@ -24,7 +24,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { CODE_PATH, linkArtifactPaths, isMediaPath, productPath } from '../renderer/src/remark-artifact-paths.ts';
+import { CODE_PATH, linkArtifactPaths, isMediaPath, productPath, shortPath } from '../renderer/src/remark-artifact-paths.ts';
 import os from 'node:os';
 import { servable, byteRange, mediaResponse, mediaType } from '../main/img-scheme.mts';
 
@@ -100,8 +100,12 @@ describe('a full path into the product folder', () => {
     expect(links(run('/Users/you/Desktop/dev/zero/renderer/index.html', { dir: DIR }))).toEqual([]);
   });
 
-  it('stays text in a sibling product whose name starts the same way', () => {
-    expect(links(run('/Users/you/Zero/accounts/acct/astral-video-agent/designs/a.html', { dir: DIR }))).toEqual([]);
+  // A page in a sibling project is still the account's, so it links as written
+  // (tests/a-picture-named-at-a-wrong-path-is-drawn-or-said-to-be-missing).
+  it('is never read as a short path into a sibling product whose name starts the same way', () => {
+    const sibling = '/Users/you/Zero/accounts/acct/astral-video-agent/designs/a.html';
+    expect(links(run(sibling, { dir: DIR }))).toEqual([sibling]);
+    expect(productPath(sibling, DIR)).toBe(null);
   });
 
   it('stays text when the pane does not know the product folder', () => {
@@ -172,7 +176,8 @@ describe('the pane draws a player for audio and video', () => {
   });
 
   it('links a full path in backticks into the product folder, the way it does in a sentence', () => {
-    expect(focus).toContain('productPath(shown, productDir)');
+    expect(focus).toContain('shortPath(shown, productDir,');
+    expect(shortPath(`${DIR}/GreatCollections-form-TO-SIGN.pdf`, DIR)).toBe('GreatCollections-form-TO-SIGN.pdf');
     expect(productPath(`${DIR}/GreatCollections-form-TO-SIGN.pdf`, DIR)).toBe('GreatCollections-form-TO-SIGN.pdf');
     expect(productPath(`${DIR}-video/a.pdf`, DIR)).toBe(null);
     expect(productPath('designs/a.pdf', DIR)).toBe(null);

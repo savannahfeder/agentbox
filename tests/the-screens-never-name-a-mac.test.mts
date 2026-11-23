@@ -13,7 +13,6 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import { COPY as plan } from '../renderer/src/plan-setup.ts';
-import { COPY as walk } from '../renderer/src/onboarding.ts';
 import { CARD } from '../renderer/src/agent-import-card.ts';
 import { checkProjectFolder } from '../shared/project-folder-check.mts';
 import { troubleSentence } from '../shared/spawn-trouble.mts';
@@ -81,11 +80,6 @@ describe('the sentences a person reads', () => {
   });
 
   it('names this computer on the lines beside that row', () => {
-    expect(walk.folderPick).toBe('Choose a folder on this computer');
-    expect(walk.missing).not.toMatch(APPLE);
-    expect(walk.intro[0].line).toBe('It works on your computer and writes back here when it finishes or gets stuck');
-    expect(walk.bringHead).toBe('Add the agents already on this computer.');
-    expect(CARD.head).toBe(walk.bringHead);
     expect(CARD.reading).toBe('Reading this computer…');
   });
 

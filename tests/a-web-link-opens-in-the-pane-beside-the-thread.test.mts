@@ -171,7 +171,8 @@ describe('the mark that takes the page out to your own browser', () => {
     // A webview navigates inside itself, so the address the mark hands over
     // is the one the pane is showing, kept in `here`.
     const pane = read('renderer/src/components/DocPane.tsx');
-    expect(pane).toMatch(/browsingKind \? here\.url/);
+    expect(pane).toMatch(/const openOutside = \(\) => \{\s*api\.openArtifactExternally\(\{ product: doc\.product, src: here\.url/);
+    expect(pane).toMatch(/onOpenOutside=\{openOutside\}/);
   });
 
   it('can actually be pressed, because the bar is never floated over the page', () => {

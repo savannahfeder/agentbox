@@ -76,8 +76,8 @@ describe('the team chat\'s Agents', () => {
   it('names whose each thread is', () => {
     const people = new Map([['p-maya', { name: 'Maya Chen', url: null }], ['p-theo', { name: 'Theo Park', url: null }]]);
     const html = renderToStaticMarkup(h(TeamThreads, { runs: runs.filter((r) => r.card), people, products: [], now: DAY + 100, onOpenItem() {}, onOpenCard() {} }));
-    expect(html).toMatch(/class="tq-from"><span[^>]*>MA<\/span><b>Maya Chen<\/b><\/span>Billing page/);
-    expect(html).toContain('<b>Theo Park</b>');
+    expect(html).toMatch(/<span class="th-slot"><span[^>]*>MC<\/span><\/span>Billing page<span class="th-who-name">Maya Chen<\/span>/);
+    expect(html).toContain('<span class="th-who-name">Theo Park</span>');
     expect(html).toContain('ev-rows team');
     // In the inbox's words: a running thread is Working there, beside the AI teammates' rows.
     expect(html).toMatch(/Billing page[\s\S]*?Working/);

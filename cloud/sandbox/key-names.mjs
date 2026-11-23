@@ -19,6 +19,10 @@ const RUNS = new Set([
   'TAR_OPTIONS', 'CC', 'CXX', 'CPP', 'LD', 'MAKEFLAGS', 'MAKE', 'MFLAGS', 'RSYNC_RSH', 'SVN_SSH', 'CVS_RSH',
   // These decide which servers the agent's own connections trust.
   'NODE_TLS_REJECT_UNAUTHORIZED', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE', 'SSL_CERT_DIR', 'REQUESTS_CA_BUNDLE', 'CURL_CA_BUNDLE',
+  'AWS_CA_BUNDLE', 'ALL_PROXY', 'LOCALDOMAIN', 'RES_OPTIONS', 'HOSTALIASES',
+  // These load code or config a library runs on start.
+  'OPENSSL_CONF', 'OPENSSL_ENGINES', 'OPENSSL_MODULES', 'GCONV_PATH',
+  'LUA_INIT', 'LUA_INIT_5_1', 'LUA_INIT_5_2', 'LUA_INIT_5_3', 'LUA_INIT_5_4',
 ]);
 
 /** Whether Claude Code or Codex reads `name` for its own sign-in or billing. */

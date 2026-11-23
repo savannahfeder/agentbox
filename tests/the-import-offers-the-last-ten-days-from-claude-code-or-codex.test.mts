@@ -159,7 +159,7 @@ describe('⌘K', () => {
     // The label span carries a class since 2026-10-16, when the row was taught
     // not to wrap onto a second line, and follows the row's mark since
     // w-391bc4efbe.
-    return [...html.matchAll(/<div class="palette-item[^"]*"><span class="palette-glyph"[^>]*>[^<]*<\/span><span class="palette-label">([^<]*)<\/span>/g)].map((m) => m[1]);
+    return [...html.matchAll(/<div class="palette-item[^"]*"[^>]*><span class="palette-glyph"[^>]*>(?:(?!<\/span>).)*<\/span><span class="palette-label">([^<]*)<\/span>/g)].map((m) => m[1]);
   };
   /** A row's label and its hint together, which is where the two tools are named. */
   const rowText = (label) => {

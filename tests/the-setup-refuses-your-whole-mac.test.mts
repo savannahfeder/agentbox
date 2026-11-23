@@ -47,12 +47,6 @@ describe('the store is the backstop', () => {
 });
 
 describe('both screens say why', () => {
-  it('the setup screen replaces its own sentence with the refusal', () => {
-    const walk = read('renderer/src/components/Onboarding.tsx');
-    expect(walk).toMatch(/if \(why\) \{ setRefused\(why\); return; \}/);
-    expect(walk).toMatch(/fr-note fr-refused/);
-  });
-
   // THE CARD IS GONE (w-33e1c968f0, 2026-10-05), so the sentence has no card to
   // sit on: New project is the Mac's own folder window and nothing of ours. The
   // refusal still has to REACH somebody, which is the whole point of this file,

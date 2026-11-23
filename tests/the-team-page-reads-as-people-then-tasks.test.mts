@@ -26,7 +26,7 @@ describe('leaving the Team page', () => {
   it('is what the sidebar\'s Inbox does', () => {
     const app = read('renderer/src/App.tsx');
     const open = app.slice(app.indexOf('  const openView = (next: View) => {'));
-    expect(open.slice(0, open.indexOf('\n'))).toMatch(/setTodayOn\(false\); setTasksOn\(false\);/);
+    expect(open.slice(0, open.indexOf('\n'))).toMatch(/setTodayOn\(false\); setChatsPlace\(null\);/);
   });
 });
 

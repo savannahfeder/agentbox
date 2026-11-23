@@ -52,8 +52,14 @@ export function unpack(value, blobs) {
 
 const nameFrom = (email) => { const s = String(email).split('@')[0]; return s[0].toUpperCase() + s.slice(1); };
 
-export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } = {}) {
+// A copy that has not asked for its events in this long is away, as a socket that dropped is.
+export const AWAY_MS = 30_000;
+
+// `freeTeams`: every team starts on Free and the `pay` door stands in for
+// Stripe's webhook, so a test can start and stop a team's Pro.
+export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000, now = Date.now, freeTeams = false } = {}) {
   const cloud = createMemoryCloud();
+  if (freeTeams) { cloud.freeTeams = true; cloud.paying = new Set(); }
   const blobs = file ? `${file}.blobs` : null;
   if (file) {
     fs.mkdirSync(blobs, { recursive: true });
@@ -88,12 +94,20 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
   const boot = crypto.randomUUID();
   // One held change list per person, filled by the same subscriptions a
   // backend gives its app, and emptied by that person's long poll.
+  // A real live socket does not keep what was said while it was down: a chat
+  // event for a copy that has been away (no poll for AWAY_MS) or that a test
+  // deafened is lost, as it is in the real cloud, so a copy must catch up by
+  // reading again rather than by this queue.
   const listeners = new Map();
   function listener(personId) {
     let l = listeners.get(personId);
     if (l) return l;
-    l = { events: [], wake: null };
-    const hear = (e) => { l.events.push(e); l.wake?.(); };
+    l = { events: [], wake: null, polledAt: now(), deafUntil: 0 };
+    const hear = (e) => {
+      const away = !l.wake && now() - l.polledAt > AWAY_MS;
+      if (e.kind === 'rooms' && (away || now() < l.deafUntil)) return;
+      l.events.push(e); l.wake?.();
+    };
     const b = memoryBackend(cloud, personId);
     b.subscribe(() => hear({ kind: 'change' }));
     b.subscribeRooms((e) => hear({ kind: 'rooms', event: e }));
@@ -102,6 +116,23 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
   }
 
   const handlers = {
+    // A team found by its name or its owner's email starts or stops paying. An
+    // email that owns no team yet has the team it makes pay from the start.
+    async pay({ team, pays = true }) {
+      if (!cloud.freeTeams) throw new Error('every team pays on this cloud; start it with freeTeams');
+      const email = String(team).toLowerCase();
+      const owner = [...cloud.people.values()].find((p) => p.email === email);
+      const found = [...cloud.teams.values()].find((t) => t.id === team || t.name === team || (owner && cloud.members.some((m) => m.teamId === t.id && m.personId === owner.id && m.role === 'owner')));
+      if (!found && email.includes('@')) {
+        cloud.payingOwners ??= new Set();
+        if (pays) cloud.payingOwners.add(email); else cloud.payingOwners.delete(email);
+        return { team: null, owner: email, pays: !!pays };
+      }
+      if (!found) throw new Error(`no team named ${team}`);
+      if (pays) cloud.paying.add(found.id); else cloud.paying.delete(found.id);
+      cloud.events.emit('cards', {});
+      return { team: found.id, pays: !!pays };
+    },
     async signin({ email, password: _password, name }) {
       const at = String(email ?? '').trim().toLowerCase();
       if (!at.includes('@')) throw new Error('that is not an email');
@@ -116,14 +147,15 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
       if (!cloud.people.has(token)) throw new Error('nobody by that token');
       const backend = memoryBackend(cloud, token);
       if (typeof backend[method] !== 'function' || method.startsWith('subscribe')) throw new Error(`no call named ${method}`);
-      // Bytes cross as { __bytes: base64 } both ways (main/team/standin-backend.mts).
-      const value = await backend[method](...args.map((a) => (a && typeof a === 'object' && typeof a.__bytes === 'string' ? Buffer.from(a.__bytes, 'base64') : a)));
+      // Bytes cross as { __bytes: base64 } both ways, a Set as { __set: [...] } (main/team/standin-backend.mts).
+      const value = await backend[method](...args.map((a) => (a && typeof a === 'object' && typeof a.__bytes === 'string' ? Buffer.from(a.__bytes, 'base64') : a && typeof a === 'object' && Array.isArray(a.__set) ? new Set(a.__set) : a)));
       mark();
       return { value: value === undefined ? null : Buffer.isBuffer(value) ? { __bytes: value.toString('base64') } : value };
     },
     async wait({ token, waitMs = 25_000 }) {
       if (!cloud.people.has(token)) throw new Error('nobody by that token');
       const l = listener(token);
+      l.polledAt = now();
       if (!l.events.length) {
         await new Promise((resolve) => {
           const done = () => { clearTimeout(timer); l.wake = null; resolve(); };
@@ -131,7 +163,16 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
           l.wake = done;
         });
       }
+      l.polledAt = now();
       return { boot, events: l.events.splice(0) };
+    },
+    // Testing only: this person's live chat events are lost for `ms`, as when
+    // their socket drops without a word. Their calls still work.
+    async deafen({ personId, email, ms = 120_000 }) {
+      const id = personId ?? [...cloud.people.values()].find((p) => p.email === String(email ?? '').trim().toLowerCase())?.id;
+      if (!id || !cloud.people.has(id)) throw new Error('nobody by that name');
+      listener(id).deafUntil = now() + Number(ms);
+      return { personId: id, until: listener(id).deafUntil };
     },
   };
 
@@ -174,7 +215,7 @@ export function startStandinCloud({ port = 0, file = null, saveEveryMs = 3000 } 
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const arg = (name) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : null; };
-  const started = await startStandinCloud({ port: Number(arg('port')) || 54900, file: arg('file') });
+  const started = await startStandinCloud({ port: Number(arg('port')) || 54900, file: arg('file'), freeTeams: process.argv.includes('--free-teams') });
   console.log(`stand-in team cloud on ${started.url}`);
   for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => started.stop().then(() => process.exit(0)));
 }

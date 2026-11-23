@@ -13,6 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { chatsFound } from '../renderer/src/team/chats-found';
 
 const read = (f) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
 
@@ -36,8 +37,12 @@ describe('the Everyone view', () => {
 });
 
 describe('a person\'s page', () => {
+  // The one column a place has is an AI teammate's settings (w-0773d2dee5, 2026-11-21).
   it('gives the chat the room, with no column beside it', () => {
-    expect(read('renderer/src/team/everything/everything.css')).not.toContain('.pl-side');
+    const app = read('renderer/src/App.tsx');
+    const person = app.slice(app.indexOf("if (placeMember.kind === 'person') {"), app.indexOf("} else if (placeMember.key.startsWith('mate:')) {"));
+    expect(person).toContain('<MemberPlace m={placeMember}');
+    expect(person).not.toMatch(/\bside=\{/);
   });
   it('wraps a long title to a second line rather than cutting it', () => {
     const css = read('renderer/src/team/everything/everything.css');
@@ -55,9 +60,10 @@ describe('the list beside it', () => {
   it('is 240 wide, leaving the rest to the page', () => {
     expect(read('renderer/src/team/rooms/rooms.css')).toMatch(/^\.gc-list \{ width: 240px;/m);
   });
-  it('says no 0 on a section with nothing in it', () => {
+  // Since 2026-11-21 a count shows only from 2, so no "People 1" either.
+  it('says no 0 or 1 on a section', () => {
     const col = read('renderer/src/teammates/ChatsColumn.tsx');
-    expect(col).toContain('{count > 0 && <em>{count}</em>}');
+    expect(col).toContain('{count > 1 && <em>{count}</em>}');
     expect(col).not.toContain('<span>{title}</span><em>{count}</em>');
   });
   it('nor does a board column or a section of threads', () => {
@@ -77,9 +83,11 @@ describe('a group opened from Team', () => {
 describe('the command bar', () => {
   // A tester typed "Sofia" and got only "Waits on Sofia", an action, and no Sofia.
   it('finds a person on the team by name, and opens their page in Team', () => {
+    expect(chatsFound({ groups: [], teammates: [], persons: [{ id: 'p-so', name: 'Sofia Marquez' }], query: 'Sofia' }))
+      .toMatchObject([{ kind: 'person', key: 'p-so', label: 'Sofia Marquez' }]);
     const app = read('renderer/src/App.tsx');
-    expect(app).toMatch(/const persons = \(chatsValue\?\.persons \?\? \[\]\)\.filter\(\(p\) => p\.name\.toLowerCase\(\)\.split\(\/\\s\+\/\)\.some\(\(w\) => w\.startsWith\(q\.toLowerCase\(\)\)\)\);/);
-    expect(app).toContain("run: () => { setModal(null); openChatsPlace(`person:${p.id}`); }");
+    expect(app).toMatch(/chatsFound\(\{[^}]*persons: chatsValue\?\.persons \?\? \[\]/);
+    expect(app).toContain("if (f.kind === 'person') openChatsPlace(`person:${f.key}`);");
   });
 });
 
@@ -90,7 +98,7 @@ describe('a teammate’s thread opened from their page in Team', () => {
   it('stays titled Team, with Team lit in the sidebar', () => {
     expect(app).toContain("const cardFromPlace = homeLayout === 'chats' && !!chatsPlace && !!openCard;");
     expect(app).toContain("<h1 className=\"workspace-title\">{openCard ? (cardFromPlace ? 'Team' : 'Inbox') : 'Team'}</h1>");
-    expect(app).toContain('roomsUi.sidebarGroups(roomShown || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace,');
+    expect(app).toContain('roomsUi.sidebarGroups(roomOnTeam || directOpen || teammatesShown || chatsPlaceShown || cardFromPlace,');
   });
   it('goes back to the page it came from, by name', () => {
     expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}");

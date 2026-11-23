@@ -59,9 +59,9 @@
 // without it, and only when both looks agree it is the same process;
 // /proc/<pid>/environ on Linux. A tag in a command's own words counts for
 // nothing. A program that renames itself (next-server) hides its environment
-// from `ps`, so a process under a tagged one belongs to the same task. Codex threads share one app-server and their commands carry
-// no task id yet, so a Codex task's leftovers are not found: coverage is
-// incomplete and the switch says so.
+// from `ps`, so a process under a tagged one belongs to the same task. Codex
+// threads share one app-server, so each thread's tag reaches its commands
+// through `shell_environment_policy.set` (main/codex-session.mts).
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -157,9 +157,22 @@ export function parseListings({ base, argv, full }: { base: unknown; argv: unkno
   return out;
 }
 
+// A look comes once a minute and can wait for ps. Cut off at 10 s under heavy
+// load, every listing was thrown away and the sweep was blind when memory was
+// shortest.
+const PS_DEADLINE_MS = 30_000;
+
 function ps(args: string[]): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    execFile('/bin/ps', args, { timeout: 10_000, maxBuffer: 256 * 1024 * 1024 }, (err, stdout) => (err ? reject(err) : resolve(stdout)));
+    execFile('/bin/ps', args, { timeout: PS_DEADLINE_MS, maxBuffer: 256 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
+      if (!err) { resolve(stdout); return; }
+      const { killed, code } = err as { killed?: boolean; code?: unknown };
+      const said = String(stderr ?? '').trim().split('\n')[0];
+      const why = killed && code !== 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
+        ? `was cut off after ${PS_DEADLINE_MS / 1000} s`
+        : `exited ${code ?? 'with no code'}${said ? `: ${said}` : ''}`;
+      reject(new Error(`/bin/ps ${args.join(' ')} ${why}`));
+    });
   });
 }
 
@@ -243,8 +256,16 @@ export function readLinuxProcesses({ root = '/proc', hz = USER_HZ, btime = null 
   return out;
 }
 
-/** Every process, tagged with its task where it can be: `ps` on a Mac (about 100 ms), /proc on Linux. */
+/**
+ * Whether this computer can tie a program to its task at all. Windows lets no
+ * process read another's environment, and the tag is only ever read from
+ * there, so on Windows nothing is attributed and nothing is stopped.
+ */
+export const seesTaskTags = (platform: string = process.platform) => platform !== 'win32';
+
+/** Every process, tagged with its task where it can be: `ps` on a Mac (about 100 ms), /proc on Linux, none on Windows. */
 export async function listProcesses(platform: string = process.platform): Promise<ProcessRecord[]> {
+  if (!seesTaskTags(platform)) return [];
   if (platform !== 'darwin') return readLinuxProcesses();
   const [base, argv, full] = await Promise.all([
     ps(['-axo', 'pid=,ppid=,rss=,time=,lstart=,comm=']),
@@ -255,7 +276,7 @@ export async function listProcesses(platform: string = process.platform): Promis
   const renamed = procs.filter((p) => !p.exe.startsWith('/')).map((p) => p.pid);
   if (renamed.length) {
     const out = await new Promise<string>((resolve) => {
-      execFile('/usr/sbin/lsof', ['-a', '-p', renamed.join(','), '-d', 'txt', '-Fpn'], { timeout: 10_000, maxBuffer: 16 * 1024 * 1024 },
+      execFile('/usr/sbin/lsof', ['-a', '-p', renamed.join(','), '-d', 'txt', '-Fpn'], { timeout: 10_000, maxBuffer: 16 * 1024 * 1024, windowsHide: true },
         (_err, stdout) => resolve(stdout ?? ''));
     });
     applyExecutables(procs, out);
@@ -292,6 +313,7 @@ export function isAgentProcess(p: { cmd?: string | null; exe?: string | null }):
 
 const idOf = (p: ProcessRecord) => `${p.pid}:${p.start}:${p.exe}`;
 const FORMAT = 2;
+const QUIET_LOOK_MS = 10 * 60_000;
 
 interface Resolved { item: string | null; inherits: boolean; guard?: boolean; agent?: boolean }
 
@@ -407,6 +429,8 @@ export class LeftoverCleaner {
   declare firstSeen: Map<string, number>;
   declare withPrograms: Set<string>;
   declare lastStatus: CleanerStatus;
+  declare looking: Promise<CleanerStatus> | null;
+  declare lastLook?: { at: number; tasks: number };
   declare runs: Record<string, RunRecord>;
   declare protectedIds: Set<string>;
   declare taskOf: Map<string, string>;
@@ -442,6 +466,7 @@ export class LeftoverCleaner {
     this.cpuShares = new Map();
     this.withPrograms = new Set();
     this.lastStatus = { leftovers: [], survivors: [], stopped: null, pressure: 'normal' };
+    this.looking = null;
     const saved = this._load();
     this.runs = saved.runs;
     this.protectedIds = new Set(saved.protectedIds);
@@ -515,16 +540,27 @@ export class LeftoverCleaner {
 
   /* ---------------------------------- a look ---------------------------------- */
 
-  async tick(): Promise<CleanerStatus> {
+  /** A look; one already under way is answered rather than started again. */
+  tick(): Promise<CleanerStatus> {
+    this.looking ??= this._look().finally(() => { this.looking = null; });
+    return this.looking;
+  }
+
+  async _look(): Promise<CleanerStatus> {
     const now = this.clock();
     let pressure: Pressure = 'normal';
     try { pressure = await this.readPressure(); } catch {}
+    if (pressure === 'normal' && this._nothingToFind(now)) {
+      this.lastStatus = { ...this.lastStatus, pressure };
+      return this.lastStatus;
+    }
     let procs: ProcessRecord[];
     try { procs = await this.list(); } catch (err) {
       this.log(`leftovers: could not list processes: ${(err as Error).message}`);
       return this.lastStatus;
     }
     const view = this._view(procs, now);
+    this.lastLook = { at: now, tasks: view.tasks.size };
     this.withPrograms = new Set([...view.tasks.values()].filter((t) => t.procs.length).map((t) => t.item));
     this._reconcileRuns(view, now);
     this._trackStopping(view, now);
@@ -539,6 +575,17 @@ export class LeftoverCleaner {
     };
     this._save();
     return this.lastStatus;
+  }
+
+  /**
+   * A task's programs come only from its runs, so with none running, nothing
+   * being stopped and none seen last time, a look would find nothing. Still
+   * one every `QUIET_LOOK_MS`, and always at the first tick.
+   */
+  _nothingToFind(now: number): boolean {
+    if (!this.lastLook || this.lastLook.tasks || now - this.lastLook.at >= QUIET_LOOK_MS) return false;
+    if (Object.keys(this.stopping).length) return false;
+    return !Object.values(this.runs).some((r) => r.state === 'running');
   }
 
   /**

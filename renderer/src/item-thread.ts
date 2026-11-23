@@ -31,14 +31,15 @@
 // stamped it, and nothing is invented, dropped or merged to put them in order.
 
 import { changedFile, commandWork, isBookkeeping, plainCommand, saidCount, shortPath, threadWindow, unleaked, workVerb } from '../../shared/agents.mts';
-import { said, traceLines } from './terminal';
-import { handsBack } from '../../shared/cloud-hand-back.mts';
+import { asTraced, said, traceLines } from '../../shared/trace-lines.mts';
+import { handsBack, withoutHandBack } from '../../shared/cloud-hand-back.mts';
 import { editOfLine, resolveEdits, type EditLine } from '../../shared/message-edits.mts';
 import type { TraceSession } from './notes';
 import { pickedLine, threadEvents, withRuns, type LedgerLine, type ThreadEvent } from './thread-history';
 import type { AgentEvent, AgentSaid, AgentTurn, AgentWork } from './types';
 import { liftReplies } from './team/chat-threads';
 import type { UndoMark } from './undo-marks';
+import type { ReplyPick } from './reply-pick';
 
 // `[Read] strategy/art-style.md` — how the supervisor writes a tool call into a
 // trace (`traceStreamLine`, main/supervisor.mts). The name is the tool and the
@@ -78,6 +79,9 @@ export interface ItemOutcome {
   /** What wrote it (thread-history.ts, `ran`), so the newest answer is signed
    *  like the ones still in the stream. */
   ran?: { engine?: string; model?: string };
+  /** On a note, whether the app wrote it. Read off the message itself: the
+   *  row's newest note may be one the thread does not draw. */
+  app?: boolean;
 }
 
 /**
@@ -113,6 +117,8 @@ export interface PendingSaid {
   cloud?: boolean;
   // Taken, and its thread's copy has not shown it yet (renderer/src/phone-rows.ts `copyShows`).
   sent?: boolean;
+  // The model and agent it went with, until the row carries them (./reply-pick.ts).
+  pick?: ReplyPick;
 }
 
 /** Whether something sent to this row is on its way, which answers any card on it. */
@@ -568,7 +574,7 @@ export function itemThread(
   // up again after a result has the agent talking below that result, and the
   // result is then no longer the end of the conversation.
   let spokeAt = -1;
-  let answer: { i: number; at: number; text: string; field: 'result' | 'note'; ran?: { engine?: string; model?: string } } | null = null;
+  let answer: { i: number; at: number; text: string; field: 'result' | 'note'; ran?: { engine?: string; model?: string }; app?: boolean } | null = null;
 
   // EVERY NODE WITH THE MOMENT IT HAPPENED, BEFORE ANYTHING IS PUT IN ORDER.
   //
@@ -613,10 +619,19 @@ export function itemThread(
     }
     if (event.message && event.words) {
       const isAnswer = event.who === 'agent' && (event.field === 'result' || event.field === 'note');
+      if (isAnswer && handsBack(event.words)) {
+        const rest = withoutHandBack(event.words);
+        if (!rest) {
+          const movedJustBefore = placed.some(({ node: n }) => 'kind' in n && n.kind === 'work' && n.verb === 'moved' && n.at <= event.at && event.at - n.at < 10 * 60_000);
+          if (!movedJustBefore) placed.push({ node: { kind: 'work', at: event.at, verb: 'moved', subject: 'to this Mac', output: '', lines: 0, failed: false }, run: null, answer: null });
+          continue;
+        }
+        event.words = rest;
+      }
       placed.push({
-        node: { at: event.at, who: event.who === 'you' ? 'you' : 'it', text: event.words, ...(event.by ? { by: event.by } : {}), ...(event.from ? { from: event.from } : {}), ...(event.voice ? { voice: event.voice } : {}), ...(event.uid ? { uid: event.uid } : {}), ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}), ...(event.ran ? { ran: event.ran } : {}), ...(event.edited ? { edited: event.edited } : {}), ...(event.deleted ? { deleted: true } : {}), ...(event.fileMark ? { fileMark: event.fileMark } : {}), ...(event.says ? { says: event.says } : {}), ...(event.sendsAt ? { sendsAt: event.sendsAt } : {}) },
+        node: { at: event.at, who: event.who === 'you' ? 'you' : 'it', text: event.words, ...(event.by ? { by: event.by } : {}), ...(event.from ? { from: event.from } : {}), ...(event.fromId ? { fromId: event.fromId } : {}), ...(event.voice ? { voice: event.voice } : {}), ...(event.uid ? { uid: event.uid } : {}), ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}), ...(event.ran ? { ran: event.ran } : {}), ...(event.edited ? { edited: event.edited } : {}), ...(event.deleted ? { deleted: true } : {}), ...(event.fileMark ? { fileMark: event.fileMark } : {}), ...(event.says ? { says: event.says } : {}), ...(event.asked ? { asked: event.asked } : {}), ...(event.sendsAt ? { sendsAt: event.sendsAt } : {}) },
         run: null,
-        answer: isAnswer ? { at: event.at, text: event.words, field: event.field as 'result' | 'note', ...(event.ran ? { ran: event.ran } : {}) } : null,
+        answer: isAnswer ? { at: event.at, text: event.words, field: event.field as 'result' | 'note', ...(event.ran ? { ran: event.ran } : {}), app: event.says === 'app' } : null,
       });
       continue;
     }
@@ -652,11 +667,13 @@ export function itemThread(
   // BOTH SIDES ARE NORMALISED BY THE SAME FUNCTION. `traceLines` puts every
   // line of prose through `said` on the way in, so a live string compared raw
   // would differ by a trailing space and print itself twice, one under the
-  // other, for the rest of the run.
+  // other, for the rest of the run. The trace also drops a heading line, so the
+  // live words are matched as it would have kept them too.
   if (live?.text) {
-    const now = said(live.text);
+    const now = said(withoutHandBack(live.text));
+    const kept = asTraced(now);
     const already = placed.some((p) => p.node.kind !== 'work'
-      && p.node.who === 'it' && said(p.node.text ?? '') === now);
+      && p.node.who === 'it' && [now, kept].includes(said(p.node.text ?? '')));
     if (now && !already) {
       placed.push({ node: { at: live.at, who: 'it', text: now }, run: live.run, answer: null });
     }
@@ -742,7 +759,7 @@ export function itemThread(
   // finished result or checkpoint with nothing spoken under it. See ItemOutcome
   // above for why this exists and what draws it.
   const outcome: ItemOutcome | null = answer && answer.i === spokeAt
-    ? { at: answer.at, text: answer.text, field: answer.field, ...(answer.ran ? { ran: answer.ran } : {}) }
+    ? { at: answer.at, text: answer.text, field: answer.field, ...(answer.ran ? { ran: answer.ran } : {}), ...(answer.field === 'note' ? { app: !!answer.app } : {}) }
     : null;
   // Counted before it is lifted: it is still a message on this task, and the
   // head line says how many there are, not how many are in the stream.

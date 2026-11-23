@@ -277,6 +277,9 @@ async function main() {
     onIdle: () => { host.close().finally(() => { fs.rmSync(dir, { recursive: true, force: true }); process.exit(0); }); },
   });
   await host.started;
+  // Read now, not when the first agent connects: Claude Code holds its first
+  // model request until every tool server answers (997 ms cold, 72 ms warm).
+  import('../mcp/stdio.mts').catch(() => { /* the packaged app does not carry it */ });
   const bye = () => host.close().finally(() => process.exit(0));
   process.on('SIGTERM', bye);
   process.on('SIGINT', bye);

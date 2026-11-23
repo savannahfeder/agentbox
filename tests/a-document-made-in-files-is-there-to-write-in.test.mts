@@ -147,8 +147,8 @@ describe('a new document', () => {
     expect((await listed()).map((f) => f.name).sort()).toEqual(['journal-ideas.md', 'journal.md']);
   });
 
-  it('is refused without a name, or in a project this computer does not hold', async () => {
-    await expect(place.newDocument({ project: 'Company', name: '   ' })).rejects.toThrow(/name/);
+  // A document with no name is "Untitled document" (a-new-document-opens-at-once-and-any-file-can-be-renamed).
+  it('is refused in a project this computer does not hold', async () => {
     await expect(place.newDocument({ project: 'Lumen', name: 'Journal' })).rejects.toThrow(/project/);
     expect(store.listItems()).toHaveLength(0);
   });

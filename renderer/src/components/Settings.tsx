@@ -51,6 +51,8 @@ import { cloudAccountState, hourWords, meterPair, resetWords } from '../account-
 import { runningFigures, type GateReading } from '../running-reading';
 import { CODEX_CLOUD_WHAT, sameAsHere } from '../cloud-permission-words';
 import { accountReadingFor, accountsOnce, codexAccountsOnce, type HereLogin, type OneAccount } from '../accounts-once';
+import { accountName } from '../../../shared/account-names.mts';
+import { USAGE_UNREADABLE } from '../../../shared/usage.mts';
 import { LOOKS, lookMeans, SKINS, TUNE_DEFAULT, TUNE_LIMITS, type Look, type SkinId, type SkinTune } from '../skins';
 import { readySkin } from '../look-switch';
 import { MatchMark } from './MatchMark';
@@ -62,12 +64,15 @@ import { chord, chords } from '../this-keyboard';
 import { capWord } from '../hint-plate';
 import { NAME, Name } from '../../../shared/product-name.mjs';
 import { SETTINGS_TERMINAL } from '../../../shared/settings-terminal.mts';
+import { IPHONE_APP_URL } from '../../../shared/phone-app.mts';
+import QRCode from 'qrcode';
 import { TaskTerminal } from './TaskTerminal';
 import { ProjectsPage } from './ProjectsPage';
 import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId } from '../settings-search';
 import type { Product } from '../types';
 import { CloudMark, MacMark } from '../threads/ThreadMenu';
 import './settings.css';
+import { TermsLinks } from '../terms-links';
 import { SkyTile } from '../home/SkyPicker';
 import { useHomeSettings } from '../home/home-settings';
 import { SKY_THEMES } from '../home/sky';
@@ -318,7 +323,7 @@ export { accountReadingFor };
 /**
  * One agent's whole story, gathered from the pieces the model still keeps
  *  apart. Nothing is derived here that main already answers. */
-function agentStory(w: WorkspaceSettings, readings: Usage[], engine: 'claude' | 'codex') {
+export function agentStory(w: WorkspaceSettings, readings: Usage[], engine: 'claude' | 'codex') {
   const reading = readings.find((r) => r.engine === engine) ?? null;
   if (engine === 'codex') {
     return {
@@ -346,7 +351,7 @@ function agentStory(w: WorkspaceSettings, readings: Usage[], engine: 'claude' | 
       email: a.email ?? null,
       plan: a.plan?.label ?? null,
       chosen: !!a.chosen,
-      signedIn: !!a.email,
+      signedIn: a.signedIn ?? !!a.email,
       trouble: a.trouble?.note ?? null,
       atLimit: a.trouble?.cause === 'at-limit',
       limitAt: a.trouble?.at ?? null,
@@ -554,9 +559,10 @@ export function cloudPlaceAccounts(cloud: CloudStatus, engine: 'claude' | 'codex
  *  place the account works. The cloud cannot borrow this computer's login, so
  *  an account missing there, or whose sign-in there stopped, offers the sign-in.
  */
-export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, onCloudSignIn }: {
+export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, onCloudSignIn, engine = 'claude' }: {
   many: boolean; now: number; onUse: (profile: string) => void;
   cloud?: boolean;
+  engine?: 'claude' | 'codex';
   onCloudSignIn?: (key: string | null, email: string | null) => void;
 }): PlaceAccount {
   const h = a.here;
@@ -585,7 +591,8 @@ export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, on
     // now, so the tile with it is the account and the others offer the switch.
     // The supervisor names one Codex login as the one that runs even before it is signed in.
     inUse: !!h?.chosen && !signingIn,
-    limits: a.limits, checkedAt: a.checkedAt, usageError: a.usageError,
+    // An empty usage read says nothing about the plan of a Claude login that is signed in with no trouble.
+    limits: a.limits, checkedAt: a.checkedAt, usageError: engine === 'claude' && a.usageError === USAGE_UNREADABLE && h?.signedIn && !h.trouble ? null : a.usageError,
     use: h?.signedIn && !h.chosen && many ? { word: 'Switch', onUse: () => onUse(h.profile) } : null,
     trouble,
     cmd: trouble && h?.dir ? `CLAUDE_CONFIG_DIR=${h.dir} claude` : null,
@@ -704,8 +711,10 @@ function CloudKeyRow({ name, label, savedAt }: { name: string; label: string | n
  */
 export function agentCountOptions(w: {
   accounts?: unknown[]; agentsTotal?: number; capacity?: number; slotsMax?: number; sessionsAtOnce?: number;
+  agentsAuto?: boolean; agentsAutoTotal?: number;
 }) {
-  const auto = w.agentsTotal ?? w.capacity ?? 1;
+  // With a number set by hand, what runs now is that number, not Automatic's.
+  const auto = (w.agentsAuto === false ? w.agentsAutoTotal : undefined) ?? w.agentsTotal ?? w.capacity ?? 1;
   const say = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
   // NO DASH BETWEEN THE TWO HALVES. This read "Automatic — 6 agents" until she
   // saw it on the screen: "looks quite bad". The app has refused em dashes in
@@ -767,11 +776,11 @@ function Reading({ running, capacity, gate }: {
 // FEEDBACK FROM A PHONE. Its corner has no Feedback button, by choice ("not
 // important to be big for mobile"), which left no way to send any ("not sure
 // how to give feedback on mobile", 2026-10-12).
-function PhoneFeedbackGroup({ onFeedback }: { onFeedback: () => void }) {
+function PhoneFeedbackGroup({ onFeedback }: { onFeedback: (start: string) => void }) {
   return (
     <Group id="phone-feedback" label="Feedback">
       <Row label="Send feedback" desc={`Tell us what works and what does not. It goes straight to the people who make ${Name}.`}>
-        <button type="button" className="set-ghost" onClick={onFeedback}>Send feedback</button>
+        <button type="button" className="set-ghost" onClick={() => onFeedback('')}>Send feedback</button>
       </Row>
     </Group>
   );
@@ -859,8 +868,35 @@ function PhoneProjectsPicker({ macShut }: { macShut: MacShut }) {
     </div>
   );
 }
+export const ANDROID_ASK = 'I’d like an Android app.';
+
+function PhoneAppGroup({ email, onFeedback }: { email?: string | null; onFeedback?: (start: string) => void }) {
+  const [qr, setQr] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    QRCode.toString(IPHONE_APP_URL, { type: 'svg', margin: 1, errorCorrectionLevel: 'M' }).then((s) => { if (live) setQr(s); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  return (
+    <Group id="phone-app" label="Get the app">
+      <div className="set-row set-phone-qr">
+        {qr && <img alt={`QR code that opens ${Name} on the App Store`} src={`data:image/svg+xml;utf8,${encodeURIComponent(qr)}`} />}
+        <div className="set-row-text">
+          <div className="set-row-label">{Name} for iOS</div>
+          <div className="set-row-desc">Scan with your phone's camera, then sign in {email ? <>as <b>{email}</b></> : `with your ${Name} account`}.</div>
+          <a className="set-ghost set-phone-store" href={IPHONE_APP_URL} target="_blank" rel="noreferrer">Open the App Store</a>
+        </div>
+      </div>
+      {onFeedback && (
+        <Row label="On Android">
+          <button type="button" className="set-ghost" onClick={() => onFeedback(ANDROID_ASK)}>Request the Android app</button>
+        </Row>
+      )}
+    </Group>
+  );
+}
+
 function MacShutGroup({ macShut }: { macShut: MacShut }) {
-  const site = macShut.site?.replace(/^https?:\/\//, '').replace(/\/$/, '') ?? null;
   return (
     <>
       <Group id="phone-mac-shut" label="On your phone">
@@ -868,18 +904,6 @@ function MacShutGroup({ macShut }: { macShut: MacShut }) {
         <Row label="Projects on your phone" desc="A copy of their threads is kept in your account, so your phone can read and reply with this computer closed.">
           <PhoneProjectsPicker macShut={macShut} />
         </Row>
-      </Group>
-      <Group id="phone-site" label="Open on your phone">
-        {site && macShut.siteQr ? (
-          <div className="set-row set-phone-qr">
-            <img alt={`QR code that opens ${site} on a phone`} src={`data:image/svg+xml;utf8,${encodeURIComponent(macShut.siteQr)}`} />
-            <div className="set-row-desc">
-              Scan with your phone's camera, or go to <code>{site}</code>. Sign in with this account, then add the page to your home screen and it opens like an app.
-            </div>
-          </div>
-        ) : (
-          <Row label="Not set up yet" desc="The phone site has no address yet." />
-        )}
       </Group>
     </>
   );
@@ -910,13 +934,14 @@ function WebAccountPage({ web, feedback, onPhoneProjects }: { web: PhoneWeb; fee
   );
 }
 
-function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { onFeedback?: () => void; macShut?: MacShut; onSignIn?: () => void; web?: PhoneWeb; onPhoneProjects?: ReactNode }) {
+export function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { onFeedback?: (start: string) => void; macShut?: MacShut; onSignIn?: () => void; web?: PhoneWeb; onPhoneProjects?: ReactNode }) {
   const feedback = onFeedback && onPhone() ? <PhoneFeedbackGroup onFeedback={onFeedback} /> : null;
   if (web) return <WebAccountPage web={web} feedback={feedback} onPhoneProjects={onPhoneProjects} />;
   if (!macShut) {
     return (
-      <Page title="Phone">
-        <Group>
+      <Page title="Phone" lede="Read and reply from your phone, even with this computer closed.">
+        <PhoneAppGroup onFeedback={onFeedback} />
+        <Group id="phone-mac-shut" label="On your phone">
           <Row label="Sign in to use your phone" desc="Then your phone can read and reply with this computer closed.">
             {onSignIn && <button type="button" className="set-ghost" onClick={onSignIn}>Sign in</button>}
           </Row>
@@ -927,6 +952,7 @@ function PhonePage({ onFeedback, macShut, onSignIn, web, onPhoneProjects }: { on
   }
   return (
     <Page title="Phone" lede="Read and reply from your phone, even with this computer closed.">
+      <PhoneAppGroup email={macShut.email} onFeedback={onFeedback} />
       <MacShutGroup macShut={macShut} />
       {feedback}
     </Page>
@@ -985,7 +1011,10 @@ export interface TeamPlanPage {
   onPay: () => void; onManage: () => void; onInvite?: () => void;
 }
 
-function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; onInvite?: () => void }) {
+/** Starting the team's Pro, as Team › Start Pro does (../pro-trial.ts). */
+export type StartTeamPro = (acceptTerms: boolean) => Promise<{ ok: true } | { ok: false; message: string; terms?: boolean }>;
+
+export function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite, teamPro = null }: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; onInvite?: () => void; teamPro?: StartTeamPro | null }) {
   const [plan, setPlan] = useState<CloudPlan | null>(null);
   const [said, setSaid] = useState<string | null>(null);
   const [waitingFor, setWaitingFor] = useState<string | null>(null);
@@ -1012,12 +1041,28 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
   }, [waitingFor]);
   const [opening, setOpening] = useState<PaidPlan | null>(null);
   const [chosen, setChosen] = useState<PaidPlan | null>(null);
+  // Signed in to a team, Pro is the team's, as in the setup: its checkout, with
+  // no second sign-in. A person's own Pro never lets a team invite.
+  const proIsTheTeams = !!teamPro && !(['pro', 'plus', 'max'] as const).some((p) => p === plan?.plan);
+  const [termsAsked, setTermsAsked] = useState(false);
+  const agrees = !signedIn || termsAsked;
+  const startTeamPro = async (start: StartTeamPro) => {
+    setSaid(null); setOpening('pro');
+    const out = await start(agrees);
+    setOpening(null);
+    if (!out.ok) { if (out.terms) setTermsAsked(true); else setSaid(out.message); return; }
+    setChosen('pro');
+    setSwitching(false);
+    setWaitingFor(planKey(plan));
+  };
   const choose = async (id: PaidPlan) => {
+    if (id === 'pro' && proIsTheTeams && teamPro) { await startTeamPro(teamPro); return; }
     if (!signedIn) { onSignIn(); return; }
     setSaid(null); setOpening(id);
     const out = await api.cloudAccountPay(id);
     setOpening(null);
     if (!out.ok) { setSaid(out.message || 'Stripe could not be opened. Try again.'); return; }
+    if (out.where === 'started') { void read(); return; }
     setChosen(id);
     setSwitching(out.where === 'billing');
     setWaitingFor(planKey(plan));
@@ -1047,9 +1092,11 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
     void read();
   };
   const bill = cloudBilling(plan);
-  const cards = <CloudPlanCards plan={plan} opening={opening} waiting={waitingFor ? chosen : null} onChoose={(id) => void choose(id)} />;
+  const cards = <CloudPlanCards plan={plan} opening={opening} waiting={waitingFor ? chosen : null} onChoose={(id) => void choose(id)}
+    proLabel={proIsTheTeams ? (plan?.teamFreeDays ? 'Try Pro free' : 'Choose Pro') : null} />;
   const lines = (
     <>
+      {proIsTheTeams && agrees && !waitingFor && <p className="cloud-plans-say cloud-plans-terms">By choosing Pro, you agree to <TermsLinks />.</p>}
       {said && <p className="cloud-plans-say">{said}</p>}
       {waitingFor && <p className="cloud-plans-say">{switching ? 'Confirm the change on Stripe’s page in your browser. Your plan shows here once it’s done.' : 'Finish paying in your browser. Your plan shows here once you’ve paid.'}</p>}
       {bill.says && !waitingFor && <p className="cloud-plans-say">{bill.says}</p>}
@@ -1065,6 +1112,7 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
   }
   // THE PLAN YOU PAY FOR, FOUND UNDER BILLING (the founder's pick of five, 2026-10-25).
   const sum = planSummary(plan);
+  const paidPlan = (['pro', 'plus', 'max'] as const).find((p) => p === plan?.plan) ?? null;
   if (sum) {
     const meter = (label: string, m: { line: string; percent: number }) => (
       <div className="bill-meter">
@@ -1081,7 +1129,9 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
               <div className="bill-plan">{sum.name}</div>
               <div className="bill-price">{sum.price} · {billSaid ?? sum.who}</div>
             </div>
-            {sum.manage && <button type="button" className="set-ghost" onClick={() => void billing()}>Manage billing</button>}
+            {sum.start && paidPlan
+              ? <button type="button" className="set-ghost" disabled={!!opening} onClick={() => void choose(paidPlan)}>{opening ? 'Starting…' : sum.start}</button>
+              : sum.manage && <button type="button" className="set-ghost" onClick={() => void billing()}>Manage billing</button>}
           </div>
         </Group>
         <Group id="cloud-use" label={sum.period} bare>
@@ -1093,12 +1143,12 @@ function CloudPlansPage({ signedIn, onSignIn, teamPlan, onInvite }: { signedIn: 
     );
   }
   return (
-    <Page title="Plan and Billing" lede="Every thread needs a slot to run in. Your computer has a few. The cloud adds more.">
+    <Page title="Plan and Billing" lede={plan?.trialOffer ? `Every plan starts with ${plan.trialOffer.days} days free and ${plan.trialOffer.hours} cloud hours.` : 'Your computer runs a few threads at once. The cloud runs the rest.'}>
       {cards}
       {lines}
       <Group id="cloud-counts" label="How the cloud counts" bare>
         <ul className="cloud-counts">
-          <li>Each slot runs one agent in the cloud, on top of the ones your computer runs.</li>
+          <li>Agents in the cloud run on top of the ones your computer runs, as many at once as you like.</li>
           <li>Time counts only while an agent is working. Waiting for your reply is free.</li>
           <li>Past a plan's hours, threads wait for your computer until the month turns.</li>
         </ul>
@@ -1728,17 +1778,18 @@ function paneFrom(want: string, has: { team: boolean }): Pane {
 
 /* --------------------------------- screen --------------------------------- */
 
-export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
+export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onResetTune, keyHints, onSetKeyHints, startPane, usageReadings = [], now = Date.now(), embedded = false, onSectionChange, onPaneChange, onNewProject, ranked = [], onSetOrder, teamPane, teamShares = true, projectShare, projectWho, account, phoneCloud, phoneWeb, onPhoneSignIn, update = null, onClose, onFeedback, cloud = null, onCloudSignIn, cloudPlans = null, roomsPane }: {
   /** Opens the feedback card. A phone has no Feedback button in its corner,
    *  so its own Settings page offers it (2026-10-12). */
-  onFeedback?: () => void;
+  /** Opens the Feedback card with `start` already written. */
+  onFeedback?: (start: string) => void;
   /** The cloud, when this Mac is set up for it: its own logins are listed on the agent's page. */
   cloud?: CloudStatus | null;
   /** Signs a Claude account in to the cloud (a login's key to sign it in again), on the cloud's own screen. */
   onCloudSignIn?: (key: string | null, email: string | null) => void;
   /** Agentbox Cloud's plans, where this copy offers it: the Cloud page. */
   /** `teamPlan`: a team's own Plan and Billing page, handed in like `teamPane` so this screen holds no team code. */
-  cloudPlans?: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode } | null;
+  cloudPlans?: { signedIn: boolean; onSignIn: () => void; teamPlan?: (page: TeamPlanPage) => ReactNode; teamPro?: StartTeamPro | null } | null;
   // ONE control for the three of them. Light, dark and each picture are one
   // list, because a picture IS dark (skins.ts) and asking her to set a theme
   // and then a background is two decisions for one choice.
@@ -1775,6 +1826,8 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   /** Team management, handed in by whoever has the team's state. Absent on a
    *  build with no team cloud, and then there is no Team row either. */
   teamPane?: ReactNode;
+  /** False while the team has no Pro, when nobody on it can read your threads. */
+  teamShares?: boolean;
   /** WHO SEES A PROJECT'S THREADS (w-b989839656), handed in the same way:
    *  the button beside a project's name, and the Projects list's column.
    *  Absent with nobody signed in, and then neither is drawn. */
@@ -1858,10 +1911,13 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   const [codexReading, setCodexReading] = useState<Usage | null>(null);
   const [codexReadings, setCodexReadings] = useState<AccountUsageReading[]>([]);
   const [codexRefreshing, setCodexRefreshing] = useState(false);
-  const refreshCodex = useCallback(async () => {
+  // Only the button asks Codex (and so OpenAI); opening the page reads what
+  // this computer has. The accounts are read after, so they carry the answer.
+  const refreshCodex = useCallback(async (ask = false) => {
     setCodexRefreshing(true);
     try {
-      const [r, readings] = await Promise.all([api.refreshUsage('codex'), api.accountUsage({ engine: 'codex' })]);
+      const r = await api.refreshUsage('codex', { ask });
+      const readings = await api.accountUsage({ engine: 'codex' });
       // A refusal draws nothing of its own: the empty row below already says
       // why there is nothing.
       if (r.ok && r.reading) setCodexReading(r.reading);
@@ -2018,7 +2074,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
       : accountsOnce({ here: agent.accounts, cloud: cloudLogins, readings: accountReadings, current: agent.reading });
     const tiles = accounts.map((a) => {
       const tile = accountTile(a, {
-        many: agent.accounts.length > 1, now,
+        many: agent.accounts.length > 1, now, engine,
         onUse: (profile) => {
           void (async () => {
             const saved = await api.setWorkspaceSetting({ key: 'activeAccount', value: { engine, profile } });
@@ -2045,7 +2101,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
     const lastRead = Math.max(0, ...tiles.map((a) => a.checkedAt ?? 0));
     const checked = lastRead ? usageCheckedAt(lastRead, now) : '';
     const busy = engine === 'codex' ? codexRefreshing : refreshing;
-    const refresh = () => void (engine === 'codex' ? refreshCodex() : readAccounts(true));
+    const refresh = () => void (engine === 'codex' ? refreshCodex(true) : readAccounts(true));
     const addAccount = async (a: Agent) => {
       const r = a.engine === 'codex' ? await api.addCodexAccount() : await api.addClaudeAccount();
       setAdding(r.ok ? { engine: a.engine, name: a.name, command: r.command } : { engine: a.engine, name: a.name, error: r.error });
@@ -2273,7 +2329,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
         {/* TEAM MANAGEMENT (w-8415594d19). It does not wait on `model`, because
             nothing on it comes from the settings file. */}
         {pane === 'cloud' && cloudPlans && <CloudPlansPage signedIn={cloudPlans.signedIn} onSignIn={cloudPlans.onSignIn} teamPlan={cloudPlans.teamPlan}
-          onInvite={teamPane ? () => setPane('team') : undefined} />}
+          teamPro={cloudPlans.teamPro} onInvite={teamPane ? () => setPane('team') : undefined} />}
 
         {model && w && pane === 'files' && (
           <FilesPage files={w.files ?? { on: true, offAfterDays: 30 }} onSet={(key, value) => setWorkspace(key, value)} onPlans={() => setPane('cloud')} />
@@ -2286,7 +2342,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
         )}
 
         {pane === 'team' && teamPane && (
-          <Page title="Team" lede="Who is on your team, who has been invited, and the team's name. Everyone can open and read your threads and their files unless you mark one private.">
+          <Page title="Team" lede={`Your name and photo, the team's name and logo, and who is on it.${teamShares ? ' Everyone can open and read your threads and their files unless you mark one private.' : ''}`}>
             {teamPane}
           </Page>
         )}
@@ -2356,7 +2412,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             <Group id="corner-tag" label="Agent Tray">
               <Row
                 label="Show the Agent Tray"
-                desc="A small tag over your other apps says when an agent has something for you. Drag it anywhere; it keeps that corner on every screen, and sizes itself to the screen it is on. Make it bigger or smaller with Size, at the foot of the list that opens when you point at it. Right-click it to hide it a while or turn it off."
+                desc="A small tag over your other apps when an agent needs you."
               >
                 <Switch label="Show the Agent Tray" on={w.cornerTag !== false} onChange={(v) => setWorkspace('cornerTag', v)} />
               </Row>
@@ -2512,7 +2568,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               {w.leftovers && (
                 <Row
                   label="Stop programs agents leave behind"
-                  desc={`Dev servers, previews and test runs an agent started keep running until you close its task, or until memory runs short. Apps installed on this computer are never stopped.${twoEngines ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.now ? ` ${w.leftovers.now}` : ''}`}
+                  desc={`Dev servers and test runs an agent started stop when you close its task or memory runs short. Your own apps never do.${twoEngines ? ' Codex agents’ programs are not found yet.' : ''}${w.leftovers.now ? ` ${w.leftovers.now}` : ''}`}
                 >
                   <Switch label="Stop programs agents leave behind" on={w.leftovers.on} onChange={(v) => setWorkspace('cleanupLeftovers', v)} />
                 </Row>
@@ -2561,7 +2617,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               {/* The moment after the row above: a chat that has stopped. */}
               <Row
                 label="Bring in new chats"
-                desc="A new Claude Code or Codex chat in one of your projects comes in after ten quiet minutes. Waiting ones go to Needs you, finished ones to Done."
+                desc="A Claude Code or Codex chat in one of your projects comes in after ten quiet minutes."
               >
                 <Switch label="Bring in new chats" on={w.importNew === true} onChange={(v) => setWorkspace('importNew', v)} />
               </Row>
@@ -2693,7 +2749,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             <Group label="How it runs">
               <Row
                 label="Let agents start the tasks they file here"
-                desc="A task an agent writes on this project gets a session straight away. Without this it waits in your inbox for your yes. Questions and reviews always wait for you either way."
+                desc="A task an agent writes here starts at once instead of waiting for your yes. Questions and reviews still wait."
               >
                 <Switch label="Let agents start the tasks they file here" on={current.autonomous} onChange={(v) => setProject(current.slug, 'autonomous', v)} />
               </Row>
@@ -2768,7 +2824,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             <Group label="Archive">
               <Row
                 label="Archive this project"
-                desc={`It leaves your inbox, the sidebar and Projects, and no new agents start on it${current.running ? '; the ones running now finish' : ''}. Its files stay where they are, and you can bring it back from Projects.`}
+                desc={`It leaves your inbox and sidebar${current.running ? ', and the agents running now finish' : ''}. Its files stay, and Projects can bring it back.`}
               >
                 <button type="button" className="set-ghost" onClick={() => write(api.archiveProject({ product: current.slug, archived: true }))}>Archive</button>
               </Row>
@@ -2815,7 +2871,7 @@ function WebPhoneProjects({ web, onWorkspace }: { web: WebComputer; onWorkspace:
 
 type WebAccount = { id: string; email: string | null; name?: string | null; plan: string | null; chosen: boolean; note?: string | null; signedIn?: boolean };
 type AccountAsk = { engine: string; account: string | null };
-function WebAccounts({ engine, list, reading, refusedAsk, onUse }: { engine: 'claude' | 'codex'; list: WebAccount[]; reading: Reading; refusedAsk: AccountAsk | null; onUse: (id: string) => void }) {
+export function WebAccounts({ engine, list, reading, refusedAsk, onUse }: { engine: 'claude' | 'codex'; list: WebAccount[]; reading: Reading; refusedAsk: AccountAsk | null; onUse: (id: string) => void }) {
   const asked = reading.value as AccountAsk | null;
   const mine = asked?.engine === engine ? asked : null;
   const chosen = (a: WebAccount) => (mine ? mine.account === a.id : a.chosen);
@@ -2824,12 +2880,12 @@ function WebAccounts({ engine, list, reading, refusedAsk, onUse }: { engine: 'cl
   if (!list.length) return <Row label="Not signed in" />;
   return (
     <>
-      {list.map((a) => {
-        const live = picked && chosen(a);
+      {list.map((a, i) => {
+        const live = picked && chosen(a) && a.signedIn !== false;
         return (
-          <ReadRow key={a.id} label={a.email ?? a.name ?? 'Not signed in'} desc={a.note ?? (a.signedIn === false ? 'Finish signing in to use it' : a.plan ?? 'Signed in')} reading={(mine && live) || refusedHere(a) ? reading : undefined}>
+          <ReadRow key={a.id} label={a.email ?? a.name ?? (a.signedIn === false || engine !== 'claude' ? 'Not signed in' : accountName({ engine, index: i, total: list.length }))} desc={a.note ?? (a.signedIn === false ? 'Finish signing in to use it' : a.plan ?? 'Signed in')} reading={(mine && live) || refusedHere(a) ? reading : undefined}>
             {live ? <span className="set-in-use">In use</span>
-              : list.length > 1 && <button type="button" className="set-ghost" onClick={() => onUse(a.id)}>{picked ? 'Use this one' : 'Use only this one'}</button>}
+              : list.length > 1 && a.signedIn !== false && <button type="button" className="set-ghost" onClick={() => onUse(a.id)}>{picked ? 'Use this one' : 'Use only this one'}</button>}
           </ReadRow>
         );
       })}
@@ -2909,12 +2965,12 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
     const auto = read('agentsAuto', w.agentsAuto);
     const count = read('sessionsAtOnce', w.sessionsAtOnce);
     const isAuto = auto.waiting ? !!auto.value : count.waiting ? false : !!auto.value;
-    const gate = read('memoryGate', w.memoryGate?.on);
+    const memory = w.memoryGate;
+    const gate = read('memoryGate', memory?.on);
     const slots = read('memoryGateSlots', w.memoryGate?.slots ?? null);
     const slow = read('agentsFeltSlow', null);
     const outside = read('outsideAgents', w.outsideAgents);
-    const say = (n: number) => `${n} ${n === 1 ? 'agent' : 'agents'}`;
-    const options = [{ value: 'auto', label: `Automatic (${say(w.agentsTotal)})` }, ...Array.from({ length: w.slotsMax ?? 12 }, (_, i) => ({ value: String(i + 1), label: say(i + 1) }))];
+    const options = agentCountOptions({ ...w, agentsAuto: isAuto });
     return (
       <Page title="Running">
         <Group id="agents" label="Agents">
@@ -2923,18 +2979,22 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
             <Picker bare label="How many run at once" value={isAuto ? 'auto' : String(count.value)} options={options}
               onChange={(v) => (v === 'auto' ? onWorkspace('agentsAuto', true) : onWorkspace('sessionsAtOnce', Number(v)))} />
           </ReadRow>
-          <ReadRow label="Hold heavy work when memory is short" reading={gate}
-            desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}>
-            <Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => onWorkspace('memoryGate', v)} />
-          </ReadRow>
-          {(gate.value as boolean) && !isAuto && (
-            <ReadRow label="Heavy commands at once" reading={slots}
-              desc={slots.value === null ? `Auto: ${w.memoryGate.slotsAuto} on this computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${w.memoryGate.slotsAuto} on this computer.`}>
-              <Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? w.memoryGate.slotsAuto} min={1} max={w.memoryGate.slotsMax ?? 8}
-                onChange={(v) => onWorkspace('memoryGateSlots', v === w.memoryGate.slotsAuto ? null : v)} />
-            </ReadRow>
+          {memory && (
+            <>
+              <ReadRow label="Hold heavy work when memory is short" reading={gate}
+                desc={`Tests and builds take turns, urgent first, and new agents wait to start until memory frees up.${two ? ' Claude Code and Codex both.' : ''}`}>
+                <Switch label="Hold heavy work when memory is short" on={!!gate.value} onChange={(v) => onWorkspace('memoryGate', v)} />
+              </ReadRow>
+              {(gate.value as boolean) && !isAuto && (
+                <ReadRow label="Heavy commands at once" reading={slots}
+                  desc={slots.value === null ? `Auto: ${memory.slotsAuto} on this computer, one for every 8 GB of memory.` : `You picked ${slots.value}. Auto is ${memory.slotsAuto} on this computer.`}>
+                  <Stepper label="Heavy commands at once" value={(slots.value as number | null) ?? memory.slotsAuto} min={1} max={memory.slotsMax ?? 8}
+                    onChange={(v) => onWorkspace('memoryGateSlots', v === memory.slotsAuto ? null : v)} />
+                </ReadRow>
+              )}
+            </>
           )}
-          {toggle('Stop programs agents leave behind', 'cleanupLeftovers', !!w.leftovers?.on, `Dev servers, previews and test runs an agent started keep running until you close its task, or until memory runs short. Apps installed on this computer are never stopped.${two ? ' Codex agents’ programs are not found yet.' : ''}`)}
+          {toggle('Stop programs agents leave behind', 'cleanupLeftovers', !!w.leftovers?.on, `Dev servers and test runs an agent started stop when you close its task or memory runs short. Your own apps never do.${two ? ' Codex agents’ programs are not found yet.' : ''}`)}
           <ReadRow label="Something felt slow" reading={slow}
             desc={w.agentsNudge ? `${NAME} is running ${w.agentsNudge} fewer than this computer suggests.` : `${NAME} runs one fewer from now on, and remembers that it did.`}>
             {!!w.agentsNudge && <button type="button" className="set-ghost" onClick={() => onWorkspace('agentsFeltSlow', 'reset')}>Undo</button>}
@@ -2963,7 +3023,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
       <Page title={p.name}>
         <Group id="how-it-runs" label="How it runs">
           <ReadRow label="Let agents start the tasks they file here" reading={auto}
-            desc="A task an agent writes on this project gets a session straight away. Without this it waits in your inbox for your yes. Questions and reviews always wait for you either way.">
+            desc="A task an agent writes here starts at once instead of waiting for your yes. Questions and reviews still wait.">
             <Switch label="Let agents start the tasks they file here" on={!!auto.value} onChange={(v) => onProject(p.slug, 'autonomous', v)} />
           </ReadRow>
           {(accounts.length > 1 || account.value !== 'any') && (

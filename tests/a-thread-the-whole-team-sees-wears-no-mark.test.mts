@@ -34,7 +34,8 @@ const team = { state: { since: SINCE, signedIn: true }, me: ME, byId: new Map(),
 const row = (it) => renderToStaticMarkup(
   React.createElement(TeamContext.Provider, { value: team }, React.createElement(ThreadCells, { item: it, product: northwind, now: NOW })),
 );
-const title = (html) => html.match(/<div class="th-cell-title[^"]*">([\s\S]*?)<\/div>/)[1];
+// Past the harness's mark every thread of yours starts with (your-own-thread-wears-the-mark-of-its-harness).
+const title = (html) => html.match(/<div class="th-cell-title[^"]*"><span class="th-slot"><span class="harness-mark \w+"[^>]*><svg[\s\S]*?<\/svg><\/span><\/span>([\s\S]*?)<\/div>/)[1];
 const display = { view: 'board', sort: 'updated', priorities: [], projects: [], updated: 'any' };
 const board = (items) => renderToStaticMarkup(React.createElement(
   TeamContext.Provider, { value: team },

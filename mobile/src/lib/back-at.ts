@@ -1,5 +1,7 @@
 // A moment as a person reads it on the phone, with its day: "until 6:19pm" read
 // late in the evening could be tomorrow or stale.
+import { toMinute } from '../../../shared/usage.mts';
+
 const clock = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(/\s/g, '');
 const dayStart = (ms: number) => { const d = new Date(ms); return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); };
 
@@ -15,5 +17,6 @@ export function dayClock(at: number, now = Date.now()): string {
 
 export function backAt(resetsAt: number | null | undefined, now = Date.now()): string | null {
   if (!resetsAt || resetsAt <= now) return null;
-  return `Out of usage until ${dayClock(resetsAt, now)}`;
+  // Rounded as the account's meter rounds, so the two say the same minute.
+  return `Out of usage until ${dayClock(toMinute(resetsAt), now)}`;
 }

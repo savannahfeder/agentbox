@@ -22,6 +22,12 @@ import path from 'node:path';
 
 export const INCLUDE_FILE = '.worktreeinclude';
 
+// Folder jobs run one at a time, so a git or cp that never returns (a hook, an
+// LFS download, a stalled disk) would leave every later thread in every project
+// without a folder.
+export const folderChildDeadline = () => Number(process.env.AGENTBOX_FOLDER_GIT_MS) || 4 * 60_000;
+const ended = () => ({ timeout: folderChildDeadline(), killSignal: 'SIGKILL' as const });
+
 /** What a failed child process or file call carries beyond a plain Error. */
 export interface ExecFailure extends NodeJS.ErrnoException {
   stderr?: unknown;
@@ -70,7 +76,7 @@ export function copyTree(from: string, to: string, platform: NodeJS.Platform = p
   const args = platform === 'darwin'
     ? ['-c', '-R', from, to]
     : ['-a', '--reflink=auto', from, to];
-  execFileSync('cp', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+  execFileSync('cp', args, { stdio: ['ignore', 'ignore', 'pipe'], ...ended(), windowsHide: true });
 }
 
 /**
@@ -86,7 +92,8 @@ export const DEFAULT_PATTERNS = ['/node_modules'];
 const MANAGED = '.claude/worktrees';
 
 const git = (cwd: string, args: string[], input?: string): string => execFileSync('git', args, {
-  cwd, input, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+  cwd, input, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], ...ended(),
+  windowsHide: true,
 });
 
 const patternsIn = (text: string) => text.split('\n')
@@ -240,7 +247,7 @@ function nearestReal(abs: string): string | null {
  */
 export function linksUnder(at: string, platform: NodeJS.Platform = process.platform): string[] {
   if (platform !== 'win32') {
-    return execFileSync('find', [at, '-type', 'l', '-print0'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    return execFileSync('find', [at, '-type', 'l', '-print0'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...ended(), windowsHide: true })
       .split('\0').filter(Boolean);
   }
   const top = fs.lstatSync(at);

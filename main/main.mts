@@ -20,24 +20,30 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { configDir, loadConfig, saveConfig } from './config.mts';
-import { installMenu, applyZoom, requestFind } from './menu.mts';
+import { installMenu, applyZoom, announceZoom, requestFind, sizeTheAppWindowWith } from './menu.mts';
+import { keepTheAppSizedForItsScreen, openingSize } from './app-size.mts';
 import { zoomDeltaFor } from './zoom-keys.mts';
 import { copySelection } from './copy-selection.mts';
 import { screenDetailFor } from './screen-detail.mts';
 import { Store } from './store.mts';
-import { storeRootEnv } from './store/home.mts';
+import { carryMovedStoreMachinery, storeRootEnv } from './store/home.mts';
 import { keepAnswerModesIn } from './answer-modes.mts';
 import { Supervisor } from './supervisor.mts';
 import { gitHubPushSignIn } from './github-push-sign-in.mts';
 import { runHostWorksOn } from './run-host.mts';
 import { startCodexWatch } from './codex-watch.mts';
+import { followChatsFor } from './chat-follow.mts';
 import { watchNewChatsFor } from './new-chats-watch.mts';
-import { readCodexThreadsOffThread } from './codex-threads.mts';
+import { readCodexThreadsOffThread } from './chat-reader.mts';
 import { appSessionFolders } from './agent-homes.mts';
 import { registerIpc } from './ipc.mts';
 import { stallWatch } from './stall-watch.mts';
+import { ownUseReader } from './own-use.mts';
+import { sendLastDaysHealth } from './health-day.mts';
+import { setupFreezeCounter } from './setup-freezes.mts';
 import { startFreezeRecorder } from './freeze-recorder.mts';
 import { startMemoryRecorder } from './memory-recorder.mts';
+import { threadHeaps } from './thread-heaps.mts';
 import { FreezeWatch } from './freeze-watch.mts';
 import { applyThrough, phoneDevice } from './phone-inbox.mts';
 import type { PhoneChannel } from './phone-inbox.mts';
@@ -51,8 +57,10 @@ import { phoneWaitsOf } from '../shared/phone-snapshot.mts';
 import { teammatesOn } from '../shared/teammates.mts';
 import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
-import { newUserWindow } from './new-user-window.mts';
+import { runningAsADemo } from '../shared/demo-world.mts';
+import { newUserTitle, newUserWindow } from './new-user-window.mts';
 import { applyGlass, glassTone, glassWindow, loadWindowGlass } from './window-glass.mts';
+import { tintWindowButtons, windowFrame } from './window-buttons.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
 import { keepThePageAlive } from './when-the-page-stops.mts';
@@ -79,6 +87,7 @@ import { writeHeldThenReload } from './write-before-reload.mts';
 import { answerDraftCopy } from './draft-copy.mts';
 import { IS_SHE_TYPING_IN_THE_PAGE, theAppKeepsThisInput, theAppKeepsThisLetterInAPage } from '../shared/artifact-keys.mts';
 import { NAME, Name, WAS } from '../shared/product-name.mjs';
+import { APP_USER_MODEL_ID } from '../shared/app-user-model-id.mts';
 import { JOIN_SCHEME, ourLink, threadFromAppLink, tokenFromLink } from '../shared/room-links.mts';
 import { fileLinkToken } from './bring-shared-file.mts';
 import { getMic } from './mic.mts';
@@ -171,6 +180,8 @@ const appDir = path.join(__dirname, '..');
 const PROFILE = String(process.env.AGENTBOX_PROFILE ?? '').trim().replace(/[^a-z0-9-]/gi, '');
 if (PROFILE) app.setName(`${NAME}-${PROFILE}`);
 if (dataFolderName(app.getName()) !== app.getName()) app.setName(dataFolderName(app.getName()));
+// Before any window or notification: Windows groups and names both by this id.
+if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID);
 
 // "ASTRAL NEW USER" IS A STRANGER EVERY TIME IT OPENS.
 //
@@ -281,6 +292,7 @@ installCrashReports({
 });
 
 let window: BrowserWindow | null = null;
+let askingQuit: () => void = () => app.quit();
 // A ROOM INVITE LINK THAT OPENED THE APP (Rooms, alpha): agentbox://join/<token>.
 // Held until the window takes it ('zero:take-join'); a window that is up is
 // told to come and take it, and one still starting takes it as it mounts.
@@ -371,6 +383,7 @@ async function createWindow() {
   // Written under every name this app has had, because a store server or a
   // script from before a rename is still out there reading the old one.
   Object.assign(process.env, storeRootEnv(config.storeRoot));
+  carryMovedStoreMachinery(config.storeRoot);
   // What a reply may do is kept in her own folder, not that home, which every
   // worker is granted (main/answer-modes.mts).
   keepAnswerModesIn({ userDir, storeRoot: config.storeRoot });
@@ -410,7 +423,7 @@ async function createWindow() {
   // (shared/which-card-is-in-front.mts). Late-bound beside the door above,
   // because only the IPC surface knows which thread is on screen, and before it
   // exists the spool's own order is the whole of what is known.
-  let cardInFront: () => { id: string } | null = () => approvals.listPending(config.storeRoot)[0] ?? null;
+  let cardInFront: () => { id: string } | null = () => approvals.listPending(config.storeRoot, { drawn: false })[0] ?? null;
   installMenu({
     onApproval: (allow) => {
       const front = cardInFront();
@@ -421,6 +434,7 @@ async function createWindow() {
     // the inbox rather than whatever happens to hold focus. If the click ever
     // arrives without one, this window is the answer, never nothing.
     onZoom: (delta, target) => applyZoom(delta, target ?? window?.webContents ?? null),
+    onQuit: () => askingQuit(),
   });
   // ANALYTICS, AND EVERYTHING IT NEEDS TO BE HONEST. Off unless her switch is
   // on AND a key is configured, so a copy built from source sends nothing. The
@@ -429,8 +443,14 @@ async function createWindow() {
   // died are finally sent, because a report is written while the process is
   // dying and delivery cannot be synchronous.
   const analytics = createAnalytics({ config, version: app.getVersion(), dir: crashDir });
-  // "Used today", once a day, at launch and whenever the window comes forward.
-  const usedToday = createDailyCount((name) => analytics.track(name));
+  // "Used today", once a day, at launch and whenever the window comes forward,
+  // and with it how heavy the app was on the last day it was open.
+  const usedToday = createDailyCount((name) => {
+    analytics.track(name);
+    try { sendLastDaysHealth({ dir: path.join(userDir, 'memory-log'), track: (n, props) => analytics.track(n, props) }); }
+    catch (err) { console.warn(`zero: could not count how heavy the app was: ${(err as Error).message}`); }
+  });
+  const froze = setupFreezeCounter({ track: (n, props) => analytics.track(n, props) });
   // The seam is filled whenever there is somewhere to send to. Whether anything
   // actually goes is asked again inside, at every send, so her switch stops it
   // from the moment she moves it rather than at the next launch.
@@ -457,6 +477,10 @@ async function createWindow() {
     ensurePersonalProject(config.accountRoot);
   } catch (err) { console.warn(`zero: could not make My Workspace: ${(err as Error).message}`); }
   const store = await new Store(config).init();
+  try {
+    const closed = store.closeShippedThreads();
+    if (closed) console.log(`zero: closed ${closed} shipped thread(s) that only offered closing`);
+  } catch (err) { console.warn(`zero: could not close shipped threads: ${(err as Error).message}`); }
   // Where the window's own pictures may come from (main/img-scheme.mts). The
   // account root holds every product's docs, attachments, designs and the
   // `.staging` folder a pasted screenshot lands in; a product's repo is where a
@@ -468,23 +492,34 @@ async function createWindow() {
   supervisor.hostRuns = runHostWorksOn();
   // And their store tools come from one shared process (main/tool-host.mts).
   supervisor.shareTools = true;
+  // The next thread's folder is made ahead, on a Mac, where the copy shares
+  // its blocks with the checkout. Elsewhere it would be a second full copy.
+  supervisor.spareFolders = process.platform === 'darwin';
   // THAT agents start and stop work (main/analytics.mts checks the switch).
   supervisor.count = (name, props) => analytics.track(name, props);
   // Whether anyone has touched the Mac since a wake (Supervisor#asleep).
   supervisor.idleMs = () => powerMonitor.getSystemIdleTime() * 1000;
   const stalls = stallWatch();
   supervisor.stalls = stalls;
+  supervisor.ownUse = ownUseReader(() => app.getAppMetrics());
   // AND WHICH OF OUR FUNCTIONS HELD THE THREAD, each time it froze.
   const freezes = startFreezeRecorder({
     dir: path.join(userDir, 'memory-log'),
     appDir,
-    onFreeze: (f) => { stalls.noteFreeze(f); console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`); },
+    onFreeze: (f) => {
+      stalls.noteFreeze(f);
+      console.warn(`zero: the app froze for ${f.ms} ms in ${f.where}`);
+      froze.held({ ms: f.ms, where: f.where, part: 'main' });
+    },
   });
+  powerMonitor.on('suspend', () => freezes.asleep());
+  powerMonitor.on('resume', () => freezes.awake());
   quitStep(app, 'before-quit', 'freezes.stop', () => freezes.stop());
   const memory = startMemoryRecorder({
     dir: path.join(userDir, 'memory-log'),
     processes: () => app.getAppMetrics().map((m) => ({ type: m.type, mb: Math.round(m.memory.workingSetSize / 1024) })),
     windowSnapshot: (file) => (window && !window.isDestroyed() ? window.webContents.takeHeapSnapshot(file) : Promise.reject(new Error('no window'))),
+    threads: () => threadHeaps(),
   });
   quitStep(app, 'before-quit', 'memory.stop', () => memory.stop());
   const freezeWatch = new FreezeWatch({ store, userDir, appDir });
@@ -509,6 +544,7 @@ async function createWindow() {
   let phoneSettings: (() => unknown) | null = null;
   // Every installed build has a cloud now, so the keychain is asked only once
   // a sign-in is read or kept, not at launch.
+  let retitle = () => {};
   const team = cloudConfig ? createTeamService({
     session: supabaseSession({
       cloudConfig,
@@ -524,12 +560,13 @@ async function createWindow() {
     stateFile: teamStateFile(config.storeRoot),
     // The window's push is declared further down and wired once the window
     // exists; until then a change has nobody to tell.
-    onChange: () => { try { pushUpdate(); } catch { /* no window yet */ } },
+    onChange: () => { try { pushUpdate(); retitle(); } catch { /* no window yet */ } },
     log: (line) => console.log(line),
     runningIds: () => supervisor.runsGoing().map((s) => s.itemId),
     wontStart: () => supervisor.status(),
     ownMates: () => matesForTheTeam(store, config),
     sharing: () => alphaFeatures(config).multiplayer,
+    tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done
     // through the window's own handlers, filed below once the window exists.
     phone: {
@@ -548,7 +585,7 @@ async function createWindow() {
       // Why each thread nothing runs on is waiting, so the phone does not read it as "Nothing running".
       waits: () => phoneWaitsOf(supervisor.status()),
       // The cards waiting on her, each with the fingerprint her answer must carry back.
-      approvals: () => approvals.listPending(config.storeRoot).map((r) => ({ ...r, card: approvals.cardShown(config.storeRoot, r.id) })),
+      approvals: () => approvals.listPending(config.storeRoot, { on: 'phone' }).map((r) => ({ ...r, card: approvals.cardShown(config.storeRoot, r.id, 'phone') })),
       stateFile: path.join(config.storeRoot, '.phone-inbox.json'),
       // This installation and this store together (main/phone-inbox.mts).
       device: () => phoneDevice(userDir, config.storeRoot),
@@ -588,10 +625,14 @@ async function createWindow() {
   // `analytics.track` itself, so this hands it over unconditionally.
   // Every Codex folder on the machine, read fresh each minute so a login made
   // while the app is open is followed too (main/agent-homes.mts).
+  // A chat brought in follows where it started (main/chat-follow.mts).
+  const chatFollow = followChatsFor({ store, config, supervisor });
+  quitStep(app, 'before-quit', 'chatFollow.stop', () => chatFollow.stop());
   const codexWatch = startCodexWatch({
     store,
     count: (name, props) => analytics.track(name, props),
     readThreads: (opts) => readCodexThreadsOffThread({ ...opts, codexDirs: appSessionFolders({ config, supervisor }).codexDirs }),
+    follow: (threads) => chatFollow.followCodex(threads),
   });
   quitStep(app, 'before-quit', 'codexWatch.stop', () => codexWatch.stop());
   // New chats from Claude Code and Codex, once asked for on setup's last
@@ -794,9 +835,10 @@ async function createWindow() {
 
   const liquidGlass = loadWindowGlass();
   const { additionalArguments, ...glass } = glassWindow(process.platform, alphaFeatures(config).glass, !!liquidGlass);
+  const opening = openingSize(electronScreen.getPrimaryDisplay(), config.zoomByScreen);
   window = new BrowserWindow({
-    width: 1440,
-    height: 900,
+    width: opening.width,
+    height: opening.height,
     // Half of a 1440-point screen, so the window tiles; under 700 is the phone layout.
     minWidth: 720,
     minHeight: 600,
@@ -806,11 +848,11 @@ async function createWindow() {
       fresh: runningAsAFreshUser(),
       name: NAME,
       screen: electronScreen.getPrimaryDisplay()?.workArea,
-      width: 1440,
-      height: 900,
+      width: opening.width,
+      height: opening.height,
     }),
     ...glass,
-    titleBarStyle: 'hiddenInset',
+    ...windowFrame(process.platform),
     webPreferences: {
       preload: path.join(appDir, 'preload.cjs'),
       contextIsolation: true,
@@ -826,6 +868,13 @@ async function createWindow() {
   // renderer/index.html carries the app's name, so a throwaway copy went back
   // to saying "Agentbox" as soon as it drew anything.
   window.on('page-title-updated', (e) => e.preventDefault());
+  retitle = () => {
+    if (!window || window.isDestroyed()) return;
+    const me = team?.state().me;
+    const title = runningAsADemo() ? `${NAME} (demo)` : newUserTitle({ fresh: runningAsAFreshUser(), name: NAME, account: team?.state().signedIn ? me?.email || me?.name : null });
+    if (title && window.getTitle() !== title) window.setTitle(title);
+  };
+  retitle();
 
   keepThePageAlive({
     window,
@@ -872,6 +921,15 @@ async function createWindow() {
     electronScreen.removeListener('display-added', tellScreenDetail);
     electronScreen.removeListener('display-removed', tellScreenDetail);
   });
+
+  // How big it draws, from the screen it is on (main/app-size.mts).
+  sizeTheAppWindowWith(keepTheAppSizedForItsScreen({
+    window,
+    screen: electronScreen,
+    chosen: config.zoomByScreen,
+    save: (picks) => saveConfig(config, { zoomByScreen: Object.keys(picks).length ? picks : undefined }),
+    announce: announceZoom,
+  }));
 
   // The junk browser's session presents as plain Chrome. Electron's default
   // UA carries "Electron/x Zero/x", which makes Google-family logins refuse
@@ -942,7 +1000,7 @@ async function createWindow() {
   });
   quitStep(app, 'before-quit', 'connections.stop', () => connected.stop());
   const ipc = registerIpc({
-    store, supervisor, config, window, analytics, docGrants, updater,
+    store, supervisor, config, window, analytics, docGrants, updater, froze,
     glass: (on) => applyGlass(window, process.platform, on, liquidGlass),
     host: filingHost,
     team,
@@ -969,7 +1027,7 @@ async function createWindow() {
     if (!model || typeof model !== 'object') return null;
     // A cloud that does not answer leaves the list empty rather than holding the copy back.
     const listed = (await Promise.resolve(phoneChannels.get('zero:file-links')?.({ sender: null }, {})).catch(() => null)) as { ok?: boolean; links?: unknown[] } | null | undefined;
-    return { ...model, cloud: supervisor.cloudStatus(), usage: ipc.usageForPhone(), links: listed?.ok ? listed.links : [] };
+    return { ...model, cloud: supervisor.cloudStatus(), usage: ipc.usageForPhone(), links: listed?.ok ? listed.links : [], seen: ipc.seenForPhone() };
   };
   updater.start();
   // A task the app just shipped moved main: look now rather than in half an
@@ -1135,6 +1193,7 @@ async function createWindow() {
       }
     };
     supervisor.start();
+    supervisor.warmTheStartPath();
     powerMonitor.on('suspend', () => supervisor.noteSleep());
     powerMonitor.on('resume', () => {
       supervisor.noteWake();
@@ -1185,6 +1244,7 @@ async function createWindow() {
   // did-finish-load, which races the first effects and would drop the very
   // message it exists to deliver.
   ipcMain.handle('zero:glass-tone', (_e, payload) => { nativeTheme.themeSource = glassTone(payload?.tone); });
+  ipcMain.handle('zero:window-buttons', (_e, payload) => { tintWindowButtons(window, process.platform, payload?.dark); });
   ipcMain.handle('zero:boot-info', () => {
     const info = {
       reloaded: reloadRequested, builtAt: builtAt(), recovered: pendingRecovery,
@@ -1372,7 +1432,7 @@ async function createWindow() {
     }, Number(process.env.ZERO_SCREENSHOT_DELAY_MS ?? 2500));
   }
 
-  askBeforeClosingWhileWorking({ app, window, dialog, working: () => supervisor._load(), name: Name });
+  askingQuit = askBeforeClosingWhileWorking({ app, window, dialog, working: () => supervisor._stoppedByQuitting(), name: Name }).quit;
 
   window.on('closed', () => {
     supervisor.stop();
@@ -1410,6 +1470,19 @@ if (!app.requestSingleInstanceLock()) {
         .then(({ installLinuxLauncher }) => installLinuxLauncher({ appDir, env: process.env }))
         .catch(() => { /* a launcher is never a reason to stop a launch */ });
     }
+    // The Windows Start menu shortcut is written here, not at install: only
+    // Electron's writer gives it the app's id (scripts/windows-launcher.mjs).
+    if (process.platform === 'win32' && !app.isPackaged) {
+      import('../scripts/windows-launcher.mjs')
+        .then(({ installWindowsLauncher }) => installWindowsLauncher({
+          appDir,
+          env: process.env,
+          electronExe: process.execPath,
+          writeShortcut: (file: string, operation: 'create', options: Electron.ShortcutDetails) => shell.writeShortcutLink(file, operation, options),
+          readShortcut: (file: string) => shell.readShortcutLink(file),
+        }))
+        .catch(() => { /* a launcher is never a reason to stop a launch */ });
+    }
     // THE ABOUT BOX SAYS AGENTBOX AND ITS OWN VERSION (w-db6f5e331e). Run from
     // source it read the bundle's, which is Electron's: "Electron 43.0.0".
     app.setAboutPanelOptions({ applicationName: NAME, applicationVersion: app.getVersion(), version: '' });
@@ -1424,6 +1497,12 @@ if (!app.requestSingleInstanceLock()) {
     for (const scheme of DOC_SCHEMES) protocol.handle(scheme, async (request) => {
       const file = docPath(request.url);
       if (!file || !docGrants.allows(file)) return new Response('Not available.', { status: 403 });
+      // A page's own pictures and films, which no thread names, may be in the cloud too.
+      if (comeBackAt && !fs.existsSync(file)) {
+        let timer: NodeJS.Timeout | undefined;
+        await Promise.race([comeBackAt(file).catch(() => false), new Promise((r) => { timer = setTimeout(r, COME_BACK_WAIT_MS); })]);
+        clearTimeout(timer);
+      }
       try {
         // The file is streamed exactly as it is on disk, pictures and all.
         // Nothing is injected into a page any more; see doc-scheme.mts for the

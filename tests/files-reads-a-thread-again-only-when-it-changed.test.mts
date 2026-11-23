@@ -44,10 +44,13 @@ describe('reading threads for their files', () => {
     expect(files.some((f) => f.name === 'notes-107.md')).toBe(true);
   });
 
-  it('an open thread\'s strip of files asks for their numbers only when the thread says more', async () => {
+  // Since 2026-11-16 an open file also asks every few seconds while the app changes
+  // (tests/an-open-file-asks-for-its-versions-again-when-the-app-changes.test.mts).
+  it('an open file asks for its numbers when the thread says more, and not on every change in the app', async () => {
     const fs = await import('node:fs');
     const strip = fs.readFileSync(new URL('../renderer/src/components/ThreadArtifacts.tsx', import.meta.url), 'utf8');
-    expect(strip).toMatch(/useFileLine\(item\.product, item\.id, lines\.length, false\)/);
+    expect(strip).toMatch(/useFileLine\(item\.product, item\.id, lines\.length, FOLLOW_MS\)/);
+    expect(strip).toMatch(/const FOLLOW_MS = \d{4,};/);
     const place = fs.readFileSync(new URL('../main/files-place.mts', import.meta.url), 'utf8');
     expect(place).not.toMatch(/filesOf\(threads\(\)\)/);
   });

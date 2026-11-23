@@ -55,3 +55,13 @@ export function stepFromPlace(stops: Stop[], place: number, dir: 1 | -1): Stop |
   const next = dir === 1 ? place : place - 1;
   return next >= 0 && next < stops.length ? stops[next] : null;
 }
+
+/**
+ * J, K and E from a chat opened in the inbox: the stop beside its row, or,
+ * once a reply or Done has taken the row off the page, beside where it sat.
+ */
+export function stepFromChat(stops: PageStop[], lead: string | null, place: number | null, dir: 1 | -1): PageStop | null {
+  const at = lead ? stops.findIndex((s) => stopKey(s) === `lead/${lead}`) : -1;
+  const next = at >= 0 ? at + dir : place === null ? -1 : dir === 1 ? place : place - 1;
+  return next >= 0 && next < stops.length ? stops[next] : null;
+}

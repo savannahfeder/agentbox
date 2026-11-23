@@ -99,9 +99,15 @@ export function referencedFiles(...texts: Array<string | null | undefined | { di
     // once, in the order a reader meets it
     const source = String(text);
     const hits: { at: number; path: string }[] = [];
-    for (const m of source.matchAll(LINK)) hits.push({ at: m.index ?? 0, path: m[1] });
-    for (const m of source.matchAll(PATH)) hits.push({ at: m.index ?? 0, path: m[0] });
-    if (dir) for (const m of source.matchAll(ABS_PATH)) hits.push({ at: m.index ?? 0, path: m[0] });
+    const links: [number, number][] = [];
+    for (const m of source.matchAll(LINK)) {
+      hits.push({ at: m.index ?? 0, path: m[1] });
+      links.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
+    }
+    // A link's words are a label and its target is already taken.
+    const inLink = (at: number) => links.some(([from, to]) => at >= from && at < to);
+    for (const m of source.matchAll(PATH)) if (!inLink(m.index ?? 0)) hits.push({ at: m.index ?? 0, path: m[0] });
+    if (dir) for (const m of source.matchAll(ABS_PATH)) if (!inLink(m.index ?? 0)) hits.push({ at: m.index ?? 0, path: m[0] });
     hits.sort((a, b) => a.at - b.at);
     for (const hit of hits) take(hit.path);
   }

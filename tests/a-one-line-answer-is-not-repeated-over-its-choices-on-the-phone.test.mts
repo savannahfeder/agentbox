@@ -24,8 +24,10 @@ describe('the heading over a thread\'s choices on the phone', () => {
     expect(t.ask).toBe('');
   });
 
-  it('stays over a longer answer', () => {
+  // Since every thread opens on the one-page view, the desktop draws the choices bare (Focus.tsx `bare`).
+  it('is left off over a longer answer too', () => {
     const t = open('agentbox', 'w-2b3c4d5e6f');
-    expect(t.ask).toMatch(/run that hits its limit/);
+    expect(t.options.length).toBeGreaterThan(0);
+    expect(t.ask).toBe('');
   });
 });

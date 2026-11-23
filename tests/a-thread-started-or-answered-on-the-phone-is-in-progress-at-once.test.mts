@@ -43,7 +43,11 @@ describe('the phone, before her Mac has taken what she did', () => {
 
   it('a reply already taken changes nothing once the Mac\'s own copy from after it says what happened', () => {
     const taken = cmd({ item: asked.id, kind: 'reply', payload: { text: 'Yes' }, taken_at: new Date(T).toISOString(), outcome: 'done' });
-    const view = phoneView({ projects: [P], threads: [{ ...thread(asked), updated_at: new Date(T + 500).toISOString() }], commands: [taken] }, T + 1000);
+    // A later copy that is only stamped later still keeps her reply
+    // (an-answer-sent-from-the-phone-stays-in-progress-until-its-thread-shows-it);
+    // this one has the agent answering after it.
+    const answered = { ...asked, result: 'Shipped.', wrote: { ...asked.wrote, result: { ts: T + 400, source: 'agent' } }, updatedAt: T + 400 };
+    const view = phoneView({ projects: [P], threads: [{ ...thread(answered), updated_at: new Date(T + 500).toISOString() }], commands: [taken] }, T + 1000);
     expect(view.items[0].answer).toBeUndefined();
     // Until that copy arrives, it is still the reply she sent.
     expect(phoneView({ projects: [P], threads: [thread(asked)], commands: [taken] }, T + 1000).items[0].answer).toBe('Yes');

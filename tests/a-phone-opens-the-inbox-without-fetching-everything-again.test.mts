@@ -48,6 +48,7 @@ describe('a first read that missed', () => {
     const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
     expect(app).toMatch(/const FIRST_READ_AGAIN_MS = 1_500;/);
     expect(app).toMatch(/refresh\(\)\.catch\(\(\) => \{ if \(!gone\) again = setTimeout\(first, FIRST_READ_AGAIN_MS\); \}\)/);
-    expect(app).toMatch(/setInterval\(refresh, pollEvery\(10_000, onPhone\(\)\)\)/);
+    // `tick` refreshes, and draws when nothing changed (an-update-that-changes-nothing-does-not-redraw-the-window).
+    expect(app).toMatch(/setInterval\(tick, pollEvery\(10_000, onPhone\(\)\)\)/);
   });
 });

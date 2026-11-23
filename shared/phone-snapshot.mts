@@ -9,6 +9,7 @@
 // safe: no node imports.
 
 import { checkSetting, type SettingChange } from './phone-settings.mts';
+import { carriedOnIn, heldOutside } from './carried-on-outside.mts';
 
 // How much of one thread goes up. The latest of a thread is what she reads on
 // a phone; the whole of it stays on the Mac. `bytes` is measured in UTF-8, as
@@ -16,6 +17,15 @@ import { checkSetting, type SettingChange } from './phone-settings.mts';
 export const SNAPSHOT_LIMITS = { lines: 400, textChars: 12_000, items: 300, bytes: 900_000 };
 
 export type SnapshotLimits = typeof SNAPSHOT_LIMITS;
+
+// How much of a thread's runs' logs goes up with it: the newest runs, the end of each.
+export const RUN_LIMITS = { runs: 8, chars: 24_000, bytes: 200_000 };
+
+/** One run's log, as renderer/src/notes.ts reads it. */
+export interface SnapshotRun {
+  startedAt: number;
+  text: string;
+}
 
 /** Where her home folder is, so it is written ~ in a copy. */
 interface Ctx {
@@ -45,7 +55,67 @@ export type ThreadSnapshot = {
   item: Copied & { wrote?: Record<string, Wrote> };
   history: SnapshotLine[];
   olderLines: number;
+  runs?: SnapshotRun[];
 };
+
+/**
+ * What a finished run changed, as a thread's copy carries it: the counts, the
+ * files, and where its folder stands, which is what the desktop builds its
+ * figures and its Ship it offer from (renderer/src/ship-offer.ts). No rows of
+ * code and no absolute paths.
+ */
+export interface PhoneChange {
+  plus: number;
+  minus: number;
+  files: { path: string; plus: number; minus: number }[];
+  /** Files past PHONE_CHANGE_FILES, counted but not listed. */
+  more?: number;
+  committed: boolean | null;
+  uncommitted: boolean | null;
+  knowsYou: boolean | null;
+}
+export const PHONE_CHANGE_FILES = 40;
+
+interface ChangeSeen {
+  plus?: unknown;
+  minus?: unknown;
+  files?: unknown;
+  committed?: unknown;
+  uncommitted?: unknown;
+  knowsYou?: unknown;
+}
+
+// The phone's pass asks for every carried thread's change each time, and a
+// saved change is the same object until its file is rewritten
+// (main/code-change.mts readChangeSummary): read for secrets once, by home.
+const phoneChanges = new WeakMap<object, Map<string, PhoneChange | null>>();
+
+/** A saved change (main/code-change.mts readChangeSummary) as the phone gets it, or null when it touched no files. */
+export function phoneChangeOf(summary: ChangeSeen | null | undefined, { home = null }: Ctx = {}): PhoneChange | null {
+  if (!summary || typeof summary !== 'object' || !Array.isArray(summary.files)) return null;
+  let byHome = phoneChanges.get(summary);
+  if (!byHome) phoneChanges.set(summary, byHome = new Map());
+  const made = byHome.get(home ?? '');
+  if (made !== undefined) return made;
+  const count = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.round(Number(v)) : 0);
+  const flag = (v: unknown) => (typeof v === 'boolean' ? v : null);
+  const named = (summary.files as ({ path?: unknown; plus?: unknown; minus?: unknown } | null)[])
+    .filter((f) => f && typeof f.path === 'string' && f.path);
+  // Only the paths that are kept: a generated change names thousands.
+  const files = named.slice(0, PHONE_CHANGE_FILES)
+    .map((f) => ({ path: hideSecrets(f!.path, { home }), plus: count(f!.plus), minus: count(f!.minus) }));
+  const change: PhoneChange | null = files.length ? {
+    plus: count(summary.plus),
+    minus: count(summary.minus),
+    files,
+    ...(named.length > PHONE_CHANGE_FILES ? { more: named.length - PHONE_CHANGE_FILES } : {}),
+    committed: flag(summary.committed),
+    uncommitted: flag(summary.uncommitted),
+    knowsYou: flag(summary.knowsYou),
+  } : null;
+  byHome.set(home ?? '', change);
+  return change;
+}
 
 /** A row's fields as this file reads them, before they are picked. */
 interface RowSeen {
@@ -158,13 +228,17 @@ const ROW_FIELDS = [
   'createdAt', 'updatedAt', 'pinned', 'onMac',
   // The phone command that made it, so the phone can follow its stand-in here.
   'fromPhone',
+  // What the thread waits on, which puts it in Later (list-rules `waitsInLater`).
+  'blockedBy', 'waitEnded',
+  // Carried on where it started, so In progress (shared/carried-on-outside.mts).
+  'carriedOn',
 ];
 // The fields a line in a thread's history may carry in its patch: what the
 // thread view draws as the conversation and its state changes.
 const LINE_FIELDS = [
   'title', 'label', 'body', 'kind', 'labels', 'priority', 'status', 'result',
   'note', 'answer', 'runAt', 'snoozedUntil', 'start', 'due', 'problem',
-  'progress', 'solution', 'inReplyTo',
+  'progress', 'solution', 'inReplyTo', 'saidOutside',
 ];
 const SOURCES: ReadonlySet<unknown> = new Set(['founder', 'agent', 'system']);
 
@@ -320,16 +394,38 @@ export function phoneTeammatesOf(view: TeammatesViewSeen | null | undefined, { h
   return out;
 }
 
-// `item` is the folded row; `history` is store.readHistory for it. `home` is
-// her home folder, written ~ in the copy.
+// The newest runs first, until the next would not fit.
+function runsFor(runs: readonly SnapshotRun[], ctx: Ctx): SnapshotRun[] {
+  const out: SnapshotRun[] = [];
+  let left = RUN_LIMITS.bytes;
+  const newest = runs.filter((r) => r && Number.isFinite(r.startedAt) && typeof r.text === 'string' && r.text).slice(-RUN_LIMITS.runs).reverse();
+  for (const r of newest) {
+    let text = hideSecrets(r.text, ctx);
+    if (text.length > RUN_LIMITS.chars) {
+      text = text.slice(-RUN_LIMITS.chars);
+      text = text.slice(text.indexOf('\n') + 1);
+    }
+    const run = { startedAt: r.startedAt, text };
+    left -= bytesOf(run);
+    if (left < 0) break;
+    out.push(run);
+  }
+  return out.reverse();
+}
+
+// `item` is the folded row; `history` is store.readHistory for it; `runs` are
+// its runs' logs (main/run-traces.mts readRunTails). `home` is her home
+// folder, written ~ in the copy.
 export function threadSnapshot(
   item: (RowSeen & Record<string, unknown>) | null | undefined,
   history: readonly (HistorySeen | null)[] = [],
   limits: SnapshotLimits = SNAPSHOT_LIMITS,
-  { home = null }: Ctx = {},
+  { home = null, runs = [] }: Ctx & { runs?: readonly SnapshotRun[] } = {},
 ): ThreadSnapshot {
   const ctx = { home };
   const row: ThreadSnapshot['item'] = pick(item, ROW_FIELDS, limits.textChars, ctx);
+  const held = item?.claim as { holder?: string } | null | undefined;
+  if (heldOutside(item as Parameters<typeof heldOutside>[0])) row.carriedOn = carriedOnIn(held?.holder) ?? '';
   // Who wrote each field, which is how the screens tell her words from an
   // agent's: the source and the moment, nothing else of it.
   if (item?.wrote && typeof item.wrote === 'object') {
@@ -348,8 +444,13 @@ export function threadSnapshot(
     if (!Object.keys(patch).length) continue;
     lines.push({ id: row.id, ts: l.ts as number, source: l.source as string, patch });
   }
-  // Under the database's megabyte, with room: fewer lines until it fits, and
-  // then shorter text, so one long thread never stops the rest being sent.
+  const logs = runsFor(runs, ctx);
+  if (logs.length) {
+    const withRuns: ThreadSnapshot = { v: 3, item: row, history: lines.slice(-limits.lines), olderLines: Math.max(0, lines.length - limits.lines), runs: logs };
+    if (bytesOf(withRuns) <= limits.bytes) return withRuns;
+  }
+  // Under the database's megabyte, with room: no runs, then fewer lines until
+  // it fits, and then shorter text, so one long thread never stops the rest being sent.
   for (let keep = limits.lines, chars = limits.textChars; ;) {
     const kept = lines.slice(-keep);
     const snap: ThreadSnapshot = {

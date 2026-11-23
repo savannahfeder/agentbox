@@ -45,7 +45,7 @@ const config: ExpoConfig = {
   slug: nameSlug,
   owner: process.env.EAS_OWNER || 'agentbox-app',
   scheme: nameSlug,
-  version: '0.1.0',
+  version: '0.2.0',
   // Not 'portrait': iOS caps the full-screen film player by this too. The
   // screens hold themselves upright (orientation in the Stacks' screenOptions).
   orientation: 'default',

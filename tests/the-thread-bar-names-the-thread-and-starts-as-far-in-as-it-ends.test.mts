@@ -32,7 +32,7 @@ describe('the arrow', () => {
     // 20 of padding, 4 of the button's own, and the ink starts 4.5 into the 13px mark.
     expect(rooms).toContain('.workspace-layout.gt-inset.workspace-task > .topbar > .topbar-right { right: 28px; }');
   });
-  it('keeps the 44 edge a file beside the thread or an open summary starts on', () => {
+  it('keeps the 44 edge a file beside the thread starts on', () => {
     expect(rooms).toContain('.workspace-layout.gt-inset.workspace-task > .topbar { padding-left: 36px; }');
     expect(rooms.indexOf(plain)).toBeGreaterThan(rooms.indexOf('.workspace-layout.gt-inset.workspace-task > .topbar { padding-left: 36px; }'));
   });

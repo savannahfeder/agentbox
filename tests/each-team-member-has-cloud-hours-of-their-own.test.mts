@@ -8,8 +8,8 @@
 // the whole team: three power testers ran a shared pool dry and could not tell
 // who had). Hours are the only limit, never how many run at once (2026-11-13,
 // tests/a-team-runs-any-number-at-once-and-a-card-trial-runs-on-trial-hours).
-// A person's own paid plan comes first, then the team's, which replace their 5
-// free hours.
+// A person's own paid plan comes first, then the team's. There are no free
+// hours behind them (2026-11-16).
 import { describe, it, expect } from 'vitest';
 import { createGateway, memoryObjects } from '../cloud/gateway/gateway.mjs';
 import { PLANS, TEAM } from '../cloud/gateway/plans.mjs';
@@ -41,7 +41,8 @@ function setup({ members = [A, B], owners = [A], madeAt = MADE, start = MADE + H
   let clock = start;
   const sent = [];
   const objects = memoryObjects();
-  const team = { id: 'team-1', createdAt: madeAt, members, owners };
+  // The trial here is a week given by hand, the only one without a card since 2026-11-21.
+  const team = { id: 'team-1', createdAt: madeAt, freeUntil: madeAt + TEAM.trialDays * DAY, members, owners };
   const gw = createGateway({
     agentcore: {
       async invoke(sessionId, payload) { sent.push({ sessionId, payload }); return { ok: true }; },
@@ -79,7 +80,7 @@ describe('the trial', () => {
     expect(TEAM).toEqual({ trialDays: 7, trialHoursPerMember: 50, hoursPerSeat: 400, dollarsPerSeat: 40, filesGBPerSeat: 100 });
   });
 
-  it('runs a member with no plan on their own trial hours, not on their free hours', async () => {
+  it('runs a member with no plan on their own trial hours', async () => {
     const { as, tick } = setup();
     const a = as(A);
     expect((await a.start(1)).body.ok).toBe(true);
@@ -87,7 +88,6 @@ describe('the trial', () => {
     await a.finish(1);
     const me = await a.me();
     expect(me.team).toMatchObject({ trial: true, hours: 50, agents: null, usedSeconds: 3600, endsAt: MADE + 7 * DAY, owner: true });
-    expect(me.free.usedSeconds).toBe(0);
   });
 
   it("one member spending all their hours leaves the other member's untouched", async () => {
@@ -107,9 +107,8 @@ describe('the trial', () => {
     expect((await b.me()).team.people).toEqual([{ id: A, usedSeconds: 2 * 3600, running: 0 }, { id: B, usedSeconds: 3600, running: 0 }]);
   });
 
-  // The trial replaces each member's 5 free hours (the owner's plan, 2026-11-06).
   // A power tester whose team ran out was moved to "Free, 5 of 5" without a word.
-  it('spent, refuses the next run and says whose hours are used and who can pay, never falling to the free hours', async () => {
+  it('spent, refuses the next run and says whose hours are used and who can pay', async () => {
     const { as, tick } = setup();
     const a = as(A); const b = as(B);
     await spendTrial(a, tick, 100);
@@ -118,7 +117,6 @@ describe('the trial', () => {
     expect(owner.body.message).toBe('Your 50 trial hours are used. Pay for the team on Plan and Billing to keep running agents there.');
     await spendTrial(b, tick, 200);
     expect((await b.start(9)).body.message).toMatch(/owner can pay/);
-    expect((await a.me()).free.usedSeconds).toBe(0);
   });
 
   it('spent, gives no upload link for a run, and no room to the phone', async () => {
@@ -129,16 +127,14 @@ describe('the trial', () => {
     expect(await gw.room(A)).toMatchObject({ ok: false, error: 'hours' });
   });
 
-  it("ends after 7 days: back to each member's own free hours", async () => {
+  it('ends after 7 days, and with no free hours behind it nothing runs until the team pays', async () => {
     const { as, tick } = setup();
     const a = as(A);
     tick(7 * DAY);
-    expect((await a.start(1)).body.ok).toBe(true);
-    tick(HOUR);
-    await a.finish(1);
+    expect((await a.start(1)).body).toMatchObject({ ok: false, error: 'plan' });
     const me = await a.me();
     expect(me.team).toBeUndefined();
-    expect(me.free.usedSeconds).toBe(3600);
+    expect(me.free).toBeUndefined();
   });
 
   it('a day before the end, it still runs', async () => {
@@ -225,7 +221,7 @@ describe('who is on a team, as the database says', () => {
     const asked = [];
     const fetchImpl = async (url) => {
       asked.push(url);
-      const body = url.includes('person_id=eq.') ? rows.mine : rows.all;
+      const body = url.includes('person_id=eq.') ? rows.mine : url.includes('team_plans') ? rows.plan ?? [] : rows.all;
       return { ok: true, status: 200, text: async () => JSON.stringify(body) };
     };
     return { db: supabaseRest({ url: 'https://db.test', serviceKey: 'k', fetchImpl }), asked };
@@ -233,7 +229,12 @@ describe('who is on a team, as the database says', () => {
 
   it('reads the team, when it was made, its members and its owners', async () => {
     const { db } = fakeDb({ mine: [{ team_id: 'team-1', teams: { created_at: '2026-11-17T09:00:00Z' } }], all: [{ person_id: A, role: 'owner' }, { person_id: B, role: 'member' }] });
-    expect(await db.teamOf(A)).toEqual({ id: 'team-1', createdAt: MADE, members: [A, B], owners: [A] });
+    expect(await db.teamOf(A)).toEqual({ id: 'team-1', createdAt: MADE, freeUntil: null, members: [A, B], owners: [A] });
+  });
+
+  it('reads the free days given to the team by hand', async () => {
+    const { db } = fakeDb({ mine: [{ team_id: 'team-1', teams: { created_at: '2026-11-17T09:00:00Z' } }], all: [{ person_id: A, role: 'owner' }], plan: [{ free_until: '2026-12-05T00:00:00Z' }] });
+    expect((await db.teamOf(A)).freeUntil).toBe(Date.UTC(2026, 11, 5));
   });
 
   it('someone on no team is on none', async () => {
@@ -246,10 +247,10 @@ describe('who is on a team, as the database says', () => {
     let t = 0;
     const teams = teamsFrom(db, { now: () => t });
     await teams(A); await teams(A);
-    expect(asked).toHaveLength(2);
+    expect(asked).toHaveLength(3);
     t = 61_000;
     await teams(A);
-    expect(asked).toHaveLength(4);
+    expect(asked).toHaveLength(6);
   });
 });
 
@@ -257,7 +258,7 @@ describe('what the app makes of it', () => {
   const NOW = MADE + 5 * DAY;
   const people = [{ id: A, usedSeconds: 4.2 * 3600, running: 1 }, { id: B, usedSeconds: 3.1 * 3600, running: 0 }, { id: C, usedSeconds: 0, running: 0 }];
   const trial = { trial: true, endsAt: MADE + 7 * DAY, seats: 0, members: 3, owner: true, agents: null, running: 1, hours: 10, usedSeconds: 4.2 * 3600, people };
-  const server = (team, over = {}) => ({ plan: 'none', agents: 0, hoursPerMonth: 0, running: 1, usedSeconds: 0, free: { agents: 2, hours: 5, usedSeconds: 0 }, team, ...over });
+  const server = (team, over = {}) => ({ plan: 'none', agents: 0, hoursPerMonth: 0, running: 1, usedSeconds: 0, team, ...over });
   const names = [
     { id: A, name: 'Sam Rivera', email: 's@example.com', avatarUrl: null, role: 'owner' },
     { id: B, name: 'Priya Natarajan', email: 'p@example.com', avatarUrl: null, role: 'member' },
@@ -270,7 +271,7 @@ describe('what the app makes of it', () => {
     expect(cloudPlanOf(server(trial))).toMatchObject({ plan: 'team', unlimited: true, agents: null, hoursPerMonth: 10, usedSeconds: 4.2 * 3600 });
   });
 
-  it('your hours spent still read as the team, never as the free hours', () => {
+  it('your hours spent still read as the team', () => {
     expect(cloudPlanOf(server({ ...trial, usedSeconds: 10 * 3600 })).plan).toBe('team');
   });
 
@@ -335,12 +336,10 @@ describe('what the app makes of it', () => {
 });
 
 describe('someone not on a team', () => {
-  it('runs on their own free hours as before, and hears nothing of a team', async () => {
-    const { as, tick } = setup();
+  it('runs nothing without a plan, and hears nothing of a team', async () => {
+    const { as } = setup();
     const c = as(C);
-    await c.start(1); tick(HOUR); await c.finish(1);
-    const me = await c.me();
-    expect(me.team).toBeUndefined();
-    expect(me.free.usedSeconds).toBe(3600);
+    expect((await c.start(1)).body).toMatchObject({ ok: false, error: 'plan' });
+    expect((await c.me()).team).toBeUndefined();
   });
 });

@@ -9,7 +9,13 @@ export function handsBack(result: string | null | undefined): boolean {
   return String(result ?? '').split('\n').some((line) => line.trimStart().startsWith(HAND_BACK));
 }
 
-// THE OTHER WAY: a run on this computer whose request needs the cloud
+/** A reply without its marked line, for drawing: that line is the app's to read. */
+export function withoutHandBack(result: string): string {
+  if (!handsBack(result)) return result;
+  return result.split('\n').filter((line) => !line.trimStart().startsWith(HAND_BACK)).join('\n').trim();
+}
+
+// THE OTHER WAY:a run on this computer whose request needs the cloud
 // (Supervisor#_noteSentToCloud). Told only where the cloud could take it.
 export const SEND_TO_CLOUD = 'AGENTBOX-NEEDS-THE-CLOUD:';
 

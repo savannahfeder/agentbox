@@ -41,9 +41,10 @@ describe('the buttons over a thread', () => {
   it('both are the size of the More button', () => {
     const team = read('renderer/src/team/team.css');
     const summary = read('renderer/src/threads/summary.css');
+    // 32, the Inbox bar's buttons (2026-11-21); the corner row sizes Add people over team.css's 30.
     expect(rule(team, '.crumb-aside .tm-add-people')).toMatch(/width:\s*30px/);
-    expect(rule(team, '.crumb-aside .tm-add-people')).toMatch(/height:\s*30px/);
-    expect(rule(summary, '.ts-done.ts-place')).toMatch(/width:\s*30px/);
-    expect(rule(summary, '.ts-more')).toMatch(/width:\s*30px; height:\s*30px/);
+    expect(rule(summary, '.ts-top .crumb-aside .tm-add-people')).toMatch(/width:\s*32px; height:\s*32px/);
+    expect(rule(summary, '.ts-done.ts-place')).toMatch(/width:\s*32px/);
+    expect(rule(summary, '.ts-more')).toMatch(/width:\s*32px; height:\s*32px/);
   });
 });

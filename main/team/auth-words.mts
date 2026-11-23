@@ -10,6 +10,7 @@ export function plainAuthError(message: unknown): string {
   if (/password should be at least/i.test(m)) return 'Use a password of at least 6 characters.';
   if (/should be different from the old password|same_password/i.test(m)) return 'Choose a password different from the one you had.';
   if (/rate limit|only request this after/i.test(m)) return 'Too many tries just now. Wait a minute and try again.';
+  if (/code verifier not found/i.test(m)) return 'That link is from an earlier email. Go back to the app to carry on.';
   if (/auth session missing/i.test(m)) return 'That reset did not finish. Ask for the email again.';
   return m || 'That did not work. Try again.';
 }

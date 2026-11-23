@@ -59,6 +59,23 @@ export const AIMED_AT_THE_THREAD_YOU_LEFT =
  *  fractions of a pixel; this is a row's worth of nothing. */
 export const MOVED_PX = 4;
 
+/** Where the strip stood when the pointer came onto it, read again on every
+ *  render. A scroll moves the strip without a render, so a place kept from
+ *  before the pointer arrived would count that scroll as a jump under it. */
+export function stripUnderThePointer() {
+  let top: number | null = null;
+  let over = false;
+  return {
+    enter(at: number | null) { over = true; top = at; },
+    leave() { over = false; },
+    jumped(at: number | null): boolean {
+      const was = top;
+      top = at;
+      return over && at !== null && was !== null && Math.abs(at - was) >= MOVED_PX;
+    },
+  };
+}
+
 /** Whether a click now lands on the row you were looking at. `movedAt` is when
  *  the strip last jumped under the pointer, or null if it has not. */
 export function clickLandsOnTheRowYouSaw(movedAt: number | null, now: number): boolean {

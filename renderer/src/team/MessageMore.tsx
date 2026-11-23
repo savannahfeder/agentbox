@@ -2,12 +2,14 @@
 // delete your own, copy its words, and mark the conversation unread from it.
 // The editor takes the message's place, Return saves and Escape puts it back;
 // deleting asks once, because it is taken back for everyone.
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { RichReply, type RichBox } from './RichReply';
+import { chatDoc, chatMarkdown } from './chat-editor';
 import './chat.css';
 
 export type MoreItem =
-  | { label: string; onClick: () => void; danger?: boolean; hint?: string }
+  | { label: string; onClick: () => void; danger?: boolean; hint?: string; icon?: ReactNode }
   | 'rule';
 
 const MENU_W = 220;
@@ -15,20 +17,20 @@ const EDGE = 8;
 
 // Under a button the menu hangs from its right edge; at the pointer, from the
 // pointer, the way a right click menu opens.
-function placeMenu(at: DOMRect, height: number): CSSProperties {
-  const from = at.width === 0 ? at.left : at.right - MENU_W;
-  const left = Math.max(EDGE, Math.min(from, window.innerWidth - MENU_W - EDGE));
+function placeMenu(at: DOMRect, height: number, width = MENU_W): CSSProperties {
+  const from = at.width === 0 ? at.left : at.right - width;
+  const left = Math.max(EDGE, Math.min(from, window.innerWidth - width - EDGE));
   const below = at.bottom + 4;
   const top = below + height <= window.innerHeight - EDGE ? below : Math.max(EDGE, at.top - 4 - height);
-  return { left: Math.round(left), top: Math.round(top), width: MENU_W };
+  return { left: Math.round(left), top: Math.round(top), width };
 }
 
-export function MoreMenu({ at, items, onClose }: { at: DOMRect; items: MoreItem[]; onClose: () => void }) {
+export function MoreMenu({ at, items, onClose, width = MENU_W }: { at: DOMRect; items: MoreItem[]; onClose: () => void; width?: number }) {
   const box = useRef<HTMLDivElement>(null);
-  const [place, setPlace] = useState<CSSProperties>({ left: -9999, top: -9999, width: MENU_W });
+  const [place, setPlace] = useState<CSSProperties>({ left: -9999, top: -9999, width });
   const [pick, setPick] = useState(0);
   const rows = items.filter((i): i is Exclude<MoreItem, 'rule'> => i !== 'rule');
-  useLayoutEffect(() => { setPlace(placeMenu(at, box.current?.offsetHeight ?? 200)); }, [at]);
+  useLayoutEffect(() => { setPlace(placeMenu(at, box.current?.offsetHeight ?? 200, width)); }, [at, width]);
   useEffect(() => {
     const away = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) onClose(); };
     const key = (e: KeyboardEvent) => {
@@ -51,7 +53,7 @@ export function MoreMenu({ at, items, onClose }: { at: DOMRect; items: MoreItem[
         return (
           <button key={item.label} type="button" role="menuitem" className={`chat-menu-row${item.danger ? ' danger' : ''}${me === pick ? ' on' : ''}`}
             onMouseEnter={() => setPick(me)} onClick={() => { onClose(); item.onClick(); }}>
-            <span>{item.label}</span>{item.hint && <kbd>{item.hint}</kbd>}
+            {item.icon && <span className="chat-menu-ico">{item.icon}</span>}<span>{item.label}</span>{item.hint && <kbd>{item.hint}</kbd>}
           </button>
         );
       })}
@@ -99,14 +101,11 @@ export function MessageEditor({ text, onSave, onCancel, onEmpty }: {
   onCancel: () => void;
   onEmpty: () => void;
 }) {
-  const [value, setValue] = useState(text);
-  const box = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(320, el.scrollHeight)}px`;
-  }, [value]);
+  // In the chat box's own editor, so a quote or a list is edited as one, not as its marks;
+  // compared in that editor's markdown, so opening and saving untouched changes nothing.
+  const start = useMemo(() => chatMarkdown(chatDoc(text)), [text]);
+  const [value, setValue] = useState(start);
+  const box = useRef<RichBox | null>(null);
   useEffect(() => {
     const el = box.current;
     if (!el) return;
@@ -116,17 +115,17 @@ export function MessageEditor({ text, onSave, onCancel, onEmpty }: {
   const save = () => {
     const next = value.trim();
     if (!next) { onEmpty(); return; }
-    if (next === text.trim()) { onCancel(); return; }
+    if (next === start.trim()) { onCancel(); return; }
     onSave(next);
   };
   return (
     <div className="chat-edit">
-      <textarea ref={box} className="chat-edit-box" value={value} rows={1} aria-label="Edit message"
-        onChange={(e) => setValue(e.target.value)}
+      <RichReply className="chat-edit-box" boxRef={box} value={value} onChange={setValue} placeholder="" label="Edit message"
         onKeyDown={(e) => {
           e.stopPropagation();
-          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); save(); }
-          if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); return true; }
+          if (e.key === 'Escape') { e.preventDefault(); onCancel(); return true; }
+          return false;
         }} />
       <div className="chat-edit-foot">
         <span className="chat-edit-hint">Return to save, Esc to cancel</span>

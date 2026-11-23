@@ -23,7 +23,7 @@ import path from 'node:path';
 import { artifactRoots, resolveArtifact } from '../artifact-path.mts';
 import { bytesOf, hideSecrets } from '../../shared/phone-snapshot.mts';
 import { isShared, runnerOf } from '../../shared/team-rules.mts';
-import { cleanMark, editedWords, familyName, fileNewsFor, filesInLines, isBookkeepingMark, marksOf, threadFiles } from '../../shared/artifact-marks.mts';
+import { cleanMark, editedWords, familyName, fileNewsFor, filesInLines, isBookkeepingMark, marksOf, TEAMMATE_MARK, threadFiles } from '../../shared/artifact-marks.mts';
 import { saveNextVersion } from '../file-version.mts';
 import { MAX_MESSAGE_FILE_BYTES } from './sync.mts';
 import { MAX_SHARED_SENT_BYTES as MAX_SENT_BYTES, PART_BYTES } from '../../shared/carried-files.mts';
@@ -89,7 +89,7 @@ export interface ThreadFileMark { id: string; owner: string; threadId: string; b
 export interface ThreadFileNews { owner: string; threadId: string; id: string; file: string; text: string | undefined; by: string | null; ts: number }
 
 /** Words left on a thread or on one of its files, for the person's page in the window. */
-export interface ThreadTalk { id: string; kind: 'comment' | 'note'; owner: string; threadId: string; by: string; text: string; at: number; file?: string; note?: string; to?: string[] }
+export interface ThreadTalk { id: string; kind: 'comment' | 'note'; owner: string; threadId: string; by: string; text: string; at: number; file?: string; v?: number; note?: string; to?: string[] }
 
 export interface SharedThreadView { shared: boolean; lines: SharedLine[]; earlier: number; product: string | null; dir: string | null }
 
@@ -124,6 +124,8 @@ export interface ThreadShareOptions {
   myName?: () => string | null;
   /** A teammate's name by their id, carried on their comment for the owner's agent. */
   nameOf?: (personId: string) => string | null | undefined;
+  /** True when a comment on your thread was taken as words to its agent, so it is not filed as a comment too. */
+  relay?: (comment: ThreadComment, thread: { item: PhoneItem; product: TeamProduct }, orElse: () => void) => boolean;
 }
 
 export interface ThreadShare {
@@ -279,7 +281,7 @@ function messageLines(lines: TeamHistoryLine[], me: string): OutLine[] {
 
 export function createThreadShare({
   backend, me, root, listCards, listThreads, historyOf, disk, accountRoot, storeRoot, listProducts = () => [],
-  onChange = () => {}, log = () => {}, now = Date.now, home = os.homedir(), myName = () => null, nameOf = () => null,
+  onChange = () => {}, log = () => {}, now = Date.now, home = os.homedir(), myName = () => null, nameOf = () => null, relay,
 }: ThreadShareOptions): ThreadShare {
   const built = new Map<string, Built>();
   // Your threads with a card, and who may read each: null is the whole team.
@@ -292,6 +294,9 @@ export function createThreadShare({
   const missed = new Map<string, number>();
   const waitingFile = `${root}.marks-waiting.json`;
   let waiting: ThreadFileMark[] | null = null;
+  // The notes you opened, kept here too: the cloud forgets them when the owner unshares and shares again.
+  const seenFile = `${root}.marks-seen.json`;
+  let seenHere: ThreadFileMark[] | null = null;
   let logged = '';
   const quietly = async <T, F = null>(what: string, fn: () => Promise<T>, fallback: F = null as F): Promise<T | F> => {
     try { return await fn(); } catch (err) {
@@ -479,6 +484,21 @@ export function createThreadShare({
     if (!Array.isArray(waiting)) waiting = [];
     return waiting;
   }
+  function seenMarks(): ThreadFileMark[] {
+    if (seenHere) return seenHere;
+    try { seenHere = JSON.parse(fs.readFileSync(seenFile, 'utf8')); } catch { seenHere = []; }
+    if (!Array.isArray(seenHere)) seenHere = [];
+    return seenHere;
+  }
+  function keepSeen(row: ThreadFileMark) {
+    seenHere = [...seenMarks(), row].slice(-2000);
+    try {
+      fs.mkdirSync(path.dirname(seenFile), { recursive: true });
+      const tmp = `${seenFile}.${process.pid}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(seenHere));
+      fs.renameSync(tmp, seenFile);
+    } catch (err) { log(`team threads: could not keep what you opened: ${(err as Error).message}`); }
+  }
   function saveWaiting() {
     fs.mkdirSync(path.dirname(waitingFile), { recursive: true });
     const tmp = `${waitingFile}.${process.pid}.tmp`;
@@ -508,7 +528,7 @@ export function createThreadShare({
 
   const asLine = (row: ThreadFileMark): (SharedLine & { uid: string; patch: { artifact: Mark } }) | null => {
     const artifact = cleanMark(row.mark);
-    return artifact ? { id: row.threadId, ts: row.at, source: 'system', by: row.by, uid: `mark-${row.id}`, patch: { artifact } } : null;
+    return artifact ? { id: row.threadId, ts: row.at, source: 'system', by: row.by, uid: `${TEAMMATE_MARK}${row.id}`, patch: { artifact } } : null;
   };
 
   /** Everything marked on one teammate's thread: what its owner published, what the cloud holds, what is waiting to go. */
@@ -516,7 +536,7 @@ export function createThreadShare({
     const out = new Map<string, SharedLine>();
     for (const l of local?.marks ?? []) out.set(l.uid ?? `${l.ts}-${out.size}`, l);
     const here = (m: ThreadFileMark) => m.owner === owner && m.threadId === threadId;
-    for (const m of [...fileMarks.filter(here), ...(waiting ?? waitingMarks()).filter(here)]) {
+    for (const m of [...fileMarks.filter(here), ...(waiting ?? waitingMarks()).filter(here), ...seenMarks().filter(here)]) {
       const line = asLine(m);
       if (line && line.patch.artifact.do !== 'edit' && !out.has(line.uid)) out.set(line.uid, line);
     }
@@ -624,14 +644,18 @@ export function createThreadShare({
     if (!unsaid.length && fileMarks.every((m) => m.owner !== me || m.by === me || deliveredMarks.has(m.id))) return;
     const threads = listThreads();
     let added = 0;
+    // The name is for the owner's agent, which has no team list to look it up in.
+    const file = (c: ThreadComment, dir: string) => {
+      const name = nameOf(c.by);
+      return disk.appendForeignLines(dir, [{
+        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text, ...(name ? { name } : {}) } },
+      }]);
+    };
     for (const c of unsaid) {
       const thread = threads.get(c.threadId);
       if (!thread) continue;
-      // The name is for the owner's agent, which has no team list to look it up in.
-      const name = nameOf(c.by);
-      added += disk.appendForeignLines(thread.product.dir, [{
-        id: c.threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text, ...(name ? { name } : {}) } },
-      }]);
+      if (relay?.(c, thread, () => { if (file(c, thread.product.dir)) onChange(); })) { delivered.add(c.id); added += 1; continue; }
+      added += file(c, thread.product.dir);
       delivered.add(c.id);
     }
     for (const m of fileMarks) {
@@ -678,7 +702,12 @@ export function createThreadShare({
       const ok = THREAD_ID.test(String(owner)) && THREAD_ID.test(String(threadId));
       const local = ok ? readLocal(owner, threadId) : null;
       const carried = new Set((local?.lines ?? []).map((l) => l.uid).filter(Boolean));
-      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId && !carried.has(`comment-${c.id}`)).map((c): SharedLine => ({
+      // A helper's words the owner's copy passed to its agent come back as that agent's reply line.
+      const passedOn = new Set((local?.lines ?? []).flatMap((l) => {
+        const from = l.patch?.from as { teammate?: unknown } | undefined;
+        return typeof from?.teammate === 'string' && l.patch?.answer ? [`${from.teammate}\n${l.patch.answer}`] : [];
+      }));
+      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId && !carried.has(`comment-${c.id}`) && !passedOn.has(`${c.by}\n${c.text}`)).map((c): SharedLine => ({
         id: threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text } },
       }));
       return {
@@ -748,6 +777,7 @@ export function createThreadShare({
       const row: ThreadFileMark = { id, owner, threadId, by: me, mark: clean, at: now() };
       waiting = [...waitingMarks(), row];
       saveWaiting();
+      if ((clean as { do?: string }).do === 'seen') keepSeen(row);
       await sendWaiting(null);
       fileMarks = await quietly('reading notes on files', () => backend.fileMarks!(), fileMarks);
       return true;
@@ -791,8 +821,8 @@ export function createThreadShare({
       for (const [threadId, b] of built) if (readers.has(threadId)) fromLines(me, threadId, b.work.marks ?? [], false);
       for (const [owner, threadId] of localThreads()) fromLines(owner, threadId, readLocal(owner, threadId)?.marks ?? [], true);
 
-      const notes = new Map<string, { by: string; file: string }>();
-      for (const s of all) if (s.mark.do === 'note') notes.set(`${s.owner}:${s.threadId}:${s.mark.id}`, { by: s.by, file: s.mark.file });
+      const notes = new Map<string, { by: string; file: string; v?: number }>();
+      for (const s of all) if (s.mark.do === 'note') notes.set(`${s.owner}:${s.threadId}:${s.mark.id}`, { by: s.by, file: s.mark.file, v: s.mark.v });
       const seen = new Set<string>();
       for (const s of all) {
         const { mark } = s;
@@ -808,7 +838,8 @@ export function createThreadShare({
           to = to.filter((p) => p === me || may === null || may?.includes(p));
         }
         if (!to.length || (s.theirs && s.by !== me && !to.includes(me))) continue;
-        out.push({ id: s.id, kind: 'note', owner: s.owner, threadId: s.threadId, by: s.by, text: mark.text, at: s.at, file: answers?.file ?? mark.file, note: mark.do === 'note' ? mark.id : mark.on, to });
+        const v = answers ? answers.v : mark.do === 'note' ? mark.v : undefined;
+        out.push({ id: s.id, kind: 'note', owner: s.owner, threadId: s.threadId, by: s.by, text: mark.text, at: s.at, file: answers?.file ?? mark.file, ...(v ? { v } : {}), note: mark.do === 'note' ? mark.id : mark.on, to });
       }
       return out.sort((a, b) => a.at - b.at);
     },
