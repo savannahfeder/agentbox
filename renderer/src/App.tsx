@@ -111,7 +111,7 @@ import { filedByThePerson, heldForHer, laterHerWordLifts, wordWaits } from '../.
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
 import { strayLetters } from './stray-letters';
-import { keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
+import { eOnThisList, keyWhileABoxIsOpen, opensATextField, takesTheListBack } from './keys';
 import { enterIsTheButtons } from './focused-button';
 import { commandATicksTheList, selectWhatYouAreReading } from './select-all';
 import { modelCommands } from './thread-model-commands';
@@ -183,7 +183,7 @@ import { planBar, type BarWords, type Plan } from './plan-setup';
 import { PRACTICE_SLUG } from '../../shared/first-run-practice.mts';
 import { ModeScreen, isModeVariant } from './components/ModeScreen';
 import { practiceRemembered, rememberProject, rememberedProject } from './compose-project';
-import { holdForStoppedAgent, neverWarned, rememberWarned } from './stopped-agent';
+import { holdForStoppedAgent, neverWarned, pressAgainGoesAhead, rememberWarned } from './stopped-agent';
 import { FirstRunFlow } from './components/FirstRun';
 import { runOfRule } from './first-run';
 import { Tour, TourFinished } from './components/Tour';
@@ -467,6 +467,8 @@ export default function App() {
   const [stoppedWarned, setStoppedWarned] = useState<boolean>(() => {
     try { return !neverWarned(localStorage); } catch { return true; }
   });
+  // The thread the last E warning was about, `product:id`.
+  const heldFor = useRef<string | null>(null);
   const [selected, setSelected] = useState(0);
   // A TEAMMATE'S ROW THE KEYBOARD IS ON (w-fb16bcaeba), by `stopKey`. Their
   // card has no place in `list`, which is your threads only, so while this is
@@ -4161,8 +4163,9 @@ export default function App() {
   const nudgeOnStopped = useCallback((rows: WorkItem[], key: 'E' | 'L') => {
     const held = holdForStoppedAgent({ rows, key, warned: stoppedWarned });
     if (!held) return false;
-    setStoppedWarned(true);
-    rememberWarned(localStorage);
+    // Learned once a press went ahead on the thread it warned about, not when shown.
+    if (pressAgainGoesAhead(heldFor.current, held.goes)) { heldFor.current = null; setStoppedWarned(true); rememberWarned(localStorage); return false; }
+    heldFor.current = `${held.goes.product}:${held.goes.id}`;
     showToast(held.say, { ...held.goes, warns: true });
     return true;
   }, [stoppedWarned, showToast]);
@@ -6311,6 +6314,7 @@ export default function App() {
           else if (multiSel.size) batchDone(multiSel);
           else if (pointed && view === 'inbox') markDone(pointed);
           else if (chatRow && view === 'inbox') void chatRowDone(chatRow);
+          else if (pointed) showToast(eOnThisList(view));
           break;
         case 'r': case 'R': if (!multiSel.size && pointed && replyKeyWorksIn(view)) { e.preventDefault(); const whose = replyingTo({ people: conversationNames(pointed) }); if (whose) showToast(whose); setFocused(pointed); markSeen(pointed); setModal('reply'); } break;
         // 1 AND 2 ANSWER A CODEX CONVERSATION'S ROW WITHOUT OPENING IT, and I
