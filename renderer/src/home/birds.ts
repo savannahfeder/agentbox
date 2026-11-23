@@ -101,8 +101,9 @@ export function boxIn(el: Element | null, frame: HTMLElement, pad = 0): Box | nu
 
 /** Nobody at the window for this long, and they settle until somebody is. */
 export const AWAY_MS = 180_000;
-/** How long to wait between updates, then the wait each one is drawn after: thirty a second, fifteen, then eight. */
-const WAITS = [24, 57, 112];
+/** The wait before each update, drawn at the screen's next frame: about twenty-four a second, fifteen, then eight.
+ *  At SPEED the first is a px an update. Thirty a second cost about twice as much in the app. */
+const WAITS = [34, 57, 112];
 /** An update this many times later than it should be is the computer falling behind. */
 const LATE = 2.5;
 /** This many, not made up since, and they are updated less often. */

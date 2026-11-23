@@ -13,7 +13,7 @@
 // second.
 //
 // Each bird is a small picture moved by transform. It goes round its own spot at
-// an even speed, about thirty times a second, whatever is pressed or scrolled.
+// an even speed, about 24 times a second, whatever is pressed or scrolled.
 // It settles, easing, only when nobody has been at the window for minutes or the
 // computer is falling behind, and is updated less often before it settles.
 import { describe, it, expect } from 'vitest';
@@ -96,11 +96,11 @@ describe('how they move', () => {
 });
 
 describe('what never stops them', () => {
-  it('moving from the first moment, at about thirty updates a second', () => {
+  it('moving from the first moment, at about 24 updates a second', () => {
     const { beats } = keepTime(2000);
     expect(beats[1].dt).toBeGreaterThan(0.02);
-    expect(beats.length).toBeGreaterThan(45);
-    expect(beats.length).toBeLessThan(75);
+    expect(beats.length).toBeGreaterThan(40);
+    expect(beats.length).toBeLessThan(56);
     expect(Math.max(...beats.slice(1).map((b, i) => b.now - beats[i].now))).toBeLessThan(60);
   });
   it('typing, scrolling and pressing Enter only say somebody is here', () => {
