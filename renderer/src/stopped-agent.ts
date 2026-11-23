@@ -88,7 +88,8 @@ export type StoppedKey = (typeof STOPPED_WARNING_KEYS)[number];
 const COST: Record<StoppedKey, string> = { E: 'marking it done', L: 'putting it off' };
 
 export function stoppedWarning(key: StoppedKey, { pressAgain = true } = {}): string {
-  const lesson = `This agent is waiting on your answer, and ${COST[key]} leaves it stuck.`;
+  // "Has answered", because its row says Answered (threads/page-rules.ts cellUnderTab).
+  const lesson = `This agent has answered and waits on you, so ${COST[key]} leaves it stuck.`;
   return pressAgain ? `${lesson} Press again to go ahead.` : lesson;
 }
 
@@ -134,6 +135,11 @@ export function stoppedWaiting(item: MaybeStopped): boolean {
  *  a selection is the one route that takes a stopped agent out without ever
  *  pointing at it. The row named in `goes` is the first stopped one in the
  *  list, which is the one the pill offers to open. */
+/** "Press again to go ahead" is about the thread it warned of: E on another stopped thread is warned about too. */
+export function pressAgainGoesAhead(heldFor: string | null, goes: { product: string; id: string }): boolean {
+  return heldFor === `${goes.product}:${goes.id}`;
+}
+
 export function holdForStoppedAgent(p: {
   rows: readonly MaybeStopped[];
   key: StoppedKey;

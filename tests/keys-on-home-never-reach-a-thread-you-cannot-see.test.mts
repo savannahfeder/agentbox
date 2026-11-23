@@ -66,7 +66,7 @@ describe('App.tsx', () => {
   // the draft with the caret at its start, so the waking letter and the rest of
   // the sentence went in front of the draft.
   it('wakes the box with the caret after the draft, for a letter and for N', () => {
-    const nowhere = app.slice(app.indexOf("if (means === 'nowhere')"), app.indexOf("if (means === 'nowhere')") + 300);
+    const nowhere = app.slice(app.indexOf("if (means === 'nowhere') {\n"), app.indexOf("if (means === 'nowhere') {\n") + 300);
     expect(nowhere).toMatch(/focusAtEnd\(box\)/);
     const start = app.slice(app.indexOf('const startThread = () =>'), app.indexOf('const startThread = () =>') + 300);
     expect(start).toMatch(/focusAtEnd\(box\)/);

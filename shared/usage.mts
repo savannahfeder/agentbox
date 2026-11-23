@@ -233,18 +233,19 @@ export function headlineLimit(limits: UsageLimit[] | null | undefined): UsageLim
 
 /**
  * HOW LONG UNTIL IT STARTS OVER, in her house style: whole minutes, then hours
- * and minutes, and never a seconds counter.
+ * and minutes, and never a seconds counter. "Resets in", as the panel's rows
+ * say it: "24m left" beside "89% used" read as 24 minutes of use left.
  */
 export function untilReset(ms: number): string {
   const span = spanLeft(ms);
-  return span === ANY_MOMENT ? span : `${span} left`;
+  return span === ANY_MOMENT ? `resets ${span}` : `resets in ${span}`;
 }
 
 /**
- * THE SAME COUNTDOWN WITHOUT THE WORD "left" ON THE END, for the callers that
- * put a preposition in front of it instead. It is the same rule and the same
- * rounding; `untilReset` is this plus a suffix, so the two cannot drift into
- * disagreeing about what 90 minutes is. */
+ * THE SAME COUNTDOWN WITHOUT WORDS AROUND IT, for the callers that put their
+ * own in front of it. It is the same rule and the same rounding as
+ * `untilReset`, so the two cannot drift into disagreeing about what 90
+ * minutes is. */
 export const ANY_MOMENT = 'any moment';
 export function spanLeft(ms: number): string {
   const minutes = Math.max(0, Math.floor(ms / 60_000));

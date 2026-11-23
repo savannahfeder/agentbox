@@ -10,7 +10,7 @@ import { REST_HEADING, URGENT_HEADING, clickIntent, rowSummary, rowTitle } from 
 import { isUrgentRow } from '../urgent-arrival';
 // THE SAME PREDICATE THE PANE USES, not a second copy of the rule. The row and
 // the pane disagreeing about one fact on one screen is what this import fixes.
-import { cameBackEmpty, cannotStartLine, runningSince } from '../live-line';
+import { cameBackEmpty, cannotStartLine, cannotStartWord, runningSince } from '../live-line';
 import { agentAtWork, engineWordFor } from '../byline';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mts';
 import { isTroubleRow } from '../trouble-row';
@@ -336,7 +336,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
         onClick={() => onOpenRepeat?.(rule)}>
         <span className="mark" aria-hidden="true" />
         <RowCells status={running?.live ? running : laterCell(null)}
-          lead={<RepeatMark />} title={rule.title} aside={repeatTag(rule)} where={rule.productName}
+          lead={<RepeatMark />} title={rule.title} line={{ text: repeatRow(rule, last).last }} aside={repeatTag(rule)} where={rule.productName}
           person={withPerson ? personCell?.(team?.me ?? null) : undefined}
           priority={shownPriority(rule)} updatedAt={rule.updatedAt ?? rule.createdAt}
           when={nextRunWords(rule)} now={Date.now()} />
@@ -410,6 +410,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                 <div key={key} className={`row th-their-row${selectedCard === key ? ' selected' : ''}`} onClick={() => onOpenCard?.(c)}>
                   <span className="mark" aria-hidden="true" />
                   <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} who={{ face: <Face person={team?.byId.get(c.personId) ?? null} />, name: team?.byId.get(c.personId)?.name ?? undefined }} title={c.title ?? 'Private thread'} where={cardPlace(c)} person={personCell?.(c.personId)}
+                    line={c.problem ? { who: team?.byId.get(c.personId)?.name ?? undefined, text: c.problem } : null}
                     priority={c.priority} updatedAt={c.updatedAt} now={Date.now()} />
                 </div>
               );
@@ -702,7 +703,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                         : shipping?.includes(item.id)
                           ? <span className="time" title="The app is shipping this. It comes back to you once it is live, or goes back to its agent if it fails.">shipping</span>
                         : queued?.includes(item.id) && cannotStart?.[item.id] && cannotStartLine(cannotStart[item.id])
-                          ? <span className="time" title={cannotStartLine(cannotStart[item.id])!}>not started</span>
+                          ? <span className="time" title={cannotStartLine(cannotStart[item.id])!}>{cannotStartWord(cannotStart[item.id]).toLowerCase()}</span>
                         : queued?.includes(item.id)
                           ? <span className="time">queued</span>
                           : paused && tab === 'progress'
