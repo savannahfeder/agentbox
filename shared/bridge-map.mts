@@ -219,6 +219,8 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   track: 'zero:track',
   // How long the window's own thread held (renderer/src/window-holds.ts).
   windowHeld: 'zero:window-held',
+  // And how held it was over the last minute (renderer/src/window-lag.ts). Main takes it from the desktop window only.
+  windowLag: 'zero:window-lag',
   sessionTrace: 'zero:session-trace',
   itemHistory: 'zero:item-history',
   openArtifact: 'zero:open-artifact',
@@ -246,6 +248,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   saveRailNote: 'zero:save-rail-note',
   agentReply: 'zero:agent-reply',
   agentReveal: 'zero:agent-reveal',
+  bringInSession: 'zero:bring-in-session',
   agentConversation: 'zero:agent-conversation',
   scheduleAgent: 'zero:schedule-agent',
   closeAgent: 'zero:close-agent',

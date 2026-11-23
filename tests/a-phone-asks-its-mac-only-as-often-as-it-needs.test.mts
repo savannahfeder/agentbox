@@ -85,7 +85,7 @@ describe('the screen uses them on a phone only', () => {
   it.each([
     ['components/AgentUpdates.tsx', /setInterval\(poll,pollEvery\(1000,onPhone\(\)\)\)/],
     ['components/RemoteControl.tsx', /setInterval\(refresh,pollEvery\(1000,onPhone\(\)\)\)/],
-    ['App.tsx', /setInterval\(refresh, pollEvery\(10_000, onPhone\(\)\)\)/],
+    ['App.tsx', /setInterval\(tick, pollEvery\(10_000, onPhone\(\)\)\)/],
     ['components/Focus.tsx', /setInterval\(read, pollEvery\(4000, onPhone\(\)\)\)/],
     ['components/Live.tsx', /setInterval\(read, pollEvery\(8000, onPhone\(\)\)\)/],
     ['components/ItemThread.tsx', /setInterval\(read, pollEvery\(REFRESH_MS, onPhone\(\)\)\)/],

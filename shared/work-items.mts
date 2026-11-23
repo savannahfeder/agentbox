@@ -118,6 +118,7 @@ export type WorkItemPatch = {
   signInAnswer?: SignInAnswer;
   ask?: AskPatch;
   verdict?: Verdict;
+  approvedFiles?: string[];
 };
 export type WorkItemField = keyof WorkItemPatch;
 export type PatchInput = { readonly [K in WorkItemField]?: unknown };
@@ -427,6 +428,8 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // A TASK THAT ASKS FOR HELP OR A REVIEW ON ONE THREAD, and what its holder
   // said when they handed it back (shared/thread-asks.mts).
   'ask', 'verdict',
+  // The files they approved while the ask was on them, by name, on the verdict's line.
+  'approvedFiles',
 ];
 
 // THE SUMMARY IS SHARED BETWEEN THE PERSON AND THE AGENT. Everywhere else the
@@ -834,6 +837,10 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
       return kind && owner && thread && product ? { kind, owner, thread, product, ...(step ? { step } : {}), ...(note ? { note } : {}) } : undefined;
     }
     case 'verdict': return value === 'done' || value === 'yes' || value === 'changes' ? value : undefined;
+    case 'approvedFiles': {
+      if (!Array.isArray(value)) return undefined;
+      return [...new Set(value.map((v) => str(v, MAX_SHORT)).filter(Boolean) as string[])].slice(0, MAX_LABELS);
+    }
     case 'shippedAt': return Number.isFinite(value) && (value as number) >= 0 ? Math.trunc(value as number) : undefined;
     case 'linkComment': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;

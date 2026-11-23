@@ -36,8 +36,8 @@ describe('a thread you just closed is never counted in progress', () => {
 
   it('the In progress list counts only held rows that start, and every held row still leaves Needs you', () => {
     expect(app).toMatch(/holdRow\(item\.id, heldRowStarts\(item, goes\)\)/);
-    expect(app).toMatch(/if \(startingIds\.has\(i\.id\) && deferredUntil <= now\) return true;/);
-    expect(app).not.toMatch(/if \(pendingIds\.has\(i\.id\) && deferredUntil <= now\) return true;/);
+    expect(app).toMatch(/if \(startingIds\.has\(i\.id\) && deferredUntil <= listNow\) return true;/);
+    expect(app).not.toMatch(/if \(pendingIds\.has\(i\.id\) && deferredUntil <= (?:list)?[nN]ow\) return true;/);
     expect(app).toMatch(/if \(pendingIds\.has\(i\.id\)\) return false; \/\/ action held in the grace window/);
   });
 });

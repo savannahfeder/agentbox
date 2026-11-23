@@ -24,7 +24,10 @@ if (!fs.existsSync(path.join(site, 'index.html'))) throw new Error('build it fir
 let project = pagesProjectOf(null);
 try { project = pagesProjectOf(JSON.parse(fs.readFileSync(teamConfigFile(root), 'utf8'))); } catch { /* the default */ }
 if (!/^[a-z0-9-]{1,58}$/.test(project)) throw new Error(`not a Pages project name: ${project}`);
-// The first time, the project is made; after that this says it exists, which is fine.
-spawnSync('npx', ['--yes', 'wrangler@4', 'pages', 'project', 'create', project, '--production-branch', 'main'], { stdio: 'inherit', cwd: root });
+// The first time, the project is made. After that wrangler prints an error
+// saying it exists, which a ship's reader took for the reason it failed, so
+// that is shown only when the deploy fails too.
+const made = spawnSync('npx', ['--yes', 'wrangler@4', 'pages', 'project', 'create', project, '--production-branch', 'main'], { stdio: ['ignore', 'pipe', 'pipe'], encoding: 'utf8', cwd: root });
 const run = spawnSync('npx', ['--yes', 'wrangler@4', 'pages', 'deploy', site, '--project-name', project, '--branch', 'main', '--commit-dirty=true'], { stdio: 'inherit', cwd: root });
+if (run.status !== 0) process.stderr.write(`${made.stdout ?? ''}${made.stderr ?? ''}`);
 process.exit(run.status ?? 1);

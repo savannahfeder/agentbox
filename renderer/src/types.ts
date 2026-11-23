@@ -14,6 +14,9 @@ import type { EngineSetupState } from './plan-setup';
 export type { AgentVoice };
 
 /** A comment on a thread's shared link, waiting for its owner (shared/work-items.mts `linkComments`). */
+/** A session started outside Agentbox, brought in as a thread (main/ipc.mts zero:bring-in-session). */
+export type BringInResult = { ok: true; product: string; id: string } | { ok: false; reason: string };
+
 export interface LinkCommentWaiting { name: string; file: string; text: string; ts: number; place?: NotePlace }
 
 export interface WorkItem {
@@ -143,6 +146,8 @@ export interface WorkItem {
   ask?: { kind: 'help' | 'review'; owner: string; thread: string; product: string; step?: string; note?: string };
   /** How that ask was handed back. */
   verdict?: 'done' | 'yes' | 'changes';
+  /** The files approved while it was out, by name. */
+  approvedFiles?: string[];
   // Set only on the synthesized rows that stand for a running Claude Code
   // agent. Its presence is what every action path checks: an agent row is drawn
   // by the same list and reached by the same keys, and nothing may write it to
@@ -823,6 +828,8 @@ export interface RunningSession {
   startedAt: number;
   /** When the reply this cloud run is working on went in; absent on its first turn. Timers read `runningSince`. */
   turnStartedAt?: number;
+  /** How long its next command has waited for memory on this computer; absent while none waits. */
+  memoryHeldMs?: number;
   /**
    * WHICH CODING AGENT REALLY STARTED THIS RUN, written at the spawn — a fact,
    *  where `snapshot.engines.byItem` is the supervisor's answer for the NEXT
@@ -1154,6 +1161,16 @@ export interface AgentSession {
   repliedAt?: number;
   /** The session's own stamp on its own status. */
   statusAt?: number;
+  /** When its newest answer began, which tells her later words from earlier ones. */
+  saidAt?: number;
+  /** Claude Code when absent. A Codex session has no process here (`pid` is 0). */
+  engine?: 'claude' | 'codex';
+  /** The tool's own question it is stopped on, with its choices. */
+  question?: { question: string; options: string[] }[];
+  /** Where it runs, in words: "Codex app", "Codex in a terminal". */
+  app?: string | null;
+  /** A command it is waiting on permission to run, with its own reason. */
+  approval?: { command: string; reason: string } | null;
   // the app's own workers, folded out of everything she sees: they are already in
   // her inbox as work items, and a second row about the same agent is a
   // rejected duplicate picture.
@@ -1183,8 +1200,10 @@ export interface AgentTurn {
   voice?: AgentVoice;
   /** A comment on a file: the link that opens the file at it. */
   fileMark?: FileMarkLink;
-  /** A teammate's comment, an agent's checkpoint, or the app's own note (thread-history.ts). */
-  says?: 'comment' | 'progress' | 'to-agent' | 'app';
+  /** A teammate's comment, an agent's checkpoint, the app's own note, or an ask handed back (thread-history.ts). */
+  says?: 'comment' | 'progress' | 'to-agent' | 'app' | 'hand-back';
+  /** On a hand-back, what the asker had asked, drawn under it. */
+  asked?: string;
   // THE MESSAGE'S OWN NAME, the uid of the ledger line it was written as. A
   // reaction is stored against it (w-560647d4db), so only a message that has
   // one can wear chips: a message still on its way has not been written down
@@ -1796,6 +1815,8 @@ declare global {
       looking?(p: { product: string | null; id: string | null }): Promise<boolean>;
       // How long this window's own thread held (./window-holds.ts).
       windowHeld?(ms: number): Promise<boolean>;
+      // Its long tasks and slow answers to input over the last minute (./window-lag.ts).
+      windowLag?(lag: { longMs: number; longest: number; slow: number; worst: number }): Promise<boolean>;
       refreshUsage?(p?: { engine?: 'claude' | 'codex'; ask?: boolean }): Promise<{ ok: boolean; reading?: Usage; error?: string }>;
       accountUsage?(p: { refresh?: boolean; engine?: 'claude' | 'codex' }): Promise<{ readings: AccountUsageReading[] }>;
       // Whether a screen reader is running, which is what decides xterm's
@@ -1811,9 +1832,10 @@ declare global {
       // A count. The name is checked against the approved list in the main
       // process, which attaches everything else; nothing from this side rides along.
       track?(name: string, count?: number): Promise<boolean>;
-      agentReply(p: { pid: number; text: string }): Promise<{ ok: boolean; delivered?: boolean; working?: boolean; name?: string; reason?: string }>;
-      agentReveal(p: { pid: number }): Promise<{ ok: boolean; name?: string; reason?: string }>;
-      agentConversation(p: { pid: number; sessionId: string | null; cwd: string }): Promise<AgentConversation>;
+      agentReply(p: { pid: number; text: string; engine?: string }): Promise<{ ok: boolean; delivered?: boolean; working?: boolean; name?: string; reason?: string }>;
+      agentReveal(p: { pid: number; engine?: string; sessionId?: string | null }): Promise<{ ok: boolean; name?: string; reason?: string }>;
+      bringInSession?(p: { pid: number; engine?: string; sessionId?: string | null }): Promise<BringInResult>;
+      agentConversation(p: { pid: number; sessionId: string | null; cwd: string; engine?: string }): Promise<AgentConversation>;
       dashboard(slug: string): Promise<ProductDashboard | null>;
       terminal<A extends TerminalAction>(p: TerminalAsk<A>): Promise<TerminalAnswer<A>>;
       // Null from the phone's own site, which has no coding agents to update.
@@ -1823,7 +1845,7 @@ declare global {
       compact(p: { product: string; id: string }): Promise<{state: string; at: number}>;
       remoteControl(p: {product: string; id: string; action?: string}): Promise<{state: string; at: number; text?: string; url?: string; mayBeActive?: boolean} | null>;
       compactionStatus(p: {product: string; id: string}): Promise<{state: string; at: number} | null>;
-      answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean; reopenAs?: { status?: string; mine?: boolean } }): Promise<WorkItem>;
+      answer(p: { product: string; id: string; answer?: string; status?: string; priority?: number; permissionMode?: string | null; model?: string | null; effort?: string | null; now?: boolean; inReplyTo?: string; closeUnshipped?: boolean; runAt?: number; putAway?: boolean; reopenAs?: { status?: string; mine?: boolean }; reopen?: boolean }): Promise<WorkItem>;
       sendNow(p: { product: string; id: string }): Promise<{ ok: boolean; interrupted: boolean }>;
       setProductOrder(p: { order: string[] }): Promise<unknown>;
       setThreadPlaces(p: { places: Record<string, number | null> }): Promise<unknown>;
@@ -1875,7 +1897,7 @@ declare global {
       connectionsCheck?(p: { id: string }): Promise<ConnectionTile | null>;
       connectionsDisconnect?(p: { id: string }): Promise<boolean>;
       connectionsAccept?(p: { id: string }): Promise<boolean>;
-      filesPlace?(): Promise<FilesPlaceList>;
+      filesPlace?(opts?: { soon?: boolean }): Promise<FilesPlaceList>;
       filesPlaceOpen?(p: { key: string }): Promise<FilesPlaceView | null>;
       filesPlaceEdit?(p: { key: string; text: string }): Promise<{ ok: boolean; error?: string; goes?: 'sent'; to?: string }>;
       filesPlaceMark?(p: { key: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;

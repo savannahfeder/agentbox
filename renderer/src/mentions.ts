@@ -29,6 +29,8 @@ export function mentionName(target: string): string {
   const value = (target ?? '').trim();
   if (/^mailto:/i.test(value)) return value.slice('mailto:'.length);
   if (ADDRESS.test(value) && !/^file:/i.test(value)) return value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/\/+$/, '');
+  // In code the folder is what tells two server.js apart.
+  if (!value.startsWith('/') && sourceReference(value.replace(/#L\d+$/, ''))) return value.replace(/^\.\//, '');
   const path = value.replace(/^file:\/\//i, '').replace(/\/+$/, '');
   const last = path.split('/').pop() ?? '';
   // A line number or an anchor after the name stays on it.

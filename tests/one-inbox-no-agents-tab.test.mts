@@ -51,21 +51,23 @@ describe('the tab is gone, not hidden', () => {
   // deferred out of every list in the app.
   it('still builds the rows, because Scheduled and the inbox are drawn from them', () => {
     expect(app).toMatch(/const agentRows = useMemo/);
-    expect(app).toMatch(/\.\.\.agentList\.filter\(\(r\) => \(r\.runAt \?\? 0\) > now\)/);
+    expect(app).toMatch(/\.\.\.agentList\.filter\(\(r\) => \(r\.runAt \?\? 0\) > listNow\)/);
   });
 
   it('asks the setting how many of them the inbox takes', () => {
     // The fallback matches the app's own default (main/settings.mts) so the
     // inbox cannot flash a row it is about to drop.
-    expect(app).toMatch(/const agentMode = snap\?\.config\?\.outsideAgents \?\? 'off';/);
-    expect(app).toMatch(/reachesInbox\(r\.agent, now, agentMode\)/);
+    expect(app).toMatch(/const agentMode = snap\?\.config\?\.outsideAgents \?\? 'all';/);
+    expect(app).toMatch(/reachesInbox\(r\.agent, listNow, agentMode\)/);
   });
 
   // A quiet agent must sort UNDER everything that is genuinely asking, or the
   // sweep buries the one row that matters. `reachesInbox` cannot
   // be the test any more: under the default every listed agent passes it.
+  // AND ONE ASKING IN ITS OWN WORDS IN THE MIDDLE (w-34f79ab66e): a power tester
+  // found two Codex rows asking a question at Low, under days-old answered threads.
   it('scores a quiet agent at the bottom and an asking one at the top', () => {
-    expect(app).toMatch(/priority: asksSomething\(a\) \? 9 : 1,/);
+    expect(app).toMatch(/priority: asksSomething\(a\) \? 9 : agentLayout\(a\)\.kind === 'asks' \? 5 : 1,/);
   });
 });
 

@@ -591,7 +591,7 @@ export function Thread({ events, omitted = 0, onWhole, onOpenOrigin, onSendNow, 
                   ? <div className="msg-body typed">{typedParts(e.text ?? '').map((p, k, all) => ('embed' in p
                     ? <div key={k} className="typed-embed">{md(p.embed)}</div>
                     : all.length === 1 ? asTyped(p.text) : <span key={k}>{asTyped(p.text)}</span>))}</div>
-                  : <div className="msg-body"><NeedOlder.Provider value={n !== asking}>{md(e.text ?? '')}</NeedOlder.Provider></div>}
+                  : <div className="msg-body"><NeedOlder.Provider value={n !== asking}>{md(e.text ?? '')}</NeedOlder.Provider>{e.asked && <p className="msg-asked">{e.asked}</p>}</div>}
               </div>
             )}
           {/* WHAT THIS TURN CARRIES, under the last thing it said and above

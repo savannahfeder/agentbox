@@ -22,11 +22,13 @@ import { readNotes, type Notes, type TraceSession } from './notes';
 import { commandPrompt } from '../../shared/claude-commands.mts';
 import { DEFAULT_ENGINE } from '../../shared/engines.mts';
 import { instructionOf } from '../../shared/repeats.mts';
-import { baseName, familyName, filesInLines, fromATeammatesCopy, placeWords, threadFiles } from '../../shared/artifact-marks.mts';
+import { baseName, familyName, filesInLines, fromATeammatesCopy, placeWords, shownName, threadFiles } from '../../shared/artifact-marks.mts';
 import { handedFrom } from '../../shared/team-departures.mts';
 import { isContinuedNote } from '../../shared/thread-continued.mts';
 import { shortTitle } from '../../shared/thread-title.mts';
-import { handBackReadBy } from '../../shared/thread-asks.mts';
+import { handBackMessage, handBackReadBy, readHandBack, type AskKind } from '../../shared/thread-asks.mts';
+import type { Verdict } from '../../shared/work-items.mts';
+import { JUST_ITS_NAME } from './media-row';
 import { carriedOnIn, saidBeforeTheStop, saysItStopped } from '../../shared/carried-on-outside.mts';
 import { Name } from '../../shared/product-name.mjs';
 import { forTheAgent } from '../../shared/notes-for-the-agent.mts';
@@ -106,8 +108,10 @@ export interface ThreadEvent {
   voice?: AgentVoice;
   /** A comment or approval on a file: which file, and for a comment where on it. */
   fileMark?: FileMarkLink;
-  /** A teammate's comment (reaches the owner, starts nothing), an agent's checkpoint, or the app's own note. */
-  says?: 'comment' | 'progress' | 'to-agent' | 'app';
+  /** A teammate's comment (reaches the owner, starts nothing), an agent's checkpoint, the app's own note, or an ask handed back. */
+  says?: 'comment' | 'progress' | 'to-agent' | 'app' | 'hand-back';
+  /** On a hand-back, what the asker had asked, drawn under it. */
+  asked?: string;
   // The runs that began at this pickup, oldest first. Set by withRuns, and
   // an array because a session that never got its claim in still has to land
   // somewhere rather than disappear.
@@ -245,8 +249,22 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   // her.
   const claudeCode = (engine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;
   let askedACommand = false;
+  // The status before this line's, so an open after a done reads as a reopen.
+  let wasStatus = '';
   // When an ask's verdict was written: the close right after it is the hand-back (shared/thread-asks.mts).
   let verdictAt = -Infinity;
+  let verdict: Verdict | null = null;
+  let approvedFiles: string[] = [];
+  let askKind: AskKind | null = null;
+  // A file a hand-back names links to it: by the name its message gave it, else by its own.
+  const fileAt = new Map<string, string>();
+  for (const l of lines) {
+    const body = l.patch?.body;
+    if (typeof body === 'string') for (const [, name, path] of body.matchAll(/!?\[([^\]\n]+)\]\((attachments\/[^)\s]+)\)/g)) if (!fileAt.has(name)) fileAt.set(name, path);
+  }
+  for (const f of filesInLines(lines.filter((l) => !l.patch?.from))) if (!fileAt.has(shownName(f.path))) fileAt.set(shownName(f.path), f.path);
+  // By name alone: its pictures are on the page already, in the message that sent them.
+  const linkTo = (name: string) => (fileAt.has(name) ? `[${name}](<${fileAt.get(name)}> "${JUST_ITS_NAME}")` : name);
   // The newest ask written from your side, for an imported Codex
   // conversation's opening (see the relabel branch in the loop).
   let yourBody: string | null = null;
@@ -312,7 +330,12 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     markVoice = (line.patch?.voice as AgentVoice | undefined) ?? undefined;
     const patch = line.patch ?? null;
     if (has(patch, 'label')) label = String(patch!.label ?? '');
-    if (has(patch, 'verdict')) verdictAt = Number(line.ts) || 0;
+    if (has(patch, 'verdict')) {
+      verdictAt = Number(line.ts) || 0;
+      verdict = (patch!.verdict as Verdict | undefined) ?? null;
+      approvedFiles = Array.isArray(patch!.approvedFiles) ? patch!.approvedFiles.filter((f): f is string => typeof f === 'string') : [];
+    }
+    if (has(patch, 'ask')) askKind = (patch!.ask as { kind?: AskKind } | null)?.kind ?? null;
     if (has(patch, 'engine')) ranEngine = String(patch!.engine ?? '') || undefined;
     if (has(patch, 'model')) ranModel = String(patch!.model ?? '') || undefined;
     const mine = line.source === 'founder';
@@ -482,7 +505,11 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
     const from = line.source === 'system' && has(patch, 'answer') ? (patch!.from as { name?: string } | undefined)?.name : undefined;
     if (from && words(patch.answer)) {
       const fromId = (patch!.from as { teammate?: unknown }).teammate;
-      events.push({ at, who: 'agent', said: `${from} handed this over`, words: handBackReadBy(words(patch.answer)!, 'asker'), message: true, field: 'answer', from, ...(typeof fromId === 'string' ? { fromId } : {}) });
+      const back = readHandBack(words(patch.answer));
+      const shown = back
+        ? { words: handBackMessage({ ...back, link: linkTo }), says: 'hand-back' as const, ...(back.asked ? { asked: `You asked: “${back.asked.note}”` } : {}) }
+        : { words: handBackReadBy(words(patch.answer)!, 'asker') };
+      events.push({ at, who: 'agent', said: `${from} handed this over`, ...shown, message: true, field: 'answer', from, ...(typeof fromId === 'string' ? { fromId } : {}) });
       continue;
     }
     if (has(patch, 'answer')) {
@@ -607,11 +634,28 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       // 'claimed' with no claim beside it is a lease line that lost its claim,
       // and the pickup above already said it.
       if (status === 'claimed') continue;
+      const before = wasStatus;
+      wasStatus = status;
       if (status === 'done') {
         // Handing it over closes your copy; "Given to …" just above already says what happened.
         const prev = events.at(-1);
         if (mine && prev?.field === 'answer' && /^Given to /.test(prev.words ?? '') && at - prev.at < 2000) continue;
         const handedBack = Number(line.ts) - verdictAt < 2000;
+        // An ask handed back is a message to its asker: the verdict, the words
+        // written with it and the files approved, as their thread reads it.
+        if (handedBack && askKind) {
+          const prev = events.at(-1);
+          const said = prev?.field === 'answer' && prev.message && !prev.from && prev.at >= verdictAt ? prev.words ?? '' : '';
+          if (said) { events.pop(); replied = null; }
+          const named = new Set(approvedFiles);
+          for (let k = events.length - 1; k >= 0; k -= 1) {
+            const m = events[k].fileMark;
+            if (m?.kind === 'approved' && named.has(shownName(fileShownName(m.file)))) events.splice(k, 1);
+          }
+          markAt = events.length;
+          events.push({ at, who, said: mine ? 'You handed it back' : 'It was handed back', words: handBackMessage({ kind: askKind, verdict, words: said, approved: approvedFiles, link: linkTo }), message: true, field: 'answer', says: 'hand-back' });
+          continue;
+        }
         // Filed in Done as it came in, its agent having finished there.
         if (mine && startedIn && resultAt && at - resultAt <= 10) {
           events.push({ at, who: 'agent', said: `It finished in ${startedIn}` });
@@ -651,7 +695,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         if (line.source === 'system' && events.at(-1)?.field === 'result') continue;
         // Nor is the app reopening the row for a teammate's words (`tellItem`).
         if (line.source === 'system' && events.at(-1)?.from && events.at(-1)?.field === 'answer') continue;
-        const said = mine ? 'You sent it back' : 'It handed this back';
+        const said = mine ? (before === 'done' ? 'You reopened it' : 'You sent it back') : 'It handed this back';
         // One press can write the reopening twice (the notes path does), so the same words within a second are one.
         const last = events.at(-1);
         if (last?.said === said && Math.abs(at - last.at) < 1000) continue;

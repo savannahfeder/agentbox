@@ -23,8 +23,8 @@ const partsOf = (s: string) => fold(s).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 export interface HomeSection { folder: FileFolder; files: PlacedFile[] }
 export interface Home { kept: HomeSection[]; empty: FileFolder[]; loose: PlacedFile[] }
 
-/** Two rows of four before a section's own page. */
-export const SHOWN_AT_FIRST = 8;
+/** Two rows of three, beside Recent, before a section's own page. */
+export const SHOWN_AT_FIRST = 6;
 
 /** The page of a project's files in no folder, where a folder's page would be. */
 export const NOT_IN_A_FOLDER = 'not-in-a-folder';
@@ -66,6 +66,30 @@ export function homeOf(files: PlacedFile[], folders: FileFolder[], project: stri
     .sort((a, b) => Number(isPinned(b.folder)) - Number(isPinned(a.folder)) || b.files[0].at - a.files[0].at);
   const empty = tops.filter((f) => !byTop.has(f.id)).sort((a, b) => a.name.localeCompare(b.name));
   return { kept, empty, loose: sortFiles(loose, 'recent') };
+}
+
+export const RECENT_MOST = 10;
+export interface RecentFile { file: PlacedFile; folder: FileFolder | null }
+
+/** The files that changed last on these homes, newest first, each with the folder it shows in. */
+export function recentOf(homes: readonly Home[]): RecentFile[] {
+  const rows = new Map<string, RecentFile>();
+  for (const home of homes) {
+    for (const s of home.kept) for (const file of s.files) if (!rows.has(file.key)) rows.set(file.key, { file, folder: s.folder });
+    for (const file of home.loose) if (!rows.has(file.key)) rows.set(file.key, { file, folder: null });
+  }
+  return [...rows.values()].sort((a, b) => b.file.at - a.file.at).slice(0, RECENT_MOST);
+}
+
+export function recentByDay(rows: readonly RecentFile[], now: number): Array<{ day: string; rows: RecentFile[] }> {
+  const days: Array<{ day: string; rows: RecentFile[] }> = [];
+  for (const r of rows) {
+    const day = whenWords(r.file.at, now);
+    const last = days[days.length - 1];
+    if (last?.day === day) last.rows.push(r);
+    else days.push({ day, rows: [r] });
+  }
+  return days;
 }
 
 /** A pinned document that changed this week: the one thing on the page in the accent. */

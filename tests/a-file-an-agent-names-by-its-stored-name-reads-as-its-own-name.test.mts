@@ -32,7 +32,8 @@ describe('a stored name an agent writes out bare', () => {
   it('leaves names that only look stamped alone', () => {
     expect(mentionName('payments-auth-audit.md')).toBe('payments-auth-audit.md');
     expect(mentionName('bookings-empty-state.html')).toBe('bookings-empty-state.html');
-    expect(mentionName('main/x.mjs#L40')).toBe('x.mjs#L40');
+    // A source file keeps its folder, which tells two server.js apart.
+    expect(mentionName('main/x.mjs#L40')).toBe('main/x.mjs#L40');
   });
 });
 

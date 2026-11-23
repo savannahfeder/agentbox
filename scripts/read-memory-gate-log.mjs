@@ -56,6 +56,8 @@ export function summariseGrants(entries) {
     lines: entries.length,
     byClass: {},
     refusals: { total: 0, underNormal: 0, underTight: 0, commands: [] },
+    // Commands answered with what their thread holds (main/memory-give-back.mts).
+    askedBack: 0,
     slotPressedWaitMs: 0,
     tightWaitMs: 0,
     waitedAtAllUnderNormal: 0,
@@ -73,6 +75,8 @@ export function summariseGrants(entries) {
       out.span.fromMs = out.span.fromMs === null ? e.t : Math.min(out.span.fromMs, e.t);
       out.span.toMs = out.span.toMs === null ? e.t : Math.max(out.span.toMs, e.t);
     }
+    // It neither queued for a slot nor ran, so it says nothing about either.
+    if (e.askedBack) { out.askedBack++; continue; }
     const wait = Number.isFinite(e.waitMs) ? e.waitMs : 0;
     // A light command needs no slot, so its waiting is the light lane filling
     // up, not the slots. Keep the two apart or the answer is wrong.
@@ -172,6 +176,7 @@ function printGrants(s) {
   console.log(`\nWHAT WAS HELD, in MB at its peak`);
   console.log(`  median ${s.peaks.heldSlotMedianMb ?? 'n/a'}, p90 ${s.peaks.heldSlotP90Mb ?? 'n/a'}, worst ${s.peaks.heldSlotMaxMb ?? 'n/a'}`);
   console.log(`  readings dropped as shared: ${s.peaks.sharedDropped}; never measured: ${s.peaks.neverMeasured}`);
+  console.log(`\nASKED TO GIVE MEMORY BACK: ${s.askedBack}`);
   console.log(`\nREFUSALS: ${s.refusals.total} (${s.refusals.underNormal} under normal, ${s.refusals.underTight} under tight)`);
   for (const r of s.refusals.commands) {
     console.log(`  ${secs(r.waitMs).padStart(8)}  ${String(r.pressure).padEnd(8)} ${r.cmd.slice(0, 80).replace(/\n/g, ' ')}`);

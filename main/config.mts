@@ -444,7 +444,7 @@ export function saveConfig(config: object, patch: Record<string, unknown>): Reco
   // to write `outsideAgents` into a new install's first save, because the
   // default flipped from "only the ones asking" to "every session" the moment a
   // config file existed, and a stranger who had never opened the setting would
-  // have been flipped by it. There is one default now for every install, `off`
+  // have been flipped by it. There is one default now for every install, `all`
   // in main/settings.mts, so there is no flip left to guard against and no
   // setting to write on somebody's behalf.
   for (const [key, value] of Object.entries(patch)) {

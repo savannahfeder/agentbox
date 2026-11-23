@@ -134,8 +134,8 @@ export interface TeamSyncOptions {
   listCards?: () => SyncCard[] | null | undefined;
   teamIdOf?: () => string | null | undefined;
   files?: SyncFiles;
-  /** Runs after the cards: the cloud takes a thread's work only while it has a card. */
-  threadShare?: { pass(teamId: string | null | undefined): unknown } | null;
+  /** Runs after the cards: the cloud takes a thread's work only while it has a card. It is handed the cards this pass read. */
+  threadShare?: { pass(teamId: string | null | undefined, cards?: readonly SyncCard[]): unknown } | null;
   /** What on this Mac a name in a message may mean. */
   findFile?: ((ask: { ref: string; project: SharedProjectRef; meant: boolean }) => unknown) | null;
   /** Options for each conversation's file carrier (tests make its waits short). */
@@ -481,10 +481,14 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
   // YOUR THREADS AS THE TEAM SEES THEM. Only the cards that changed are
   // written, because every row written is a realtime message to each Mac
   // listening, and a running thread's card changes each time it checks in.
+  // The cards as this pass read them, for the threads' work that follows: the list is every thread, worked out once.
+  let passCards: SyncCard[] | undefined;
   async function publishCards() {
+    passCards = undefined;
     const teamId = teamIdOf?.();
     if (!teamId) return false;
-    const cards = (listCards() || []).slice().sort((a, b) => a.threadId.localeCompare(b.threadId));
+    passCards = listCards() || [];
+    const cards = passCards.slice().sort((a, b) => a.threadId.localeCompare(b.threadId));
     const before = state.getCardsSent();
     const had = before?.teamId === teamId ? before.cards : null;
     const now: Record<string, string> = {};
@@ -522,7 +526,7 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
 
     report.cards = await publishCards();
     // After the cards: the cloud takes a thread's work only while it has a card.
-    await threadShare?.pass(teamIdOf?.());
+    await threadShare?.pass(teamIdOf?.(), passCards);
     return report;
   }
 

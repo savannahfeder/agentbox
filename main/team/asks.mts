@@ -96,7 +96,7 @@ export function createAsks({ file, me, products, readRows, nameOf, tell, putAway
         const name = nameOf(helper);
         const mine = me();
         const asker = mine ? nameOf(mine).split(/\s+/)[0] : 'You';
-        const text = handedBackWords({ kind: a.kind, name: name.split(/\s+/)[0] || name, verdict: ((r as { verdict?: Verdict }).verdict ?? null), words: handBackSaid(r as never), asked: a.note ? { by: asker, note: a.note } : null });
+        const text = handedBackWords({ kind: a.kind, name: name.split(/\s+/)[0] || name, verdict: ((r as { verdict?: Verdict }).verdict ?? null), words: handBackSaid(r as never), asked: a.note ? { by: asker, note: a.note } : null, approved: (r as { approvedFiles?: string[] }).approvedFiles ?? [] });
         k.back.push(r.id);
         void Promise.resolve(tell(a.product, a.thread, { text, from: { teammate: helper, name }, hold: true }))
           .catch((err) => log(`asks: ${name}'s hand-back did not reach the thread: ${err?.message ?? err}`));

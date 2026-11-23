@@ -47,6 +47,11 @@ export function takesTheListBack(key: string): boolean {
   return TAKES_THE_LIST_BACK.has(key.toLowerCase());
 }
 
+/** What E says on a list where it closes nothing, so the press is never silent. */
+export function eOnThisList(view: string): string {
+  return view === 'done' ? 'This thread is already done.' : 'Open this thread to close it.';
+}
+
 // WHAT A KEY MEANS WHILE A BOX IS OPEN, which is not one answer but three.
 //
 // Typing owns the keyboard: a caret in any field takes every key, and a modal

@@ -12,6 +12,20 @@ import type { Invisible } from '../team/rooms/GoInvisible';
 import { chord } from '../this-keyboard';
 import { pointerMoved } from '../sidebar-shrinks';
 import { actsOnPress } from '../press';
+import { foldedSet, toggleFold } from '../teammates/chat-lines';
+
+/** A thread in Recent: whose it is, its name, and whether it waits on you. */
+export interface RecentRow { key: string; mark: ReactNode; title: string; waits: boolean; onOpen: () => void }
+
+const FOLDS_KEY = 'agentbox.sidebarFolds';
+const foldsKept = (): string | null => { try { return globalThis.localStorage?.getItem(FOLDS_KEY) ?? null; } catch { return null; } };
+
+/** A section's name, which folds its rows away. */
+function SectionHead({ id, label, folds, onFold }: { id: string; label: string; folds: Set<string>; onFold: (id: string) => void }) {
+  return <button type="button" className="ws-sec" aria-expanded={!folds.has(id)} onClick={() => onFold(id)}>
+    <span>{label}</span><svg viewBox="0 0 8 8" aria-hidden="true"><path d="M1.2 2.4h5.6L4 6.2z" fill="currentColor" /></svg>
+  </button>;
+}
 
 // The search glass drawn at the sidebar's stroke, like Feedback's plane.
 function SearchGlyph() {
@@ -48,7 +62,9 @@ function SearchGlyph() {
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSearch, onCompose: _onCompose, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, statuses = true, onAccount, onSignIn, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove, invisible = null, inboxLabel = 'Inbox', onPalette, rail = false, onHover, groups = null, onGroupsPage = false, onTeammatesPage = false, onFiles, filesPage = false, onConnections, connectionsPage = false, onTasks, tasksPage = false, onHome, homePage = false }: {
+export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSearch, onCompose, recent = [], inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, statuses = true, onAccount, onSignIn, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove, invisible = null, inboxLabel = 'Inbox', onPalette, rail = false, onHover, groups = null, onGroupsPage = false, onTeammatesPage = false, onFiles, filesPage = false, onConnections, connectionsPage = false, onTasks, tasksPage = false, onHome, homePage = false }: {
+  /** The threads you last had open, newest first. Drawn on a desktop, and not while the sidebar is closed. */
+  recent?: RecentRow[];
   /** Whether one of the teammates' pages is up, which unlights Threads. */
   onTeammatesPage?: boolean;
   /** The Files place, and whether it is the page. */
@@ -130,6 +146,17 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
     onMouseLeave: () => { if (hoverAt.current) clearTimeout(hoverAt.current); hoverAt.current = null; onHover(false); },
   } : {};
   const me = team?.signedIn ? team.me : null;
+  // Your account menu has Settings in it, so the foot does not say it twice.
+  // The row is still made: a window as small as a phone draws no account row,
+  // and there it is the only way in (sidebar.css hides it at desktop sizes).
+  const accountHoldsSettings = rail && !!me && !!onAccount;
+  const [folds, setFolds] = useState(() => foldedSet(foldsKept()));
+  const fold = (id: string) => {
+    const next = toggleFold(JSON.stringify([...folds]), id);
+    try { globalThis.localStorage?.setItem(FOLDS_KEY, next); } catch { /* folds for this window only */ }
+    setFolds(foldedSet(next));
+  };
+  const workspaceOpen = !rail || !folds.has('workspace');
   const teamName = team?.team?.name ?? Name;
   // A team wears its logo, else its initial. With no team the corner names the
   // app itself, so it wears the Agentbox icon rather than a letter A.
@@ -171,6 +198,9 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   return <aside className={`workspace-navigation${rail ? ' gt-rail-nav' : ''}`} aria-label="Workspace" {...hover} {...clicked}>
     <div className="th-team" title={collapsed ? undefined : teamName}>
       {mark}<span className="th-team-name">{teamName}</span>
+      {rail && onCompose && <button type="button" className="ws-new" aria-label="New thread" title="New thread (N)" onClick={onCompose}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h8" /><path d="m4 20 1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5 4 20Z" /></svg>
+      </button>}
     </div>
     {/* Search is a way to look, not a place to go, so it sits above the tabs
         rather than among them, and its keys are text rather than caps. */}
@@ -185,8 +215,9 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
           faces at the end of the Inbox's tab bar pick whose threads are on
           it. `onTeam` is still the sign-in link at the foot. */}
     </nav>
-    {groups}
-    {(onConnections || onFiles || onTasks) && <nav className="workspace-tabs workspace-places" aria-label="Places">
+    {rail && (groups || onConnections || onFiles || onTasks) && <SectionHead id="workspace" label="Workspace" folds={folds} onFold={fold} />}
+    {workspaceOpen && groups}
+    {workspaceOpen && (onConnections || onFiles || onTasks) && <nav className="workspace-tabs workspace-places" aria-label="Places">
       {onTasks && <button data-tab="team" className={`workspace-tab${tasksPage ? ' active' : ''}`} aria-label="Team" aria-current={tasksPage ? 'page' : undefined} title={collapsed ? 'Team' : undefined} {...actsOnPress(onTasks)}>
         <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="2.5"/><circle cx="6" cy="10" r="2"/><circle cx="18" cy="10" r="2"/><path d="M8 19c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5"/><path d="M3 18c0-2 1.3-3.5 3-3.5 .8 0 1.5.3 2 .8M21 18c0-2-1.3-3.5-3-3.5-.8 0-1.5.3-2 .8"/></svg>
         <span>Team</span>
@@ -200,6 +231,14 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
         <span>Files</span>
       </button>}
     </nav>}
+    {rail && recent.length > 0 && <div className="ws-recent">
+      <SectionHead id="recent" label="Recent" folds={folds} onFold={fold} />
+      {!folds.has('recent') && <nav className="ws-recent-list" aria-label="Recent">
+        {recent.map((r) => <button type="button" key={r.key} className="ws-recent-row" title={r.title} onClick={r.onOpen}>
+          <span className="ws-recent-mark" aria-hidden="true">{r.mark}</span><span>{r.title}</span>{r.waits && <i className="ws-need" role="img" aria-label="Waiting on you" />}
+        </button>)}
+      </nav>}
+    </div>}
     <div className="workspace-bottom">
       {/* The card sits above the foot list; with the sidebar shut it is a
           row inside it (SidebarUpdate.tsx). */}
@@ -233,7 +272,7 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
         {onSignIn && <button aria-label="Sign in" title="Sign in" onClick={onSignIn}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><g transform="translate(12 12) scale(.8) translate(-12 -12)" strokeWidth="1.5625"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.3-6 8-6s6.8 2 8 6"/></g></svg><span>Sign in</span></button>}
         {onFeedback && <button aria-label="Feedback" title="Feedback" onClick={onFeedback}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><g transform="translate(12 12) scale(.8) translate(-12 -12)" strokeWidth="1.5625"><path d="M2.5 11.5 21.5 3l-5 18-5-6.5z"/><path d="M11.5 14.5 21.5 3"/><path d="m11.5 14.5-1.2 6 3-3.6"/></g></svg><span>Feedback</span></button>}
         {onInstructions && <button aria-label="Instructions" aria-current={page === 'instructions' ? 'page' : undefined} title="Instructions for every agent" onClick={onInstructions}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 16h6"/></svg><span>Instructions</span></button>}
-        {onSettings && <button aria-label="Settings" aria-current={page === 'settings' ? 'page' : undefined} title="Settings" onClick={onSettings}><SettingsIcon/><span>Settings</span></button>}
+        {onSettings && <button aria-label="Settings" className={accountHoldsSettings ? 'ws-in-menu' : undefined} aria-current={page === 'settings' ? 'page' : undefined} title="Settings" onClick={onSettings}><SettingsIcon/><span>Settings</span></button>}
       </div>
       {usage && <div className="workspace-usage">{usage}</div>}
       {corner && <div className="th-me">{corner}</div>}
