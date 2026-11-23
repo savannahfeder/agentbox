@@ -38,36 +38,69 @@ function runHere({ name, args, resolve, reject }: GitJobRequest) {
 function giveUp() {
   broken = true;
   worker = null;
+  if (idle) clearTimeout(idle);
   const left = [...waiting.values()];
   waiting.clear();
   for (const job of left) runHere(job);
 }
 
+// A THREAD WITH NOTHING TO RUN NEVER COLLECTS WHAT ITS LAST JOB LEFT, so one
+// big job's memory stayed until the next job. After this long with no job the
+// thread is ended, which frees all of it, and the next job starts another.
+let idleMs = 60_000;
+let idle: ReturnType<typeof setTimeout> | null = null;
+let started = 0;
+
+function restSoon() {
+  if (idle) clearTimeout(idle);
+  idle = setTimeout(() => {
+    idle = null;
+    const mine = worker;
+    if (!mine || waiting.size) return;
+    // Forgotten first, so its exit is not read as the thread failing.
+    worker = null;
+    mine.terminate().catch(() => {});
+  }, idleMs);
+  idle.unref?.();
+}
+
 function thread(): Worker | null {
   if (worker || broken) return worker;
+  let mine: Worker;
   try {
-    worker = new Worker(new URL('./git-change-thread.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] });
+    mine = new Worker(new URL('./git-change-thread.mts', import.meta.url), { execArgv: [...process.execArgv, ...stripTypesFlags()] });
   } catch (error) {
     console.warn('zero: the checkout will be read on the main thread:', (error as Error).message);
     broken = true;
     return null;
   }
-  noteThread('git', worker);
-  worker.on('message', ({ id, ok, value, error }: { id: number; ok: boolean; value: unknown; error: string }) => {
+  worker = mine;
+  started += 1;
+  noteThread('git', mine);
+  mine.on('message', ({ id, ok, value, error }: { id: number; ok: boolean; value: unknown; error: string }) => {
     const job = waiting.get(id);
     if (!job) return;
     waiting.delete(id);
-    if (!waiting.size) worker?.unref();
+    if (!waiting.size) {
+      mine.unref();
+      restSoon();
+    }
     if (ok) job.resolve(value); else job.reject(new Error(error));
   });
-  worker.on('error', (error: Error) => {
+  // Only the thread in use: one ended for being idle says nothing about the next.
+  mine.on('error', (error: Error) => {
+    if (worker !== mine) return;
     console.warn('zero: the checkout thread failed:', error.message);
     giveUp();
   });
-  worker.on('exit', () => { if (worker) giveUp(); });
-  worker.unref();
-  return worker;
+  mine.on('exit', () => { if (worker === mine) giveUp(); });
+  mine.unref();
+  restSoon();
+  return mine;
 }
+
+/** For tests: the idle time, and how many threads have been started. */
+export const __gitThread = { idleMs(ms: number) { idleMs = ms; }, started: () => started };
 
 /** Settles once no job is waiting on the thread. */
 export async function __gitJobsIdle() {
@@ -89,12 +122,19 @@ export function gitJob(name: string, ...args: unknown[]): Promise<unknown> {
     const id = ++seq;
     waiting.set(id, job);
     w.ref();
+    if (idle) {
+      clearTimeout(idle);
+      idle = null;
+    }
     try {
       w.postMessage({ id, name, args });
     } catch (error) {
       // Arguments a thread cannot be handed (a function, say) run here.
       waiting.delete(id);
-      if (!waiting.size) w.unref();
+      if (!waiting.size) {
+        w.unref();
+        restSoon();
+      }
       runHere(job);
     }
   });
