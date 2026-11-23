@@ -27,6 +27,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { OUTSIDE_MODES } from '../outside-agents';
 import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel, UpdateState } from '../types';
 import { onCloudPhone, onPhone, phoneSized } from '../phone-screen';
 import { setSidebarShrinks, useSidebarShrinks } from '../sidebar-shrinks';
@@ -1219,11 +1220,7 @@ const CODEX_MODE_OPTIONS: Array<{ value: CodexModeId; label: string }> = CODEX_M
 // Three positions, not a switch, because the middle one is the interesting one
 // and a switch cannot hold it: a machine that has been swept once wants only
 // the sessions that are actually stopped on a question.
-const AGENT_OPTIONS: Array<{ value: AgentMode; label: string }> = [
-  { value: 'all', label: 'All of them' },
-  { value: 'waiting', label: 'Only the stuck ones' },
-  { value: 'off', label: 'None' },
-];
+const AGENT_OPTIONS = OUTSIDE_MODES;
 
 // One short sentence each (2026-10-05): the row is read at a glance, and the
 // picker beside it already names the choice.

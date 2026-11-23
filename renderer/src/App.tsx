@@ -23,7 +23,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { cursorAfterWait, cursorIndex, cursorMark, cursorWait, type CursorMark, type CursorWait } from './cursor-follows';
 import { createPortal, flushSync } from 'react-dom';
 import { readySkin, swapLook } from './look-switch';
-import type { AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
+import type { AgentMode, AgentTurn, AnswerMode, Approval, ApprovalInput, CloudPlan, PermissionMode, Product, RepeatRule, RepeatShape, RunningSession, Snapshot, TableCell, ThreadCard, ThreadStateWord, View, WorkItem } from './types';
 import type { ReplyPick } from './reply-pick';
 import { api } from './api';
 import { setClaudeModels, setCodexFreePlan } from './models';
@@ -264,6 +264,7 @@ import { InviteCards, InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
 import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheLastToast, opensTheToast, saysWhereItWent, toastOpens, toastParts, type LastToast, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
+import { OUTSIDE_SAID } from './outside-agents';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
 import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
@@ -3609,6 +3610,12 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);
   }, []);
   showToastRef.current = showToast;
+  // From one of those sessions' ⋯, the inbox's View and filters, or ⌘K. The
+  // filters menu shows the list change under it, so it raises no toast.
+  const chooseOutside = useCallback((mode: AgentMode, { say = true } = {}) => {
+    void api.setWorkspaceSetting({ key: 'outsideAgents', value: mode });
+    if (say) showToast(OUTSIDE_SAID[mode]);
+  }, [showToast]);
   // A second copy on an invented team, for a call where this inbox should stay
   // off the shared screen (main/demo.mts). The toast says which window is which.
   const openDemoCopy = useCallback(async () => {
@@ -7659,6 +7666,7 @@ export default function App() {
               onCloudWhenOn={(mode) => { void api.setWorkspaceSetting({ key: 'cloudWhenOn', value: mode }); }}
               onCloudSetUp={() => setCloudSetupOpen(true)}
               onCloudMove={(ids) => { void moveToCloud(ids); }}
+              outside={{ mode: agentMode, onMode: (mode) => chooseOutside(mode, { say: false }) }}
               filters={!roomShown && (!evOn || evKey === 'me' || !!evBoardEl)}
               home={teamMode && !onPhone() ? { group: needsGroup, onGroup: setNeedsGroup } : null}
               view={roomShown ? roomsUi.viewButton : null}
@@ -7997,6 +8005,8 @@ export default function App() {
                   onReopenDone={() => reopenDone(focused)}
                   onMove={() => { setPaletteTyped('Move to '); setModal('palette'); }}
                   onPriority={(value) => { void retag([focused], value); }}
+                  outside={agentMode}
+                  onOutside={chooseOutside}
                   session={snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null}
                   // WHAT THE FLEET IS DOING ABOUT THIS ROW, through `factsFor`,
                   // which is the builder every row already reads. Written out
@@ -8392,6 +8402,8 @@ export default function App() {
         phone={onPhone()}
         cloud={snap.cloud?.setUp ? snap.cloud : null}
         onCloudMode={(mode) => { if (cloudOffAsks(mode)) { setModal('cloud-off'); return; } setModal(null); void api.setWorkspaceSetting({ key: 'cloudRuns', value: mode }); }}
+        outside={agentMode}
+        onOutside={(mode) => { setModal(null); chooseOutside(mode); }}
         onFirstRun={walkAgain}
         onTutorial={startTutorial}
         onImportAgents={() => { setModal(null); setImportAgents(true); }}

@@ -2562,6 +2562,10 @@ body {
    waiting agent, but it is a sentence and not a control: there is nothing to
    click, because a message here would not reach it. */
 .dock-pill-static { cursor: default; }
+/* Takes her to the window the session runs in, so it is pressed, not typed into. */
+.dock-pill-go { cursor: pointer; }
+.dock-pill-go .dock-pill-key { color: var(--text-faint); }
+.dock-pill-go:hover .dock-pill-text, .dock-pill-go:hover .dock-pill-key { color: var(--text-dim); }
 .dock-pill-static .dock-pill-text { padding-right: 16px; }
 /* THE BOX GROWS AS SHE WRITES. The height is written by dock-height.ts on every
    render, because the ceiling is 40% of the PANE and no stylesheet can read

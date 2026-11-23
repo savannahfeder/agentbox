@@ -41,7 +41,7 @@ import { MessageMarkdown } from './MessageMarkdown';
 import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
-import type { AgentTurn, AnswerMode, CodexModeId, FileMarkLink, PermissionMode, RunningSession, WorkItem } from '../types';
+import type { AgentMode, AgentTurn, AnswerMode, CodexModeId, FileMarkLink, PermissionMode, RunningSession, WorkItem } from '../types';
 import type { ReplyPick } from '../reply-pick';
 import {
   MENU_TITLE, MODE_ORDER, MODE_STATUS, MODE_WORDS, exactClear, exactMode, nextMode, slashQuery,
@@ -754,7 +754,10 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
+/** Out of the app, to the window the session runs in. */
+const GO_MARK = <span className="dock-pill-key" aria-hidden="true"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 4h6v6" /><path d="m20 4-9 9" /><path d="M18 14v5H5V6h5" /></svg></span>;
+
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, outside = 'all', onOutside, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
   /** `supervisor.outOfUsage`, for the reply box's model chip. */
   outOfUsage?: Record<string, { tool: string; until: number }>;
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
@@ -945,6 +948,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onMove?: () => void;
   /** Sets the thread's level, from the thread's own menu. */
   onPriority?: (value: number) => void;
+  /** How many sessions started outside Agentbox the inbox takes, changed from one of their pages. */
+  outside?: AgentMode;
+  onOutside?: (mode: AgentMode) => void;
   // Putting something off had no button anywhere in the app: S, and only S.
   // Every other verb in this footer is clickable, so the one verb that is not
   // is the one a hand that has never read a shortcut list cannot reach.
@@ -2025,6 +2031,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onMove={canFinish && !agent && !direct ? onMove ?? null : null}
       priority={priorityIdOf(shownPriority(item))}
       onPriority={canFinish && !agent && !direct && onPriority ? (id) => onPriority(priorityValueOf(id)) : undefined}
+      outside={agent ? outside : null}
+      onOutside={agent ? onOutside : undefined}
     />
   );
 
@@ -2677,12 +2685,14 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                saying there was nothing there to answer, and that was false: it
                is sitting at its prompt and it is listening. w-9348b8d148. */
             codexAtWork ? null : agent?.engine === 'codex' && onReveal ? (
-              <button type="button" className="dock-pill" onClick={onReveal}>
+              <button type="button" className="dock-pill dock-pill-go" onClick={onReveal}>
                 <span className="dock-pill-text">Open {codexPlace} to {codexVerb}</span>
+                {GO_MARK}
               </button>
             ) : onReveal ? (
-              <button type="button" className="dock-pill" onClick={onReveal}>
+              <button type="button" className="dock-pill dock-pill-go" onClick={onReveal}>
                 <span className="dock-pill-text">Answer this one in its own window. A message from here would wait behind the box it is stuck on.</span>
+                {GO_MARK}
               </button>
             ) : (
             <div className="dock-pill dock-pill-static">
