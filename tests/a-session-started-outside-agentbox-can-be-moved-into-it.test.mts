@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Store } from '../main/store.mts';
-import { chatFromSession, rowForSession } from '../shared/bring-in.mts';
+import { chatFromSession, movedLabel, movedSessions, rowForSession } from '../shared/bring-in.mts';
 
 const NOW = Date.UTC(2026, 10, 23, 9, 0, 0);
 const MIN = 60_000;
@@ -56,6 +56,14 @@ describe('what a session is filed as', () => {
     const asks = chatFromSession(claude('/x', { lastSaid: 'I looked at both.', question: [{ question: 'Which library?', options: ['date-fns', 'Luxon'] }] }));
     expect(asks?.lastSaid).toBe('I looked at both.\n\nWhich library?\n1. date-fns\n2. Luxon');
   });
+  // A power tester answered Codex's question in the terminal, moved the session,
+  // and the write-up asked the question again: it had read only the first
+  // message and the last answer.
+  it('carries every message the person typed, so what they already answered is not asked again', () => {
+    const asked = [{ at: 1, text: 'write the waitlist headline' }, { at: 2, text: 'clinic operations teams' }];
+    expect(chatFromSession(codex('/x', { asked }))?.prompt).toBe('write the waitlist headline\n\nclinic operations teams');
+    expect(chatFromSession(claude('/x', { asked, about: '' }))?.title).toBe('write the waitlist headline');
+  });
   it('named by what was asked when it has no name of its own', () => {
     expect(chatFromSession(claude('/x', { about: '' }))?.title).toBe('the receipts page is slow for big stores, can you find out why');
   });
@@ -95,6 +103,34 @@ describe('moving it in', () => {
     const w = await world();
     w.store.importThreadRows(w.slug, [chatFromSession(claude(w.folder, { sessionId: 'same' }))!], { land: 'inbox' });
     expect(rowForSession(w.store.listItems(), codex(w.folder, { sessionId: 'same' }))).toBeNull();
+  });
+});
+
+// Two power testers (2026-11-23): Back after a move reopened the session's old
+// page with Move to Agentbox on it, and typing in its terminal afterwards put
+// the session back in the inbox beside the thread it had become.
+describe('a moved session is in one place', () => {
+  const rows = [
+    { id: 'w-1', status: 'open', labels: ['thread-import', 'thread:cl-1'] },
+    { id: 'w-2', status: 'open', labels: ['codex', 'codex:cx-3'] },
+    { id: 'w-3', status: 'done', labels: ['codex', 'codex:cx-old'] },
+  ];
+  it('its thread here stands for it while that is open', () => {
+    const moved = movedSessions(rows);
+    expect(moved.has(movedLabel(claude('/x')))).toBe(true);
+    expect(moved.has(movedLabel(codex('/x')))).toBe(true);
+  });
+  it('and once that thread is done the session can be a row again', () => {
+    expect(movedSessions(rows).has(movedLabel(codex('/x', { sessionId: 'cx-old' })))).toBe(false);
+  });
+  it('a session nobody moved is not hidden', () => {
+    expect(movedSessions(rows).has(movedLabel(codex('/x', { sessionId: 'cx-new' })))).toBe(false);
+    expect(movedSessions(rows).has(movedLabel(claude('/x', { sessionId: 'cx-3' })))).toBe(false);
+  });
+  it('the rows every list and Back are drawn from leave it out', () => {
+    const app = fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/App.tsx'), 'utf8');
+    expect(app).toContain('const live = (snap?.agents ?? []).filter((a) => agentIsListed(a) && !movedHere.has(movedLabel(a)));');
+    expect(app).toContain('() => [...items, ...agentRows, ...(troubleItem ? [troubleItem] : [])]');
   });
 });
 

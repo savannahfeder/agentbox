@@ -265,6 +265,7 @@ import { mentionRows } from './team/rooms/room-rules';
 import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheLastToast, opensTheToast, saysWhereItWent, toastOpens, toastParts, type LastToast, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
 import { BROUGHT_IN, OUTSIDE_SAID } from './outside-agents';
+import { movedLabel, movedSessions } from '../../shared/bring-in.mts';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
 import { HomePage, type NeedsRow, type ProgressRow, type TeamRow } from './home/HomePage';
@@ -1564,8 +1565,10 @@ export default function App() {
   // CONVERSATION THE CARD RECALLS: the message it was STARTED with, up to three
   // later ones from the user, and where the thread got to. That is the only
   // shape, one size for every row, so there is no setting to read here any more.
+  // A session moved into Agentbox is its thread there while that is open, so it is not a second row.
+  const movedHere = useMemo(() => movedSessions(items), [items]);
   const agentRows = useMemo(() => {
-    const live = (snap?.agents ?? []).filter(agentIsListed);
+    const live = (snap?.agents ?? []).filter((a) => agentIsListed(a) && !movedHere.has(movedLabel(a)));
     return [...live].sort(byRecency).map((a) => {
       const { title, body } = agentRow(a, now);
       return {
@@ -1599,7 +1602,7 @@ export default function App() {
         agent: a,
       } as WorkItem;
     });
-  }, [snap?.agents, now]);
+  }, [snap?.agents, now, movedHere]);
 
   // A session she closed, or is closing (Z can still take it back), is out of every list, whatever moment it was put off to.
   const agentList = useMemo(() => agentRows.filter((r) => !pendingIds.has(r.id) && (!r.agent || !putAway(r.agent))), [agentRows, pendingIds]);

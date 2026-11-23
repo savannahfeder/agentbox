@@ -27,13 +27,15 @@ export interface SessionChat {
 export function chatFromSession(agent: AgentLike | null | undefined): SessionChat | null {
   const id = String(agent?.sessionId ?? '').trim();
   if (!agent || !id) return null;
-  const first = theirWords(agent.asked?.[0]?.text ?? agent.lastAsked ?? '');
+  // Every message the person typed, so the write-up knows what they already answered.
+  const theirs = (agent.asked ?? []).map((t) => theirWords(t?.text)).filter(Boolean);
+  const first = theirs.join('\n\n') || theirWords(agent.lastAsked ?? '');
   // What it is stopped on is part of where it stands, though no message says it.
   const pending = agent.approval
     ? `${agent.approval.reason}\n\n\`${agent.approval.command}\``
     : (agent.question ?? []).map((q) => [q.question, ...q.options.map((o, i) => `${i + 1}. ${o}`)].join('\n')).join('\n\n');
   const said = [String(agent.lastSaid ?? '').trim(), pending].filter(Boolean).join('\n\n');
-  const title = String(agent.about ?? '').trim() || first.slice(0, 80) || String(agent.name ?? '').trim() || 'Session';
+  const title = String(agent.about ?? '').trim() || (theirs[0] ?? first).slice(0, 80) || String(agent.name ?? '').trim() || 'Session';
   return {
     id,
     source: agent.engine === 'codex' ? 'codex' : 'claude',
@@ -50,6 +52,19 @@ export function chatFromSession(agent: AgentLike | null | undefined): SessionCha
 }
 
 interface LabelledRow { id?: string; labels?: unknown[]; status?: string }
+
+/** The label a session's thread here carries: Claude Code's import files it as `thread:<id>`, Codex's as `codex:<id>`. */
+export const movedLabel = (agent: AgentLike | null | undefined): string => `${agent?.engine === 'codex' ? 'codex' : 'thread'}:${String(agent?.sessionId ?? '').trim()}`;
+
+/** The sessions that have a thread here still open. Once that thread is done, the session can be a row of its own again. */
+export function movedSessions(items: readonly LabelledRow[]): Set<string> {
+  const out = new Set<string>();
+  for (const item of items) {
+    if (item.status === 'done') continue;
+    for (const l of item.labels ?? []) if (typeof l === 'string' && /^(thread|codex):./.test(l)) out.add(l);
+  }
+  return out;
+}
 
 /** The thread a session already became, open or not, so a second press opens it rather than filing another. */
 export function rowForSession<T extends LabelledRow>(items: readonly T[], agent: AgentLike | null | undefined): T | null {
