@@ -35,6 +35,11 @@ export const SETTINGS_PAGES: Array<{ id: SettingsPageId; label: string; group: '
   { id: 'cloud', label: 'Plan and Billing', group: 'Billing' },
 ];
 
+/** The pages this app draws: Team with a team cloud, Plan and Billing where the cloud is offered, Rooms when they are on. */
+export function pagesOn({ team, cloud, rooms }: { team: boolean; cloud: boolean; rooms: boolean }) {
+  return SETTINGS_PAGES.filter((p) => (p.id !== 'team' || team) && (p.id !== 'cloud' || cloud) && (p.id !== 'rooms' || rooms));
+}
+
 const pageLabel = (id: SettingsPageId) => SETTINGS_PAGES.find((p) => p.id === id)?.label ?? id;
 
 /** One thing the search can land on. `anchor` is the group it scrolls to on

@@ -84,6 +84,8 @@ import { Standing, STANDING } from './components/Standing';
 import { Settings } from './components/Settings';
 import { Snooze } from './components/Snooze';
 import { LATER_KEYWORDS, LATER_OLD_NAMES, REOPEN_KEYWORDS, threadResult } from './palette-rows';
+import { settingRows } from './palette-settings';
+import { pagesOn } from './settings-search';
 import { aBigViewIsOpen } from './over-a-big-view';
 /* The line, the toast and the dot on the cog were the other three drawn for that round and
  are gone; their copy is in decisions.md and their photographs on
@@ -8683,6 +8685,11 @@ export default function App() {
         keyHints={keyHints}
         onSetKeyHints={(v) => { setModal(null); setHints(v); }}
         findThreads={findThreads}
+        findSettings={(q) => settingRows(q, pagesOn({ team: !!snap?.team?.configured, cloud: !!(snap.cloud?.managed || snap.cloud?.offered), rooms: !!roomsUi.settingsPane }).map((p) => p.id), (hit) => {
+          setModal(null); setTeamOpen(false);
+          setSettingsPane(hit.anchor ? `${hit.page}#${hit.anchor}` : hit.page);
+          setSettingsVisit((n) => n + 1); setSettingsOpen(true);
+        })}
         findChats={findChats}
         findInside={insideForPalette}
         onSearchFor={searchFor}

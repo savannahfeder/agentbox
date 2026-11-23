@@ -161,6 +161,7 @@ const BY_ID: Record<string, IconName> = {
 // Longest prefix first, so `teammate-pause-` is read before `teammate-`.
 const BY_PREFIX: [string, IconName][] = [
   ['teammate-pause-', 'pause'],
+  ['setting:', 'settings'],
   ['teammate-', 'person'],
   ['chat-person-', 'person'],
   ['chat-', 'hash'],

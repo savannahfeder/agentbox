@@ -81,7 +81,7 @@ describe('the app is wired to it', () => {
   });
 
   it('reads the page back through paneFrom, so an unknown one lands on General', () => {
-    expect(settings).toContain('const [pane, setPane] = useState<Pane>(() => paneFrom(asked, { team: !!teamPane }));');
+    expect(settings).toContain('const [pane, setPane] = useState<Pane>(() => paneFrom(askedPage, { team: !!teamPane }));');
     const fn = settings.slice(settings.indexOf('function paneFrom('), settings.indexOf('/* --------------------------------- screen'));
     expect(fn).toContain("if (want.startsWith('project:')) return { project: want.slice('project:'.length) };");
     expect(fn.trim().endsWith("return 'general';\n}")).toBe(true);

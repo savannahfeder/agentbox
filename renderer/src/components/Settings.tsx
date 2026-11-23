@@ -68,7 +68,7 @@ import { IPHONE_APP_URL } from '../../../shared/phone-app.mts';
 import QRCode from 'qrcode';
 import { TaskTerminal } from './TaskTerminal';
 import { ProjectsPage } from './ProjectsPage';
-import { searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId } from '../settings-search';
+import { pagesOn, searchSettings, SETTINGS_PAGES, type SettingsHit, type SettingsPageId } from '../settings-search';
 import type { Product } from '../types';
 import { CloudMark, MacMark } from '../threads/ThreadMenu';
 import './settings.css';
@@ -1869,7 +1869,9 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
   // a way in Settings for me to configure [notifications]" (2026-10-12). The
   // page was there, a tab along a strip that opened on General.
   const asked = startPane || new URLSearchParams(location.search).get('settings') || (onPhone() ? 'phone' : '');
-  const [pane, setPane] = useState<Pane>(() => paneFrom(asked, { team: !!teamPane }));
+  // `running#outside`: the page, and the group ⌘K's row for one setting lands on.
+  const [askedPage, askedFind = ''] = asked.split('#');
+  const [pane, setPane] = useState<Pane>(() => paneFrom(askedPage, { team: !!teamPane }));
   // WHICH PAGE IS UP, for the window around this screen.
   useEffect(() => {
     onSectionChange?.(typeof pane === 'object' ? 'projects' : pane === 'general' ? null : pane);
@@ -2016,7 +2018,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
     ? { computer: (model as unknown as { computer: SettingsRow }).computer, commands: (model as unknown as { settingCommands?: PhoneRows['commands'] }).settingCommands ?? [] }
     : null;
   const computerPages = webSettingsPages(webComputer?.computer ?? null);
-  const pages = SETTINGS_PAGES.filter((p) => (p.id !== 'team' || !!teamPane) && (p.id !== 'cloud' || !!cloudPlans) && (p.id !== 'rooms' || !!roomsPane) && (!onCloudPhone() || WEB_PAGES.has(p.id) || computerPages.has(p.id)) && !(p.id === 'shortcuts' && phoneSized()))
+  const pages = pagesOn({ team: !!teamPane, cloud: !!cloudPlans, rooms: !!roomsPane }).filter((p) => (!onCloudPhone() || WEB_PAGES.has(p.id) || computerPages.has(p.id)) && !(p.id === 'shortcuts' && phoneSized()))
     .map((p) => (onCloudPhone() && p.id === 'phone' ? { ...p, label: 'Account' } : p));
   const hits = useMemo(
     () => searchSettings(query, { pages: pages.map((p) => p.id), projects }),
@@ -2026,7 +2028,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
 
   // WHERE A SEARCH LANDS: the page, then the group the hit names, lit for a
   // moment so the eye finds it on a page it may never have seen.
-  const [landing, setLanding] = useState<{ anchor: string; at: number } | null>(null);
+  const [landing, setLanding] = useState<{ anchor: string; at: number } | null>(() => (askedFind ? { anchor: askedFind, at: Date.now() } : null));
   const go = (h: SettingsHit) => {
     setQuery('');
     setPane(h.page.startsWith('project:') ? { project: h.page.slice('project:'.length) } : h.page as SettingsPageId);

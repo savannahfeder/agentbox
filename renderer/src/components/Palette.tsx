@@ -15,6 +15,7 @@ import { type ThemeChoice } from '../theme';
 import { NAME } from '../../../shared/product-name.mjs';
 import { CHECK_SAY, MOVE_SAY } from '../update-row';
 import { closesOnPress } from '../press';
+import { SETTING_ROW } from '../palette-settings';
 
 export interface Command {
   id: string;
@@ -47,7 +48,7 @@ export interface InsideSection { key: string; label: string; rows: Command[] }
 export interface PaletteInside { sections: InsideSection[]; threads?: ReadonlyMap<string, string> }
 const NOTHING_INSIDE: PaletteInside = { sections: [] };
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, skyThemes = [], onSkyTheme, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, onHome, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onDemo, onClose, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, skyThemes = [], onSkyTheme, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, onHome, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onDemo, onClose, findSettings, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -125,6 +126,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   onFlipView?: () => void;
   /** The threads a query finds, best first, with those `findInside` found. Absent, the box finds commands only. */
   findThreads?: (query: string, inside?: ReadonlyMap<string, string>) => Command[];
+  /** Single settings the words name (../palette-settings). */
+  findSettings?: (query: string) => Command[];
   /** People, groups, chats and AI teammates a query names, best first (../team/chats-found). */
   findChats?: (query: string) => Command[];
   /** Lines, files, comments and decisions a query finds, a few of each, shown after the threads. */
@@ -416,7 +419,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   ], [itemCommands, batch, projects, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, skyThemes, onSkyTheme, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onDemo, cloud, onCloudMode]);
   // The walkthrough's ⌘K is a short list, with the rest a word away.
   const drawn = useMemo(() => (onEndTutorial ? walkRows(commands) : commands), [onEndTutorial, commands]);
-  return open ? <PaletteBox commands={drawn} findThreads={findThreads} findChats={findChats} findInside={findInside} onSearchFor={onSearchFor} onClose={onClose} phone={phone} typed={typed} /> : null;
+  return open ? <PaletteBox commands={drawn} findThreads={findThreads} findChats={findChats} findInside={findInside} findSettings={findSettings} onSearchFor={onSearchFor} onClose={onClose} phone={phone} typed={typed} /> : null;
 }
 
 /** How many threads the box lists under the commands before "See all". */
@@ -483,14 +486,19 @@ export function paletteOrder(all: Command[], threads: Command[], phone = false, 
   const ahead = (c: Command) => named(c) && (!carriesANamedTitle(c) || said(c.label).startsWith(said(query)));
   if (!phone) {
     // A command the words only touch by keyword comes after the threads they found.
+    const setting = (c: Command) => c.id.startsWith(SETTING_ROW);
     if (found.length && query.trim()) {
       const first = matched.filter(ahead);
-      const after = matched.filter((c) => !ahead(c));
+      const after = matched.filter((c) => !ahead(c) && !setting(c));
+      const settings = matched.filter((c) => !ahead(c) && setting(c));
       heads(first.length);
       if (after.length) labels.set(first.length + found.length, 'Commands');
-      return { rows: [...first, ...found, ...after], labels };
+      if (settings.length) labels.set(first.length + found.length + after.length, 'Settings');
+      return { rows: [...first, ...found, ...after, ...settings], labels };
     }
     if (found.length) heads(matched.length);
+    const settingsAt = matched.findIndex(setting);
+    if (settingsAt > 0) labels.set(settingsAt, 'Settings');
     return { rows: [...matched, ...found], labels };
   }
   if (found.length) {
@@ -509,7 +517,7 @@ function RowIcon({ row }: { row: Command }) {
 }
 
 // The box itself, mounted fresh each time ⌘K opens, so it starts empty and focused.
-function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor, onClose, phone = false, typed = '' }: { commands: Command[]; findThreads?: (q: string, inside?: ReadonlyMap<string, string>) => Command[]; findChats?: (q: string) => Command[]; findInside?: (q: string) => Promise<PaletteInside>; onSearchFor?: (q: string) => void; onClose: () => void; phone?: boolean; typed?: string }) {
+function PaletteBox({ commands, findThreads, findChats, findInside, findSettings, onSearchFor, onClose, phone = false, typed = '' }: { commands: Command[]; findThreads?: (q: string, inside?: ReadonlyMap<string, string>) => Command[]; findChats?: (q: string) => Command[]; findInside?: (q: string) => Promise<PaletteInside>; findSettings?: (q: string) => Command[]; onSearchFor?: (q: string) => void; onClose: () => void; phone?: boolean; typed?: string }) {
   const [query, setQuery] = useState(typed);
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -528,8 +536,9 @@ function PaletteBox({ commands, findThreads, findChats, findInside, onSearchFor,
     if (!q) return offered.filter((c) => !c.unlisted);
     // Ranked as well as filtered, so "rem" puts Remind Me above Remote Control
     // (../palette-rows).
-    return rankMatches(q, offered.filter((c) => matchesQuery(q, c)));
-  }, [offered, query]);
+    const settings = phone || !findSettings ? [] : findSettings(q);
+    return [...rankMatches(q, offered.filter((c) => matchesQuery(q, c))), ...settings];
+  }, [offered, query, phone, findSettings]);
   const chats = useMemo(() => (query.trim() && findChats ? findChats(query.trim()) : []), [query, findChats]);
   // Found inside things comes from main a moment after the words are typed. The
   // last answer stays up until the next lands, so the list does not blink.
