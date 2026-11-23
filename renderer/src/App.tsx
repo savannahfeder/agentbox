@@ -105,7 +105,7 @@ import { approvalAnswered, approvalAsker, approvalView, KEY_CARD_TOOL } from './
 // there is anything to confirm the card has closed.
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
-import { agentOnOrComing, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
+import { agentOnOrComing, askPutOff, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, heldForHer, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentRow, asksSomething, byRecency, listed as agentIsListed, onTheRail, railLine, reachesInbox, progressAfterReply, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
@@ -1802,8 +1802,9 @@ export default function App() {
     // without this line the agent-to-agent rows came back the moment a project
     // was shared with somebody.
     // Above the team branch, which answers before the rule does: a permission
-    // request is not something a project's sharing has any view on.
-    if (asking(i)) return true;
+    // request is not something a project's sharing has any view on. Your own
+    // Later still holds it, as in the rule.
+    if (asking(i)) return !askPutOff(i, true, now);
     if (shared === true) return i.status !== 'done' && !(hiddenAt(i) > now) && !isProposal(i) && !waitsInLater(i, waitingOn(i));
     return belongsInInbox(i, { deliveredThrough, hiddenUntil: hiddenAt(i), now, asking: asking(i), waitingOn: waitingOn(i), stopped: stalledIds.has(i.id), seen: seenAt[i.id] ?? unreadSince });
   }), [items, hiddenAt, now, pendingIds, teamInbox, liveIds, shippingIds, stalledIds, asking, waitingOn, team, seenAt, myName, askedOut]);
@@ -1953,6 +1954,7 @@ export default function App() {
       // sent thing still sitting in the inbox reads as not sent. A deferred row
       // is the exception, and it has somewhere to be: Scheduled.
       if (startingIds.has(i.id) && deferredUntil <= now) return true;
+      if (askPutOff(i, asking(i), now)) return false;
       // A message waits on whoever did not speak last, and the row names them, so
       // it never reads as an agent at work.
       if (isDirect(snap?.products.find((p) => p.slug === i.product)) && !isTaskRow(i)) return iSpokeLast(i, team?.products.get(i.product), team?.me ?? null);
@@ -1980,7 +1982,7 @@ export default function App() {
     // threads/page-rules.ts): a queued row is told by its Status cell, and
     // what you just sent is on top.
   ].sort(byRunningOrder(score)),
-  [items, agentList, agentMode, startingIds, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, stalledIds, askedOut, handedOut]);
+  [items, agentList, agentMode, startingIds, dueAt, hiddenAt, score, now, team, teamProgress, liveIds, shippingIds, stalledIds, askedOut, handedOut, asking]);
 
   // AND THE TAB COUNTS EACH THREAD ONCE: the list, less what Needs you holds,
   // the way `tabState` below has it for the board and `done` for the archive.
@@ -2061,11 +2063,13 @@ export default function App() {
     // AND A FIFTH (w-5244c90c33): a thread waiting on another one, unless a
     // session, the run queue or the ship queue has it, which is In progress. A put-off one too.
     ...items.filter((i) => !queuedTeammateRun(i) && (notStarted(i) || isProposal(i)
-        || putOffInLater(i, { hiddenUntil: hiddenAt(i), now, waitingOn: waitingOn(i), runOnIt: liveIds.has(i.id) || queuedIds.has(i.id) || shippingIds.has(i.id) || pendingIds.has(i.id) }))
+        || putOffInLater(i, { hiddenUntil: hiddenAt(i), now, waitingOn: waitingOn(i), runOnIt: liveIds.has(i.id) || queuedIds.has(i.id) || shippingIds.has(i.id) || pendingIds.has(i.id) })
+        // A run waiting on you is not moving, so Later holds it (`askPutOff`).
+        || (askPutOff(i, asking(i), now) && !pendingIds.has(i.id)))
       && (i.status !== 'done' || i.wrote?.status?.source !== 'founder')
 ),
     ...agentList.filter((r) => (r.runAt ?? 0) > now),
-  ].sort((a, b) => whenShown(a) - whenShown(b)), [items, agentList, hiddenAt, whenShown, waitingOn, liveIds, queuedIds, shippingIds, pendingIds, now]);
+  ].sort((a, b) => whenShown(a) - whenShown(b)), [items, agentList, hiddenAt, whenShown, waitingOn, liveIds, queuedIds, shippingIds, pendingIds, asking, now]);
 
   // Repeating tasks. They are RULES, on their own channel, which is why nothing
   // in the item list rules has to know they exist. They are read up here, ahead

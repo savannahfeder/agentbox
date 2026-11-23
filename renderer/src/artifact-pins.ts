@@ -312,7 +312,11 @@ export function whoTalksOnFile(notes: readonly Pick<FileNote, 'file' | 'by' | 't
 }
 
 /** What the button says once the note it sent has saved: who it went to, or null for a comment kept on the file. */
-export const noteSentWords = (sendWords: string): string | null => (sendWords.startsWith('Send to ') ? `Sent to ${sendWords.slice('Send to '.length)}` : null);
+/** A note written while a teammate's review is on you goes with your reply, not on its own. */
+export const ADD_TO_YOUR_REPLY = 'Add to your reply';
+
+export const noteSentWords = (sendWords: string): string | null => (sendWords === ADD_TO_YOUR_REPLY ? 'Added to your reply'
+  : sendWords.startsWith('Send to ') ? `Sent to ${sendWords.slice('Send to '.length)}` : null);
 
 /**
  * Whether a key goes into the note box. The view takes every key while it is
