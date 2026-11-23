@@ -141,6 +141,11 @@
 .acct-tile-trouble { margin-top: 16px; font-size: 12px; line-height: 1.5; color: var(--text-dim); }
 .acct-tile-add { grid-column: 1 / -1; padding: 11px 16px; border-style: dashed; background: none; color: var(--text-faint); font: inherit; font-size: 13px; text-align: center; cursor: pointer; }
 .acct-tile-add:hover { color: var(--text); }
+/* Where an agent's cloud login would be: the tile's shape, dashed and unfilled, so the gap is seen. */
+.acct-tile-slot { display: flex; flex-direction: column; border-style: dashed; background: none; }
+.acct-slot-title { margin-top: 10px; font-size: 13.5px; font-weight: 500; color: var(--text); }
+.acct-slot-line { margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: var(--text-dim); }
+.acct-slot-act { margin-top: auto; padding-top: 14px; }
 /* IN USE is said in the app's label voice, the small mono capitals the
    new-task card's TO and MODEL wear, in the accent. */
 .set-badge {

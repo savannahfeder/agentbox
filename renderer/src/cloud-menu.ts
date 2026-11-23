@@ -157,6 +157,12 @@ export const cloudIsOn = (status: OnOff) => !!status && status.mode !== 'mac';
  * them and ended "in turn", which is what `pickCloudLogin` used to do; it takes
  * one account now and waits for it, so the sentence names that one.
  */
+/** When threads go to the cloud, for an agent with no login there to name. */
+export function cloudWhenLine(mode: CloudMode, computer = 'this computer'): string {
+  if (mode === 'mac') return `Every thread runs on ${computer}.`;
+  return mode === 'all' ? 'Threads start there first.' : `Threads start there when ${computer} is full.`;
+}
+
 export function cloudRunsLine(mode: CloudMode, inUse: string | null, computer = 'this computer'): string {
   if (mode === 'mac') return `Every thread runs on ${computer}.`;
   const when = mode === 'all' ? 'Threads start there first' : `Threads start there when ${computer} is full`;
