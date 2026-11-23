@@ -7,6 +7,8 @@
 // "Answered" and "waiting on your answer" said opposite things. The warning
 // now says the agent has answered and waits on you, in the row's own word.
 import { describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { stoppedWaiting, stoppedWarning } from '../renderer/src/stopped-agent.ts';
 import { asksForYourWords, cellUnderTab } from '../renderer/src/threads/page-rules.ts';
 
@@ -29,6 +31,13 @@ describe('a thread stopped on a pick', () => {
       expect(said).toMatch(/has answered and waits on you/);
       expect(said).toMatch(/leaves it stuck/);
     }
+  });
+
+  // Drawn on 2026-11-23: the toast's one line cut it at "waits on you, …".
+  it('is drawn whole, its line wrapping rather than cut', () => {
+    const read = (f: string) => fs.readFileSync(path.join(import.meta.dirname, '..', f), 'utf8');
+    expect(read('renderer/src/App.tsx')).toMatch(/\$\{toast\.goes\.warns \? ' toast-warns' : ''\}/);
+    expect(read('renderer/src/styles.css')).toMatch(/\.toast-warns \.toast-line \{ white-space: normal; \}/);
   });
 
   it('still names what each key costs', () => {

@@ -9311,7 +9311,7 @@ export default function App() {
           </>
         );
         const card = toast.goes
-          ? <button key={toastShown.current} type="button" className={`toast toast-goes${aboutTitle ? '' : ' toast-plain'}${toastInBar ? ' toast-in-bar' : ''}`} onClick={() => openToastRow(toast.goes!)}>{face}</button>
+          ? <button key={toastShown.current} type="button" className={`toast toast-goes${aboutTitle ? '' : ' toast-plain'}${toast.goes.warns ? ' toast-warns' : ''}${toastInBar ? ' toast-in-bar' : ''}`} onClick={() => openToastRow(toast.goes!)}>{face}</button>
           : <div key={toastShown.current} className={`toast toast-plain${toastInBar ? ' toast-in-bar' : ''}`}>{face}</div>;
         return toastInBar && cornerHeaderTarget ? createPortal(card, cornerHeaderTarget) : card;
       })()}

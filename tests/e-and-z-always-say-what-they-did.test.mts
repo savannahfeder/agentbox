@@ -40,7 +40,7 @@ describe('the press after a stuck-agent warning', () => {
 
 describe('E on a list where it closes nothing', () => {
   it('says why, on In progress and on Done', () => {
-    expect(eOnThisList('progress')).toBe('E closes threads in Needs you. Open this one to close it.');
+    expect(eOnThisList('progress')).toBe('Open this thread to close it.');
     expect(eOnThisList('done')).toBe('This thread is already done.');
   });
 

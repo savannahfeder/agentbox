@@ -49,7 +49,7 @@ export function takesTheListBack(key: string): boolean {
 
 /** What E says on a list where it closes nothing, so the press is never silent. */
 export function eOnThisList(view: string): string {
-  return view === 'done' ? 'This thread is already done.' : 'E closes threads in Needs you. Open this one to close it.';
+  return view === 'done' ? 'This thread is already done.' : 'Open this thread to close it.';
 }
 
 // WHAT A KEY MEANS WHILE A BOX IS OPEN, which is not one answer but three.
