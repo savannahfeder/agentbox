@@ -9,8 +9,9 @@
 // back to the agent, which is still running.
 //
 // Two fields on the thread, both latest-wins:
-//   signIn        { id, service, url, code?, why?, asksForCode?, at, done? }   the agent's ask
-//   signInAnswer  { id, said, url?, code?, at }                                 the answer to it
+//   signIn        { id, service, url, code?, why?, asksForCode?, at, done?, keep? }   the agent's ask;
+//                 `keep: false` when the person unticked saving it for every cloud thread
+//   signInAnswer  { id, said, url?, code?, at }                                        the answer to it
 // `said` is 'signed-in' (they finished in the browser), 'landed' (with the
 // address the browser was sent back to, for a login waiting on another
 // machine), 'code' (with the code the service's page showed them, for a login
@@ -18,12 +19,14 @@
 // 'replied' (they wrote on the thread instead, which ends the wait so the
 // agent can take what they wrote).
 
-export interface SignInAsk { id: string; service: string; url: string; code?: string; why?: string; asksForCode?: true; at: number; done?: true }
+export interface SignInAsk { id: string; service: string; url: string; code?: string; why?: string; asksForCode?: true; at: number; done?: true; keep?: false }
 export type SignInSaid = 'signed-in' | 'landed' | 'code' | 'skipped' | 'replied';
 export interface SignInAnswer { id: string; said: SignInSaid; url?: string; code?: string; at: number }
 
 const SAID: readonly string[] = ['signed-in', 'landed', 'code', 'skipped', 'replied'];
 const ID = /^s-[a-z0-9]{6,24}$/;
+// What the cloud machine's own sign-in takes (cloud/sandbox/server.mjs `signin-code`).
+const MAX_CODE = 4096;
 const text = (v: unknown, max: number): string | null => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
 const link = (v: unknown): string | null => {
   if (typeof v !== 'string' || v.length > 4000) return null;
@@ -71,6 +74,7 @@ export function cleanSignIn(value: unknown): SignInAsk | undefined {
   if (why) out.why = why;
   if (v.asksForCode === true) out.asksForCode = true;
   if (v.done === true) out.done = true;
+  if (v.keep === false) out.keep = false;
   return out;
 }
 
@@ -85,8 +89,9 @@ export function cleanSignInAnswer(value: unknown): SignInAnswer | undefined {
     out.url = url;
   }
   if (v.said === 'code') {
-    const code = text(v.code, 80);
-    if (!code) return undefined;
+    // Whole or not at all: AWS's codes run to hundreds of characters, and a cut one can only fail.
+    const code = text(v.code, Infinity);
+    if (!code || code.length > MAX_CODE) return undefined;
     out.code = code;
   }
   return out;

@@ -1,6 +1,7 @@
 // The logs a thread's runs wrote, one per run, under sessions/<item-id>/.
 import fs from 'node:fs';
 import path from 'node:path';
+import { traceAnswer, type TraceAnswer } from '../shared/trace-delta.mts';
 
 // The regular read runs on every push while an agent works, so it stays small.
 // `whole` is the read for a thread whose middle was asked for, and it is made once.
@@ -21,6 +22,11 @@ export function readRunTraces(dir: string, { whole = false }: { whole?: boolean 
     if (!whole && text.length > TAIL) text = `… truncated (${text.length} bytes total)\n\n${text.slice(-TAIL)}`;
     return { startedAt: startOf(f), text };
   });
+}
+
+/** The newest logs as an open thread is sent them, each its end. `have`: the stamps of those the screen holds (shared/trace-delta.mts). */
+export function newestRunTraces(dir: string, have?: Record<string, string>): TraceAnswer[] {
+  return logsIn(dir).slice(-NEWEST).map((f) => traceAnswer({ fs, file: path.join(dir, f), startedAt: startOf(f), had: have?.[startOf(f)] }));
 }
 
 // The phone's copy of every thread is built from these, so only each log's end is read off the disk.

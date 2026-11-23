@@ -52,6 +52,8 @@ interface TakenList {
   byKey: Map<string, Row>;
   order: string[];
   parts: Parts;
+  /** What take() handed back for this answer, so an answer that changes nothing is that same object. */
+  snapshot: unknown;
 }
 
 const keyOf = (item: Row | null | undefined): string => `${item?.product ?? ''}/${item?.id}`;
@@ -68,6 +70,16 @@ function deepSame(a: unknown, b: unknown): boolean {
 }
 
 const sameList = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/** `next`, with every piece of it that is the same as in `prev` being prev's own. */
+function sharing(prev: unknown, next: unknown): unknown {
+  if (prev === next || deepSame(prev, next)) return prev;
+  if (!prev || !next || typeof prev !== 'object' || typeof next !== 'object' || Array.isArray(prev) !== Array.isArray(next)) return next;
+  if (Array.isArray(next)) return next.map((v, i) => sharing((prev as unknown[])[i], v));
+  const out: Parts = {};
+  for (const [key, value] of Object.entries(next)) out[key] = sharing((prev as Parts)[key], value);
+  return out;
+}
 
 /** The computer's half: `answer(whole, since)` for each ask. */
 export function snapshotSender({ keep = 16 }: { keep?: number } = {}): SnapshotSender {
@@ -121,8 +133,8 @@ export function snapshotSender({ keep = 16 }: { keep?: number } = {}): SnapshotS
 export function snapshotReader({ keep = 6 }: { keep?: number } = {}): SnapshotReader {
   const held = new Map<string, TakenList>();
   let newest: { token: string; snapshot: unknown; run: string; count: number } | null = null;
-  const remember = <S,>(token: string, state: TakenList, snapshot: S): S => {
-    held.set(token, state);
+  const remember = <S,>(token: string, state: Omit<TakenList, 'snapshot'>, snapshot: S): S => {
+    held.set(token, { ...state, snapshot });
     newest = { token, snapshot, ...partsOf(token) };
     while (held.size > keep) held.delete(held.keys().next().value!);
     return snapshot;
@@ -146,13 +158,19 @@ export function snapshotReader({ keep = 6 }: { keep?: number } = {}): SnapshotRe
       }
       const base = held.get(delta.since);
       if (!base) { held.clear(); newest = null; return null; }
-      const byKey = new Map(base.byKey);
+      // The window draws again whenever what it holds is a new object, so
+      // nothing new is the snapshot it holds, and new parts keep its list.
+      const sameRows = !delta.changed?.length && !delta.removed?.length && !delta.order;
+      if (sameRows && !Object.keys(rest).length && !delta.gone?.length) return remember(token!, base, base.snapshot as T);
+      const byKey = sameRows ? base.byKey : new Map(base.byKey);
       for (const key of delta.removed ?? []) byKey.delete(key);
       for (const item of delta.changed ?? []) byKey.set(keyOf(item), item);
       const order = delta.order ?? base.order;
-      const parts: Parts = { ...base.parts, ...rest };
+      const parts: Parts = { ...base.parts };
+      for (const [name, value] of Object.entries(rest)) parts[name] = sharing(base.parts[name], value);
       for (const name of delta.gone ?? []) delete parts[name];
-      return remember(token!, { byKey, order, parts }, { ...parts, items: order.map((key) => byKey.get(key)).filter(Boolean) } as T);
+      const items = sameRows ? (base.snapshot as { items: Row[] }).items : order.map((key) => byKey.get(key)).filter(Boolean);
+      return remember(token!, { byKey, order, parts }, { ...parts, items } as T);
     },
   };
 }

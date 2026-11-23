@@ -112,7 +112,7 @@ describe('When they need you', () => {
 // matched while the row sat behind the search (2026-11-23).
 describe('⌘K finds a terminal session by the name its row wears', () => {
   it('searches those rows with the threads', () => {
-    expect(read('renderer/src/App.tsx')).toContain('searchThreads([...items, ...agentList], q, searchContext)');
+    expect(read('renderer/src/App.tsx')).toContain('searchThreads([...items, ...agentList], q, searchContext');
   });
   it('and a row shaped like one is found by its title', async () => {
     const { searchThreads } = await import('../renderer/src/threads/search.ts');

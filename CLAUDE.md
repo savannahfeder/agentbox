@@ -173,10 +173,11 @@ anywhere else. `--ide` is the user's to switch on, never ours.
 
 Nor does an agent start the person's Google Chrome headless: the Mac files that
 copy as their Chrome, and their own Chrome then opens no window. Every hidden
-browser comes from `shared/hidden-browser.mjs` (Chrome for Testing or
-Playwright's headless shell), and
-`tests/no-agent-browser-is-the-persons-own-chrome.test.mjs` fails if any other
-file names Google Chrome's binary.
+browser comes from `shared/hidden-browser.mts` (Playwright's headless shell,
+else Chrome for Testing) and starts with its `KEEPS_OFF_THE_KEYCHAIN` flags,
+even a one-off from the shell; without them it asks for the person's keychain
+password. `tests/no-agent-browser-is-the-persons-own-chrome.test.mts` fails if
+any other file names Google Chrome's binary.
 
 ## Billing
 
@@ -243,12 +244,13 @@ separate private repository. It was merged in here with its history, so this
 is the one app and the one source of truth. The plan is `docs/team/PLAN.md`.
 
 - `cloud/team.config.json` is never committed (it is ignored, and
-  `tests/the-team-cloud-key-stays-out-of-the-repository` checks it). It is what
-  makes a copy the team version: machines that run it keep their own copy, and
-  without it the app is the single-person app. `cloud/team.config.example.json`
-  shows the shape. The same database's public address and anon key do ship, in
+  `tests/the-team-cloud-key-stays-out-of-the-repository` checks it). It points
+  a copy at another team cloud. `cloud/team.config.example.json` shows the
+  shape. The database's public address and anon key ship in
   `shared/cloud-address.mts`, so every copy can sign in to Agentbox Cloud
-  (2026-10-26); they were already inside every download.
+  (2026-10-26), and a checkout with no team file signs in to that same team, so
+  forks get Multiplayer (2026-11-22). Fresh test copies and the new-user window
+  still get a team only when handed one.
 - A branch cut from the old private repository's history will not line up with
   this one: the merge rewrote those commits to take the key file out. Move it
   across with

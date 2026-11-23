@@ -79,6 +79,6 @@ describe('⌘K finds threads', () => {
     expect(app).toContain('onSearchFor={searchFor}');
     const finder = app.slice(app.indexOf('const findThreads = useCallback'), app.indexOf('const goToStop'));
     // With the terminal sessions in the inbox, which are found by the names their rows wear.
-    expect(finder).toMatch(/searchThreads\(\[\.\.\.items, \.\.\.agentList\], q, searchContext\)/);
+    expect(finder).toMatch(/searchThreads\(\[\.\.\.items, \.\.\.agentList\], q, searchContext[,)]/);
   });
 });

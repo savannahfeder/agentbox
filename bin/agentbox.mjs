@@ -28,6 +28,7 @@ const { watchNewChatsFor } = await import('../main/new-chats-watch.mts');
 const { startCodexWatch } = await import('../main/codex-watch.mts');
 const { readCodexThreadsOffThread } = await import('../main/chat-reader.mts');
 const { appSessionFolders } = await import('../main/agent-homes.mts');
+const { followChatsFor } = await import('../main/chat-follow.mts');
 const { osOpenDialog } = await import('../main/os-folder-window.mts');
 const { browserLauncher } = await import('../main/open-in-browser.mts');
 
@@ -100,6 +101,7 @@ startFreezeRecorder({
 // them here either.
 let newChatsWatch = null;
 let codexWatch = null;
+let chatFollow = null;
 if (!process.env.ZERO_NO_SUPERVISOR) {
   // Whoever was signed in to the team last time is signed in again.
   booted.team?.start().then(() => booted.supervisor.wake?.()).catch((err) => console.warn(`team: ${err.message}`));
@@ -114,6 +116,8 @@ if (!process.env.ZERO_NO_SUPERVISOR) {
     store: booted.store,
     readThreads: (opts) => readCodexThreadsOffThread({ ...opts, codexDirs: appSessionFolders({ config: booted.config, supervisor: booted.supervisor }).codexDirs }),
   });
+  // A chat brought in follows where it started (main/chat-follow.mts).
+  chatFollow = followChatsFor({ store: booted.store, config: booted.config, supervisor: booted.supervisor });
 }
 const token = newToken();
 const server = createServer({
@@ -155,6 +159,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
     console.log('\n  Stopping.');
     newChatsWatch?.stop();
     codexWatch?.stop();
+    chatFollow?.stop();
     booted.host.app.quit();
     // The quit count and whatever is still queued, or a copy opened once is
     // never heard from. `shutdown` rather than `flush`, because flush does not

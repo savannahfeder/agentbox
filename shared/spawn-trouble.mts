@@ -486,6 +486,11 @@ export function needsHerHands(cause: string | null | undefined): boolean {
   return cause === 'signed-out' || cause === 'no-plan' || cause === 'org-blocked' || cause === 'subscription-ended' || cause === 'too-old' || cause === 'api-key';
 }
 
+// THE SUBSCRIPTION ITSELF IS REFUSED: an admin's block, or a payment past due.
+// Unlike a limit it names no hour, and unlike a sign-in that ran out it holds
+// for every login of that subscription, here and in the cloud.
+export const accountRefused = (cause: string | null | undefined): boolean => cause === 'org-blocked' || cause === 'subscription-ended';
+
 // THE ONE COMMAND THAT UPDATES IT, WHEREVER IT CAME FROM. `claude update`
 // updates a native install itself and, on a Homebrew one, prints the brew line
 // to run instead (read in 2.1.80's own code), so it is the right first thing
@@ -706,7 +711,8 @@ export function strandedRemedy(causes: string[] = []): string {
 const DEAD_RUN_OPENERS: Record<string, string> = {
   workspace: "would not start in this project's folder, so nothing has been done here.",
   'signed-out': 'could not sign in, so nothing has been done on this task.',
-  'org-blocked': 'is switched off for that account by its organization, so nothing has been done.',
+  // An admin's block and a personal plan Claude refuses print the same words.
+  'org-blocked': 'will not run on that account, so nothing has been done on this task.',
   'subscription-ended': "cannot run because that account's Claude subscription has ended, so nothing has been done.",
   'at-limit': 'is at its usage limit, so nothing has been done on this task.',
   interrupted: 'was cut off in the middle, so nothing has been done on this task.',
@@ -723,6 +729,8 @@ const DEAD_RUN_OPENERS: Record<string, string> = {
   unknown: 'stopped before it did anything, so this task has not been started.',
 };
 
+const REFUSED_CHECK = 'Check its plan at claude.ai, or on a work account ask an admin.';
+
 // WHERE A PLAN GETS SET UP: the bar across the top of the inbox (`PlanBar`),
 // which is the only way back into setup. Said once, for the four places that
 // point at it.
@@ -735,7 +743,7 @@ const SET_UP_A_PLAN = 'at the top of your inbox';
 // misreading and gets the plain line.
 const WORKED_OPENERS: Record<string, string> = {
   'signed-out': 'was signed out partway through, so this task is not finished.',
-  'org-blocked': 'was switched off for that account partway through, so this task is not finished.',
+  'org-blocked': 'was refused on that account partway through, so this task is not finished.',
   'subscription-ended': "stopped partway through because that account's subscription ended.",
   'at-limit': 'hit its usage limit partway through, so this task is not finished.',
   interrupted: 'was cut off partway through, so this task is not finished.',
@@ -803,7 +811,7 @@ function dayWords(ms: number): string {
 function fixBeforeReplying({ cause, engineWord, resetsAt, model, planEnded }: { cause: string; engineWord: string; resetsAt?: string | null; model?: string | null; planEnded?: number | null }): string | null {
   if (cause === 'signed-out') return 'Sign that account back in.';
   if (cause === 'no-plan') return `Set up a plan ${SET_UP_A_PLAN}.`;
-  if (cause === 'org-blocked') return 'Only an admin of that Claude workspace can turn it back on.';
+  if (cause === 'org-blocked') return REFUSED_CHECK;
   if (cause === 'subscription-ended') return 'Renew it at claude.ai.';
   if (cause === 'at-limit') {
     const plan = PLAN_WORD[engineWord];
@@ -904,7 +912,7 @@ export function deadRunSentence({ engineWord = 'The agent', cause = 'unknown', r
     : cause === 'no-plan'
       ? ` Set one up ${SET_UP_A_PLAN} and it picks straight up.`
     : cause === 'org-blocked'
-      ? ' Only an admin of that Claude workspace can turn it back on.'
+      ? ` ${REFUSED_CHECK}`
       : cause === 'subscription-ended'
       ? ' Renew it at claude.ai and it picks straight up.'
       : cause === 'at-limit'
@@ -1001,6 +1009,8 @@ export function stoppedStartingSentence({ starts = 6, minutes = 10, tries = 0, t
 // person (`gaveUpOnTheAnswer`, renderer/src/list-rules.ts).
 const DEAD_RUN_HALVES: Record<string, string[]> = {
   'at-limit': ['is at its usage limit', 'so nothing has been done on this task.'],
+  // Rows written before 2026-11-22 carry these words.
+  'org-blocked': ['is switched off for that account by its organization', 'so nothing has been done.'],
 };
 
 // A THREAD WHOSE MODEL IS FOR THE OTHER AGENT (`_sayTheModelIsForAnotherEngine`

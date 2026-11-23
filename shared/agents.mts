@@ -153,8 +153,12 @@ export function answeredWhereItRuns(agent: AgentLike): boolean {
 // be newer than the reply, because the session is still idle for a moment
 // before it picks the message up. An older CLI that publishes no status is
 // never moved, since nothing could show it stopping.
+//
+// A reply is hers wherever she typed it: sent from here (`repliedAt`) or typed
+// into the session's own window (`asked`, off its transcript).
 export function tookHerReply(agent: AgentLike): boolean {
-  const spoke = agent?.repliedAt ?? 0;
+  const typed = (agent?.asked ?? []).reduce((at, t) => Math.max(at, Number(t?.at) || 0), 0);
+  const spoke = Math.max(agent?.repliedAt ?? 0, typed);
   if (!spoke) return false;
   if (!agent?.status) return false;
   if (putAway(agent)) return false;

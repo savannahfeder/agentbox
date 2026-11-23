@@ -39,8 +39,10 @@ const presets = laterPresets;
 
 const fmt = (ts: number) => dayAndTime(ts).toUpperCase();
 
-export function Snooze({ item, count = 1, note, onPick, onRepeat, onNow, onClose }: {
-  item: WorkItem;
+export function Snooze({ item, subtitle, count = 1, note, onPick, onRepeat, onNow, onClose }: {
+  item?: WorkItem;
+  /** In place of the thread's name, for what is not a thread: a chat. */
+  subtitle?: string;
   count?: number;
   /** The stopped-agent lesson, when this thread is one (../stopped-agent.ts).
    *  It is drawn here rather than swallowing the key, because L opens a text
@@ -66,7 +68,7 @@ export function Snooze({ item, count = 1, note, onPick, onRepeat, onNow, onClose
   return (
     <SchedulePicker<LaterMeans>
       title="Later"
-      subtitle={scheduleSubtitle(item, count)}
+      subtitle={subtitle ?? (item ? scheduleSubtitle(item, count) : '')}
       note={note}
       placeholder={onRepeat ? 'Try: 3h, tomorrow, next week, every monday 9am' : 'Try: 30m, 3h, 8am, tomorrow, next week'}
       hintWhenRefused={onRepeat ? 'try 3h, tomorrow, every monday 9am' : 'try 3h, 8am, tomorrow'}

@@ -13,8 +13,9 @@ import { voiceName } from '../../../shared/agent-voice.mts';
 import { priorityIdOf, priorityValueOf, type PriorityId } from '../priority';
 import { dayAndTime, firstRealLine, itemOptions } from '../format';
 import { asksSomething } from '../../../shared/teammates.mts';
+import { followsWord } from '../../../shared/carried-on-outside.mts';
 import { threadState } from '../../../shared/thread-cards.mts';
-import { dropPlaces, placeScore, placedScore, shownPriority } from '../../../shared/rank.mts';
+import { DEFAULT_PRIORITY, dropPlaces, oneLevelUp, placeScore, placedScore, shownPriority } from '../../../shared/rank.mts';
 import { plainWords } from '../team/agent-mentions';
 import { heldByAPerson, iSpokeLast, isTaskRow, isWorkThread, lastSpeaker, nameIsAPersons, taskGiver, whatWaits, type TeamRow } from '../../../shared/team-rules.mts';
 import { handedFrom } from '../../../shared/thread-link.mts';
@@ -190,8 +191,8 @@ export type Ranked = { priority?: number | null; updatedAt: number; placedAt?: n
 
 /**
  * WHEN A PERSON LAST WROTE ON THE THREAD (w-21b638d821): the newest of the
- * opening message, a reply (a picked option and an approval are replies), and
- * starting it from Later. An agent's write never moves it, because the Status
+ * opening message, a reply (a picked option and an approval are replies, and so
+ * is one typed where a chat brought in started), and starting it from Later. An agent's write never moves it, because the Status
  * column already says what the agent is doing. A thread no person has written
  * on reads when it was made; a row with no record of who wrote what, a
  * teammate's card, reads when it last changed.
@@ -202,7 +203,7 @@ export function sentAt(r: Ranked): number {
     const w = r.wrote?.[field];
     return w && w.source !== 'agent' ? w.ts : 0;
   };
-  return Math.max(by('body'), by('answer'), r.start === 'now' ? by('start') : 0) || r.createdAt || r.updatedAt;
+  return Math.max(by('body'), by('answer'), by('saidOutside'), r.start === 'now' ? by('start') : 0) || r.createdAt || r.updatedAt;
 }
 const bySent = (a: Ranked, b: Ranked) => sentAt(b) - sentAt(a);
 
@@ -502,6 +503,33 @@ export const conversationSlugs = (products: readonly Product[] = []): ReadonlySe
   new Set(products.filter(isDirect).map((p) => p.slug));
 
 /**
+ * The level a row a teammate sent you has for you: one up from the level it
+ * came with (`oneLevelUp`, shared/rank.mts). Null keeps the row's own. Only a
+ * conversation's rows are sent to you; of those, a task you gave keeps your
+ * level, and so does any level you picked yourself. An AI teammate's thread
+ * lives in a project, so it ranks as the agent it is.
+ */
+export function levelForYou(item: WorkItem, product: Product | undefined | null, me: string | null): number | null {
+  if (!me || !isDirect(product)) return null;
+  if (isTaskRow(item) && item.assignee !== me) return null;
+  const set = item.wrote?.priority;
+  if (set?.source === 'founder' && set.by === me) return null;
+  const came = Number(item.priority);
+  return oneLevelUp(came > 0 ? came : DEFAULT_PRIORITY);
+}
+
+/** Every row wearing its `levelForYou`, so the list, the board, Home and the
+ *  thread page read one level. A row it does not raise comes back as it was. */
+export function withLevelsForYou(items: WorkItem[], products: readonly Product[], me: string | null): WorkItem[] {
+  if (!me) return items;
+  const bySlug = new Map(products.map((p) => [p.slug, p]));
+  return items.map((i) => {
+    const level = levelForYou(i, bySlug.get(i.product), me);
+    return level === null || level === i.levelForYou ? i : { ...i, levelForYou: level };
+  });
+}
+
+/**
  * WHO AN OPEN CONVERSATION WOULD HAND TO NEW THREAD, in the shape the card's
  * `initial` takes: the first person in To, everyone else beside them.
  *
@@ -672,6 +700,7 @@ export function waitingWord(item: Pick<WorkItem, 'assignee' | 'people' | 'wrote'
  * (main/message-priority.mts) or the person setting it is what makes it real.
  */
 export function messagePriority(item: WorkItem): number | null {
+  if (Number.isFinite(item.levelForYou)) return item.levelForYou!;
   const set = item.wrote?.priority;
   return set && set.source !== 'system' ? item.priority ?? null : null;
 }
@@ -699,9 +728,10 @@ export function cellUnderTab(word: string, tab: string | undefined, { fromPeople
 export function asksForYourWords(item: Pick<WorkItem, 'result' | 'note' | 'body'> & { wrote?: Record<string, { ts: number } | undefined>; agent?: WorkItem['agent'] }): boolean {
   // A session started outside Agentbox asks in its own words, laid out by its own rules.
   if (item.agent) return agentLayout(item.agent).kind === 'asks';
-  if (itemOptions(item).length) return false;
   const said = (item.wrote?.note?.ts ?? 0) > (item.wrote?.result?.ts ?? 0) ? item.note : item.result;
-  return asksSomething(said);
+  // A chat whose agent stopped, choices and all: nobody answered.
+  if (followsWord(said)) return true;
+  return !itemOptions(item).length && asksSomething(said);
 }
 
 /**

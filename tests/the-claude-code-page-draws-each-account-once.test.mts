@@ -38,7 +38,7 @@ describe('the Claude Code page', () => {
 
   it('the cloud is one row with a switch, not a second set of tiles', () => {
     expect(claude).toMatch(/<Group id="cloud-accounts" label="Cloud">\s*<Row label="Use the cloud"/);
-    expect(claude).toContain('cloudToggleTarget(cloudHere)');
+    expect(claude).toContain('cloudToggleTarget(cloud)');
     expect(page).not.toContain('cloudCard');
   });
 });

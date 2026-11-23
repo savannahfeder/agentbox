@@ -110,7 +110,7 @@ contextBridge.exposeInMainWorld('zero', {
   fileMark: (payload) => ipcRenderer.invoke('zero:file-mark', payload),
   fileNewVersion: (payload) => ipcRenderer.invoke('zero:file-new-version', payload),
   teamMarkFile: (payload) => ipcRenderer.invoke('zero:team-mark-file', payload),
-  filesPlace: () => ipcRenderer.invoke('zero:files-place'),
+  filesPlace: (opts) => ipcRenderer.invoke('zero:files-place', opts),
   filesPlaceOpen: (payload) => ipcRenderer.invoke('zero:files-place-open', payload),
   filesPlaceEdit: (payload) => ipcRenderer.invoke('zero:files-place-edit', payload),
   filesPlaceMark: (payload) => ipcRenderer.invoke('zero:files-place-mark', payload),
@@ -258,6 +258,7 @@ contextBridge.exposeInMainWorld('zero', {
   gitHubBrowserSignIn: () => ipcRenderer.invoke('zero:github-browser-sign-in'),
   gitHubCloudSignIn: (payload) => ipcRenderer.invoke('zero:github-cloud-sign-in', payload),
   signInAnswer: (payload) => ipcRenderer.invoke('zero:sign-in-answer', payload),
+  signInKeep: (payload) => ipcRenderer.invoke('zero:sign-in-keep', payload),
   cloudSendFile: (payload) => ipcRenderer.invoke('zero:cloud-send-file', payload),
   cloudSendCode: (payload) => ipcRenderer.invoke('zero:cloud-send-code', payload),
   cloudFileInfo: (payload) => ipcRenderer.invoke('zero:cloud-file-info', payload),
@@ -306,11 +307,15 @@ contextBridge.exposeInMainWorld('zero', {
   // something happened and can say nothing about what.
   // A number may ride with it (which setup step), and main keeps only a number.
   track: (name, count) => ipcRenderer.invoke('zero:track', { name, count }),
+  // How long this window's own thread held, a number and nothing else (renderer/src/window-holds.ts).
+  windowHeld: (ms) => ipcRenderer.invoke('zero:window-held', { ms }),
   onboardingArm: () => ipcRenderer.invoke('zero:onboarding-arm'),
   sessionTrace: (payload) => ipcRenderer.invoke('zero:session-trace', payload),
   // Everything that happened on one task, as the ledger lines it happened as.
   itemHistory: (payload) => ipcRenderer.invoke('zero:item-history', payload),
   openArtifact: (payload) => ipcRenderer.invoke('zero:open-artifact', payload),
+  // The apps the open mark's menu offers for a file.
+  openWith: (payload) => ipcRenderer.invoke('zero:open-with', payload),
   // The pictures in a folder a message names on its own line (main/folder-pictures.mts).
   folderPictures: (payload) => ipcRenderer.invoke('zero:folder-pictures', payload),
   // The document pane's own two: the text of a file it has open, and her edit

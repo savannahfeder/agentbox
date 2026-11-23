@@ -28,6 +28,8 @@ import { FileSheet } from '../../components/FileSheet';
 import { FileCover } from '../../components/FileCover';
 import { reviewKind, shownName } from '../../../../shared/artifact-marks.mts';
 import { RoomFileView, type RoomFileOpening, type RoomFiles } from './RoomFileView';
+import { commentsInChat, type ChatComment } from './chat-comments';
+import { CommentOn, CommentQuote, FileMarkOpener } from '../../components/FileMarkLine';
 import { AttachRow } from '../../components/AttachRow';
 import { ChatLink } from '../../threads/ContinuedFrom';
 import { collectFiles, isImageName, type PendingAttachment } from '../../attachments';
@@ -79,7 +81,7 @@ export type RoomChatCalls = {
 
 const FileChipMark = () => <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden="true"><path d="M4 2.5h5l3 3v8H4z M9 2.5v3h3" strokeLinejoin="round" /></svg>;
 
-export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand, onSwitch, switchOpen, full = false, head, hang = false, along, ...calls }: {
+export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand, onSwitch, switchOpen, full = false, head, hang = false, folded = false, along, ...calls }: {
   room: Room; messages: RoomMessage[]; people: ChatPerson[]; meId: string | null; now: number;
   onInvite?: () => void; onExpand?: () => void;
   onSwitch?: (anchor: DOMRect) => void; switchOpen?: boolean;
@@ -87,6 +89,8 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   full?: boolean; head?: ReactNode;
   /** Faces at 32, hung beside the words, as a chat that is the whole page draws them. */
   hang?: boolean;
+  /** Opened in the inbox: the box waits folded, as a thread's does, and the keys stay the inbox's until R. */
+  folded?: boolean;
   along?: ChatAlong;
 } & RoomChatCalls) {
   const { onSend, onRead, onReact, onEdit, onDelete, onMarkUnread, onNotice, marks, onDecide } = calls;
@@ -195,11 +199,15 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
   const who = (id: string | null) => (id ? byId.get(id) : undefined);
   const nameOf = (id: string | null) => { const p = who(id); return p ? cardName(p) : 'Someone'; };
   const listRef = useStick([room.id, thread]);
-  type Drawn = { m: RoomMessage; a?: undefined } | { a: ChatAlongRow; m?: undefined };
+  // A comment on one of the chat's files is a row of the chat, as it is of a thread.
+  type Drawn = { m: RoomMessage; a?: undefined; c?: undefined } | { a: ChatAlongRow; m?: undefined; c?: undefined } | { c: ChatComment; m?: undefined; a?: undefined };
   const asMessages = shown.map((m): Drawn => ({ m }));
-  const drawn: Drawn[] = root || !along?.rows.length ? asMessages
-    : [...asMessages, ...along.rows.map((a): Drawn => ({ a }))].sort((x, y) => (x.m ?? x.a).at - (y.m ?? y.a).at);
-  const slots = chatLayout(drawn.map((d) => ({ at: (d.m ?? d.a).at, by: d.m ? d.m.by ?? '' : d.a.by })), now);
+  const comments = root ? [] : commentsInChat(calls.files?.marks).map((c): Drawn => ({ c }));
+  const atOf = (d: Drawn) => (d.m ?? d.a ?? d.c).at;
+  const drawn: Drawn[] = root || (!along?.rows.length && !comments.length) ? asMessages
+    : [...asMessages, ...(along?.rows ?? []).map((a): Drawn => ({ a })), ...comments].sort((x, y) => atOf(x) - atOf(y));
+  const slots = chatLayout(drawn.map((d) => ({ at: atOf(d), by: d.m ? d.m.by ?? '' : (d.a ?? d.c).by ?? '', ...(d.c ? { fileMark: d.c.link } : {}) })), now);
+  const openComment = useCallback((link: { id?: string; file: string }) => setViewing({ ...(link.id ? { note: link.id } : {}), file: link.file, at: Date.now() }), []);
   const myNames = useMemo(() => {
     const name = people.find((p) => p.me)?.name;
     if (!name) return [];
@@ -235,6 +243,22 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
         if (d.a) {
           const p = who(d.a.by);
           return <AlongRow key={d.a.key} a={d.a} day={slot.day} head={slot.head} face={p} name={nameOf(d.a.by)} size={hang ? 28 : 16} />;
+        }
+        if (d.c) {
+          const p = who(d.c.by);
+          return <div key={`c:${d.c.id}`} data-line={d.c.id}>
+            {slot.day && <div className="rm-day"><span className="rm-label">{slot.day}</span></div>}
+            <div className="rm-cm">
+              <div className="h">
+                <Face name={p?.name ?? '?'} url={p?.avatarUrl} size={hang ? 28 : 16} />
+                <span>{nameOf(d.c.by)}</span>
+                <FileMarkOpener.Provider value={calls.files ? openComment : null}><CommentOn e={{ fileMark: d.c.link }} /></FileMarkOpener.Provider>
+                <em>{clockOf(d.c.at)}</em>
+              </div>
+              <CommentQuote e={{ fileMark: d.c.link }} />
+              <div className="tx">{d.c.text}</div>
+            </div>
+          </div>;
         }
         const m = d.m;
         const where = root ? undefined : along?.on.get(m.id);
@@ -290,7 +314,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
         </div>;
       })}
     </div></div>
-    <Composer key={`${room.id}:${thread ?? ''}`} roomId={room.id} threadId={thread} takesTyping={full || !!thread} people={others}
+    <Composer key={`${room.id}:${thread ?? ''}`} roomId={room.id} threadId={thread} takesTyping={folded ? !!thread : full || !!thread} folds={folded && !thread} people={others}
       placeholder={root ? `Reply to ${nameOf(root.by)}` : `Message ${room.kind === 'group' ? others.map((p) => p.name.split(' ')[0]).join(', ') || room.name : room.name}`}
       onPutFile={calls.onPutFile} onPutFileFrom={calls.onPutFileFrom} sending={calls.sending} onNotice={onNotice}
       onEditLast={() => { const mine = myNewest(messages, meId, root?.id ?? null); if (mine) setEditing(mine.id); }}
@@ -494,8 +518,8 @@ export function FirstChatBox({ person, placeholder, open, send, putFile, putFile
     onPutFileFrom={async (name, srcPath) => putFileFrom(await room(), name, srcPath)} />;
 }
 
-function Composer({ roomId, threadId, takesTyping = false, placeholder, people, onSend, onPutFile, onPutFileFrom, sending, onNotice, onEditLast }: {
-  roomId: string; threadId: string | null; takesTyping?: boolean; placeholder: string; people: ChatPerson[];
+function Composer({ roomId, threadId, takesTyping = false, folds = false, placeholder, people, onSend, onPutFile, onPutFileFrom, sending, onNotice, onEditLast }: {
+  roomId: string; threadId: string | null; takesTyping?: boolean; folds?: boolean; placeholder: string; people: ChatPerson[];
   onSend: (body: string) => Promise<string | null>;
   onPutFile?: (name: string, dataBase64: string) => Promise<string | null>;
   onPutFileFrom?: (name: string, srcPath: string) => Promise<string | null>;
@@ -545,6 +569,8 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
   // A send that failed, so it can be tried again, and is when the connection comes back.
   const [failed, setFailed] = useState(false);
   const ready = !!text.trim() || attachments.length > 0 || recording;
+  const [awake, setAwake] = useState(!folds);
+  const isFolded = folds && !awake && !ready && !error;
   // EVERYTHING STAYS IN THE BOX UNTIL THE ROOM HAS IT. Each file keeps the
   // name it was given when it went into the box, so a second try puts the
   // same file rather than another copy, and a file the room already has
@@ -629,7 +655,8 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
   return <>
     {error && <div className="rm-chat-err" role="alert">{error}
       {failed && !busy && <button type="button" className="rm-retry" onClick={() => void send()}>Try again</button>}</div>}
-    <div className="rm-compose">
+    <div className={`rm-compose${isFolded ? ' folded' : ''}`} onFocus={() => setAwake(true)}
+      onMouseDown={isFolded ? (e) => { e.preventDefault(); ref.current?.focus(); } : undefined}>
       {matches.length > 0 && <div className="rm-picker rm-pop rm-menu">
         {matches.map((p, i) => <button type="button" key={p.id} className={`row${i === pick ? ' on' : ''}`} onMouseDown={(e) => { e.preventDefault(); choose(p); }}>
           <Face name={p.name} url={p.avatarUrl} size={18} /><span>{p.name}</span></button>)}
@@ -647,9 +674,10 @@ function Composer({ roomId, threadId, takesTyping = false, placeholder, people, 
           }
           if (e.key === 'ArrowUp' && !plain.trim() && !attachments.length) { e.preventDefault(); onEditLast(); return true; }
           if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); return true; }
-          if (e.key === 'Escape') { ref.current?.blur(); return true; }
+          if (e.key === 'Escape') { ref.current?.blur(); if (folds && !ready) setAwake(false); return true; }
           return false;
         }} />
+      {isFolded && <span className="rm-fold-key" aria-hidden="true"><kbd>R</kbd></span>}
       <AttachRow look="tiles" attachments={attachments} onRemove={(i) => { forgetVoiceDraft(attachments[i]?.draftId); setAttachments((x) => x.filter((_, j) => j !== i)); }} />
       {tooBig > 0 && <div className="compose-note attach-problem" role="alert">{tooBig === 1
         ? 'One pasted image is too big to keep. Leaving this chat loses it.'

@@ -123,9 +123,11 @@ export interface CodexFold {
   lastActiveAt: number;
   events: ThreadEvent[];
   sawEventTurns: boolean;
+  /** When it last stopped on a question or a permission prompt. */
+  waitingAt: number;
 }
 
-export const freshFold = (): CodexFold => ({ approval: null, turnStartedAt: 0, turnEndedAt: 0, lastSaid: '', saidAt: 0, asked: [], question: [], pendingCall: '', lastActiveAt: 0, events: [], sawEventTurns: false });
+export const freshFold = (): CodexFold => ({ approval: null, turnStartedAt: 0, turnEndedAt: 0, lastSaid: '', saidAt: 0, asked: [], question: [], pendingCall: '', lastActiveAt: 0, events: [], sawEventTurns: false, waitingAt: 0 });
 
 const said = (parts: Part[] | undefined, kinds: string[]) => (Array.isArray(parts) ? parts : [])
   .filter((c) => c && kinds.includes(String(c.type)) && typeof c.text === 'string').map((c) => c.text).join('\n').trim();
@@ -173,7 +175,7 @@ export function foldCodexLine(acc: CodexFold, line: string): void {
       if (it.type === 'UserMessage') hers(said(it.content, ['text']), true);
       if (it.type === 'AgentMessage') {
         const qs = questionsOf(it.questions);
-        if (qs.length) acc.question = qs;
+        if (qs.length) { acc.question = qs; acc.waitingAt = at; }
         its(said(it.content, ['Text', 'text']));
       }
     }
@@ -188,7 +190,7 @@ export function foldCodexLine(acc: CodexFold, line: string): void {
     const qs = questionsOf(args);
     const last = acc.events[acc.events.length - 1];
     const lead = last && last.who === 'it' && last.at >= acc.turnStartedAt ? last.text : '';
-    if (qs.length) { acc.question = lead ? [{ ...qs[0], lead }, ...qs.slice(1)] : qs; acc.pendingCall = String(p.call_id ?? 'pending'); }
+    if (qs.length) { acc.question = lead ? [{ ...qs[0], lead }, ...qs.slice(1)] : qs; acc.pendingCall = String(p.call_id ?? 'pending'); acc.waitingAt = at; }
   } else if (p.type === 'function_call_output' && acc.pendingCall && p.call_id === acc.pendingCall) {
     // Her answer to its question is her turn, so the row moves to In progress while it goes on.
     const out = (p as { output?: unknown }).output;
@@ -198,7 +200,7 @@ export function foldCodexLine(acc: CodexFold, line: string): void {
   }
   if (p.type === 'function_call' || p.type === 'custom_tool_call') {
     const asked = approvalAsked(String(p.call_id ?? ''), String(p.arguments ?? p.input ?? ''));
-    if (asked) acc.approval = asked;
+    if (asked) { acc.approval = asked; acc.waitingAt = at; }
   } else if ((p.type === 'function_call_output' || p.type === 'custom_tool_call_output') && acc.approval && p.call_id === acc.approval.callId) {
     acc.approval = null;
   }
@@ -385,7 +387,8 @@ export function readCodexLive({ home = os.homedir(), codexDirs = null, products 
         cwd: meta.cwd,
         startedAt: meta.startedAt,
         status,
-        statusAt: Math.max(fold.turnStartedAt, fold.turnEndedAt),
+        // Stopped on her mid-turn is a stop after anything she typed before it (shared/agents.mts tookHerReply).
+        statusAt: Math.max(fold.turnStartedAt, fold.turnEndedAt, status === 'waiting' ? fold.waitingAt : 0),
         waitingFor: status === 'waiting' && fold.approval ? 'permission prompt' : null,
         approval: status === 'waiting' && fold.approval ? { command: fold.approval.command, reason: fold.approval.reason } : null,
         socket: '',

@@ -109,6 +109,8 @@ export type WorkItemPatch = {
   handedOver?: SaidAt;
   linkComment?: LinkComment;
   linkReply?: { file: string; text: string };
+  saidOutside?: string;
+  chatAt?: number;
   comment?: { text: string; name?: string };
   artifact?: ArtifactMarkPatch;
   putAway?: boolean;
@@ -116,6 +118,7 @@ export type WorkItemPatch = {
   signInAnswer?: SignInAnswer;
   ask?: AskPatch;
   verdict?: Verdict;
+  approvedFiles?: string[];
 };
 export type WorkItemField = keyof WorkItemPatch;
 export type PatchInput = { readonly [K in WorkItemField]?: unknown };
@@ -398,6 +401,13 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // THE OWNER'S ANSWER TO THOSE, POSTED ON THE LINK PAGE: `{ file, text }`. It
   // answers the comments before it and starts no agent.
   'linkReply',
+  // WHAT YOU TYPED TO A CHAT BROUGHT IN, WHERE IT STARTED (main/chat-follow.mts),
+  // written by the app as yours. Like `linkReply` it starts no agent: the agent
+  // it was typed to already has it.
+  'saidOutside',
+  // HOW FAR THAT CHAT HAS BEEN READ, in its own times: the row's last write is
+  // no measure, since the write-up of one answer lands after the next message.
+  'chatAt',
   // WORDS A TEAMMATE LEFT ON A SHARED THREAD: `{ text }`, on a line the sync
   // writes from the cloud's own comment (main/team/thread-share.mts). A delta
   // like `react`, read back as `waitingComments` until the owner deals with
@@ -416,6 +426,8 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // A TASK THAT ASKS FOR HELP OR A REVIEW ON ONE THREAD, and what its holder
   // said when they handed it back (shared/thread-asks.mts).
   'ask', 'verdict',
+  // The files they approved while the ask was on them, by name, on the verdict's line.
+  'approvedFiles',
 ];
 
 // THE SUMMARY IS SHARED BETWEEN THE PERSON AND THE AGENT. Everywhere else the
@@ -679,7 +691,7 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
     // rule about how the app writes, and it lives with the writer in
     // main/row-label.mts. This module holds no taxonomy, only storage.
     case 'label': return str(value, MAX_TITLE);
-    case 'body': case 'result': case 'note': case 'answer': case 'typed': return str(value, MAX_TEXT_BYTES);
+    case 'body': case 'result': case 'note': case 'answer': case 'typed': case 'saidOutside': return str(value, MAX_TEXT_BYTES);
     // kind and product are free strings on purpose: the taxonomy of work is the
     // caller's to invent and change without a migration here.
     //
@@ -741,7 +753,7 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
     //
     // A ts rather than a flag, so her NEXT answer outdates it by carrying a
     // later one, with nothing to clear and nobody who has to remember to.
-    case 'answeredThrough': return Number.isFinite(value) ? Math.trunc(value as number) : undefined;
+    case 'chatAt': case 'answeredThrough': return Number.isFinite(value) ? Math.trunc(value as number) : undefined;
     // An empty list is a real value: it is how the last label, `ship` above
     // all, comes off.
     case 'labels': {
@@ -823,6 +835,10 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
       return kind && owner && thread && product ? { kind, owner, thread, product, ...(step ? { step } : {}), ...(note ? { note } : {}) } : undefined;
     }
     case 'verdict': return value === 'done' || value === 'yes' || value === 'changes' ? value : undefined;
+    case 'approvedFiles': {
+      if (!Array.isArray(value)) return undefined;
+      return [...new Set(value.map((v) => str(v, MAX_SHORT)).filter(Boolean) as string[])].slice(0, MAX_LABELS);
+    }
     case 'shippedAt': return Number.isFinite(value) && (value as number) >= 0 ? Math.trunc(value as number) : undefined;
     case 'linkComment': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
@@ -1141,7 +1157,7 @@ export function foldWorkItems(lines: unknown, now = Date.now()): Map<string, Wor
 // A reply taken back reads as this, and is nobody's news.
 const WITHDRAWN = '(withdrawn)';
 // How much of a message the record keeps: enough for a row's one line.
-const TALK_TEXT = 280;
+export const TALK_TEXT = 280;
 // How many of the newest messages the record keeps, in the chat and in each
 // thread. The counts it answers stop at your own newest word, which in a chat
 // you are part of is never this far back.

@@ -16,6 +16,7 @@ import { shownTitle } from '../../../shared/thread-title.mts';
 import { askIsOpen, askWord } from '../../../shared/thread-asks.mts';
 import { clearDraft, readDraft } from '../drafts';
 import { handedFrom } from '../../../shared/thread-link.mts';
+import { commentsToHand } from '../threads/comments-to-hand';
 
 /** Is this a shared row given to a person? Then the team draws its header. */
 export function teamHeld(item: WorkItem, team: TeamView | null): boolean {
@@ -197,10 +198,13 @@ export function TeamRouteStrip({ item, onHandToAgent, items = [], onOpenItem }: 
   };
   // Where it stands now, which is the agent's last word when there is one, not the first ask.
   const ask = (item.result || item.body || item.title).split('\n').find((l) => l.trim())?.replace(/\*\*/g, '').trim() ?? item.title;
+  // The comments on its files go to the agent with it, so the choice says how many.
+  const comments = isGivenTask(item, team?.products.get(item.product)) ? commentsToHand(item.artifacts?.notes, { me: team?.me ?? null }).length : 0;
   return <div className="opt-strip">
     {!isGivenTask(item, team?.products.get(item.product)) && <div className="opt-head opt-head-ask"><span>{ask}</span></div>}
     {choices.map(({ label, route: r }, i) => <button key={r} className="opt-row" disabled={busy} onClick={() => route(r)}>
       <span className="opt-key">{i + 1}</span><span className="opt-text">{label}</span>
+      {r === 'agent' && comments > 0 && <span className="tm-with-thread">{comments === 1 ? '1 comment goes with it' : `${comments} comments go with it`}</span>}
     </button>)}
     {error && <div className="opt-head"><span className="tm-error">{error}</span></div>}
   </div>;

@@ -18,6 +18,7 @@ import { gitJob, warmGitThread } from './git-change-offthread.mts';
 import { queuedReplyText, submitReply, framedPick, framedTeammate } from './live-replies.mts';
 import { resolveAnsweredNotes } from './notes-wake.mts';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mts';
+import { shownTitle } from '../shared/thread-title.mts';
 import { editedFilesLine } from '../shared/artifact-marks.mts';
 import { readItemHistory, updateWorkItem } from './store/work-items.mts';
 import { reconcileRows, type ReconcilePatch } from './version-reconcile.mts';
@@ -133,11 +134,15 @@ import { namedThreadsBlock } from '../shared/named-threads.mts';
 import { changePath } from './code-change.mts';
 import { noteAgentWrites } from './store/written-elsewhere.mts';
 import { snapshotRepo } from './git-change.mts';
-import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mts';
+import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, writesTheAnswer, importedAgentBrief, importedAgentName, THREAD_LABEL } from '../shared/agent-import.mts';
 import { readTranscriptHead } from './agent-sessions.mts';
-import { claudeSessionOpen } from './claude-session-open.mts';
+import { claudeSessionOpen, claudeSessionState } from './claude-session-open.mts';
+import { carriedOnFromTheApp, reply as replyToSession } from './agents.mts';
+import { HELD_IN, heldThere } from '../shared/carried-on-outside.mts';
+import { isShared } from '../shared/team-rules.mts';
+import { appSessionFolders } from './agent-homes.mts';
 import { planStamp, readPlan } from './claude-plan.mts';
-import { troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown, modelForAnotherEngineSentence } from '../shared/spawn-trouble.mts';
+import { troubleCause, refineCause, needsHerHands, accountRefused, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown, modelForAnotherEngineSentence } from '../shared/spawn-trouble.mts';
 import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST, MOVED_HERE } from '../shared/dead-run-trace.mts';
 import { commandPrompt } from '../shared/claude-commands.mts';
 import { machineryPath, storeRootEnv } from './store/home.mts';
@@ -163,7 +168,7 @@ import { effortLabel, isEffort, isEffortWord } from '../shared/effort-levels.mts
 import {
   engineFor, engineLabel, engineChoiceSince, engineChoiceOnRowIsStale,
   availableEngines, isEngine, modelForEngine, homeEngine,
-  ENGINE_CHOICE_ENABLED, DEFAULT_ENGINE, DEFAULT_CLAUDE_MODEL, ENGINE_IDS,
+  ENGINE_CHOICE_ENABLED, DEFAULT_ENGINE, DEFAULT_CLAUDE_MODEL, ENGINE_IDS, ENGINES,
 } from '../shared/engines.mts';
 import { createCodexAppServer } from './codex-app-server.mts';
 import { CLAUDE_MODELS } from '../shared/claude-models.generated.mts';
@@ -183,7 +188,7 @@ import { codexDefaultModel, codexHome, codexKnownSlugs, codexModelLevels, codexM
 import { codexAccount, codexPlanEnded, ensureCodexHome } from './codex-account.mts';
 import { accountName } from '../shared/account-names.mts';
 import { nameRow, wantsName, askSmallModel, smallModelPictures } from './row-label.mts';
-import { catchUpRow, catchUpResult } from './catch-up.mts';
+import { catchUpRow, catchUpResult, turnsSaid } from './catch-up.mts';
 import { isAuto, asksWho, routeCandidates, routePrompt, readRoute, readOffer, offerPrompt, readGains, routedPatch, orAgent, NOBODY_WHY } from '../shared/auto-route.mts';
 import { LEVELS, latestMessage, sortMessage, wantsPriority } from './message-priority.mts';
 import { GUESSED_LEVELS, levelTask, wantsLevel } from './task-priority.mts';
@@ -219,6 +224,7 @@ import type { ShipItem, ShipProduct } from './ship-queue.mts';
 import type { GitHubPushSignIn } from './github-push-sign-in.mts';
 import { SignInReturns } from './sign-in-returns.mts';
 import { openSignIn } from '../shared/sign-in-ask.mts';
+import { causeCleared, waitingForMemory } from '../shared/notes-for-the-agent.mts';
 import type { CloudKit } from './cloud/kit.mts';
 import type { CatchUpCard } from './catch-up.mts';
 import type { QueuedLine, ReplyItem, ReplyPayload } from './live-replies.mts';
@@ -440,6 +446,8 @@ export type RunState = {
   ranOn?: { model: string | null; effort: string | null };
   exitFailed?: boolean;
   accountFault?: AccountFault | null;
+  /** The account in use when a cloud run started, as `_accountKey` spells it. */
+  cloudAccount?: string | null;
   lastOutputAt?: number;
   /** Whether the run has put anything in its trace: said or done one thing. */
   traced?: boolean;
@@ -505,6 +513,8 @@ export interface LiveSessionRecord {
   engine?: string;
   continuation?: boolean;
   startedAt?: number;
+  // A cloud run takes replies between turns, so its start is not its turn's.
+  turnStartedAt?: number;
   cloud?: boolean;
   reachedTheCloud?: boolean;
   carrying?: string | null;
@@ -781,6 +791,7 @@ export interface SupervisorStore {
   prioritizeItem(slug: string, id: string, value: unknown): unknown;
   touchAnswerMode(slug: string, id: string, used: unknown): unknown;
   settleAnswer?(slug: string, id: string, answerTs: number): unknown;
+  holdChatOutside?(slug: string, id: string, holder: string): Promise<unknown>;
   composeItem(slug: string, fields: Record<string, unknown>): WorkItem | null | undefined;
   fileItem(slug: string, fields: Record<string, unknown>): { id: string };
   noteItem(slug: string, id: string, note: string): unknown;
@@ -1074,6 +1085,8 @@ const LOGIN_ASK_EVERY_MS = 2 * 60_000;
 const AT_LIMIT_REST_MS = 5 * 60_000;
 // How long past a limit's printed reset hour the fleet waits before trying.
 const LIMIT_RESET_GRACE_MS = 30_000;
+// How long the cloud button says the work moved off an account Claude refused.
+const REFUSED_NOTICE_MS = 24 * 3_600_000;
 // A run on a capped login that lives this long shows the login has room
 // (Claude reports a weekly limit in about 35 s, Codex in about two minutes).
 const LIMIT_TRY_PROVES_MS = 3 * 60_000;
@@ -1378,6 +1391,7 @@ export class Supervisor {
   declare _heardAnswers: Record<string, string>;
   declare _liveSessions: Record<string, LiveSessionRecord>;
   declare _rowSessions: Record<string, RowSessionRecord>;
+  declare _toTerminal: { going: Set<string>; refused: Set<string> } | undefined;
   declare _stoppedSessions: Record<string, StoppedSessionRecord>;
   declare _compactions: Record<string, CompactionRecord>;
   declare _nativeCommands: Record<string, string[]>;
@@ -1400,7 +1414,7 @@ export class Supervisor {
   declare _profileStrikes: Record<string, number> | undefined;
   declare _movedWhy: Record<string, MovedWhy>;
   declare _accountChosenAt: number | undefined;
-  declare _accountSwitch: { from: string; to: string; until: number } | null | undefined;
+  declare _accountSwitch: { from: string; to: string; until: number; why?: 'refused' } | null | undefined;
   declare _movedToCloudAt: Record<string, number> | undefined;
   declare _hungReaps: Record<string, { count: number; at: number }> | undefined;
   declare _modelRefused: Record<string, string[]> | undefined;
@@ -2007,7 +2021,11 @@ export class Supervisor {
     const cause = this._profileTrouble?.[key]?.cause;
     if (cause === 'at-limit' || cause === 'subscription-ended') this._clearProfileTrouble(key);
     else if (this._profileCooldown) this._profileCooldown[key] = 0;
-    if (engineOf(engine) === DEFAULT_ENGINE) this._spawnCooldownUntil = 0;
+    if (engineOf(engine) === DEFAULT_ENGINE) {
+      this._spawnCooldownUntil = 0;
+      const inCloud = this._cloudLoginOf(profile);
+      if (inCloud?.refusedUntil) markCloudLogin(DEFAULT_ENGINE, inCloud.key, inCloud.id, { refusedUntil: null }, { home: this.config.home });
+    }
     this._saveState();
     this.wake();
     return true;
@@ -2016,7 +2034,8 @@ export class Supervisor {
   /**
    * AN ACCOUNT AT ITS LIMIT HANDS THE WORK TO ONE WITH ROOM (2026-11-10, their
    * call: "your Mac and the cloud move to your account with room by
-   * themselves"). Claude only: a second Codex login is kept for testing. The
+   * themselves"), and so does one Claude refuses (w-3e97e1531d).
+   * Claude only: a second Codex login is kept for testing. The
    * cloud follows because it runs on whatever account this Mac is set to.
    * Another folder of the same subscription shares its limit, so it is no way
    * out; with nowhere to go, the limit is waited out as before.
@@ -2025,7 +2044,8 @@ export class Supervisor {
     const engine = DEFAULT_ENGINE;
     const from = this._profilesFor(engine)[0];
     if (!from) return null;
-    const until = this._limitedUntil(from, now);
+    const refused = this._refusedUntil(from, now);
+    const until = refused ? now + REFUSED_NOTICE_MS : this._limitedUntil(from, now);
     if (!until) return null;
     const home = this.config.home || os.homedir();
     const idOf = (p: string) => accountIdentity(p === 'default' ? null : p, { home });
@@ -2033,7 +2053,7 @@ export class Supervisor {
     const same = (a: AccountIdentity | null) => !!a && !!mine && ((!!a.accountUuid && a.accountUuid === mine.accountUuid) || a.email.toLowerCase() === mine.email.toLowerCase());
     const room = this._profiles().filter((p) => p !== from && !!idOf(p) && !same(idOf(p))
       && !this._profileTrouble?.[this._accountKey(engine, p)] && !this._profileResting(this._accountKey(engine, p))
-      && !this._limitedUntil(p, now));
+      && !this._limitedUntil(p, now) && !this._refusedUntil(p, now));
     if (!room.length) return null;
     const cloudRuns = (p: string) => { const r = this._cloudLoginOf(p); return !!r && mayRunOn(cloudLoginState(r, { now })); };
     const to = room.find(cloudRuns) ?? room[0];
@@ -2042,10 +2062,10 @@ export class Supervisor {
       console.warn('zero: could not save the account switch:', (e as Error).message);
       this.config.activeAccount = { ...(this.config.activeAccount ?? {}), [engine]: to };
     }
-    this._accountSwitch = { from, to, until };
+    this._accountSwitch = { from, to, until, ...(refused ? { why: 'refused' as const } : {}) };
     this._cloudConfigAt = 0;
     this._cloudInUseSeen?.delete(engine);
-    console.log(`zero: ${from} is at its usage limit, so work moves to ${to}`);
+    console.log(`zero: ${from} is ${refused ? 'refused by Claude' : 'at its usage limit'}, so work moves to ${to}`);
     this._saveState();
     this.onChange?.();
     this.wake?.();
@@ -2071,6 +2091,15 @@ export class Supervisor {
     return !picked && r.limitedUntil && r.limitedUntil > now ? r.limitedUntil : null;
   }
 
+  // Until when an account whose subscription Claude refuses sits out, or null:
+  // refused here, or in the cloud, whose login is the same subscription.
+  _refusedUntil(profile: string, now = Date.now()): number | null {
+    const key = this._accountKey(DEFAULT_ENGINE, profile);
+    const here = accountRefused(this._profileTrouble?.[key]?.cause) ? this._profileCooldown?.[key] ?? 0 : 0;
+    const until = Math.max(here, this._cloudLoginOf(profile)?.refusedUntil ?? 0);
+    return until > now ? until : null;
+  }
+
   _cloudLoginOf(profile: string) {
     const home = this.config.home || os.homedir();
     const ids = this._profiles().map((p) => ({ ...accountIdentity(p === 'default' ? null : p, { home }), profile: p }));
@@ -2083,7 +2112,7 @@ export class Supervisor {
     const s = this._accountSwitch;
     if (!s || s.until <= now || this._profilesFor(DEFAULT_ENGINE)[0] !== s.to) return null;
     const name = (p: string) => this._accountNameFor(DEFAULT_ENGINE, this._accountKey(DEFAULT_ENGINE, p)) ?? 'your other Claude account';
-    return { from: name(s.from), to: name(s.to), until: s.until };
+    return { from: name(s.from), to: name(s.to), until: s.until, ...(s.why ? { why: s.why } : {}) };
   }
 
   /**
@@ -2496,6 +2525,9 @@ export class Supervisor {
       if (item.wrote?.blockedBy?.source === 'founder') continue;
       const blockers = item.blockedBy.map((id) => byId.get(`${item.product}:${id}`) ?? causes.get(id));
       if (blockers.some((b) => !b || b.status !== 'done')) continue;
+      // A task an agent filed that you closed before saying yes was dismissed,
+      // not finished: what the thread waited for will not come.
+      if (blockers.some((b) => !isCause(b) && b!.wrote?.status?.source === 'founder' && !filedByThePerson(b!) && !(b!.answer && b!.answer !== '(withdrawn)'))) continue;
       const cleared = Math.max(...blockers.map((b) => b!.wrote?.status?.ts ?? 0));
       if (cleared <= (item.wrote?.blockedBy?.ts ?? 0) || cleared <= this._waitsSince) continue;
       // A wait somebody else wrote is theirs to show, not a reason to start a
@@ -2512,7 +2544,7 @@ export class Supervisor {
       this._resumedWaits.add(key);
       // Its own last words say it is waiting, so it is told the cause is gone.
       for (const b of blockers) {
-        if (isCause(b)) try { this.store.noteItem?.(item.product, item.id, `${b!.title} is cleared. Carry on from where this stopped.`); } catch { /* the resume still goes ahead */ }
+        if (isCause(b)) try { this.store.noteItem?.(item.product, item.id, causeCleared(b!.title)); } catch { /* the resume still goes ahead */ }
       }
       this.store.answerItem(item.product, item.id, { status: 'open' });
       this._resumeQueue.add(item.id);
@@ -2992,6 +3024,8 @@ export class Supervisor {
       || (b.session.startedAt ?? 0) - (a.session.startedAt ?? 0));
     const taken = candidates[0];
     this._kill(taken.session);
+    // Said on the paused thread, or its agent just stops with no reason given.
+    try { this.store.noteItem?.(taken.victim.product, taken.id, `Paused so “${shownTitle(item)}” could run first. This carries on when an agent is free.`); } catch { /* the pause still holds */ }
     this._preempted.set(taken.id, {
       at: Date.now(),
       forItem: item.id,
@@ -3493,6 +3527,54 @@ export class Supervisor {
     try { fresh = Date.now() - fs.statSync(file!).mtimeMs < 2 * 60_000; } catch { fresh = false; }
     const open = fresh || claudeSessionOpen(sessionId, [home, path.join(this.config.home || os.homedir(), '.claude')]);
     return { sessionId, profile, imported: true, folder, open };
+  }
+
+  /**
+   * A REPLY TO A CHAT STILL OPEN IN A TERMINAL GOES TO THAT TERMINAL, so it stays
+   * one conversation; the follow brings its answer back (main/chat-follow.mts).
+   * A copy run here beside it put two agents on one job in two folders. True
+   * while it is on its way or gone there. False for a chat that is closed, or
+   * whose terminal would not take it: the reply then starts a run here as ever.
+   */
+  _goesToItsTerminal(item: WorkItem): boolean {
+    this._toTerminal ??= { going: new Set(), refused: new Set() };
+    const { going, refused } = this._toTerminal;
+    const key = this._answerKey(item);
+    if (going.has(key)) return true;
+    if (refused.has(key) || answerSettled(item) || this._answerDelivered(item)) return false;
+    const open = this._openTerminalFor(item);
+    if (!open) return false;
+    going.add(key);
+    const text = String(item.answer);
+    void Promise.resolve()
+      .then(() => this._sayInTerminal(open.pid, text))
+      .then(async (r) => {
+        if (!r.ok && !r.held) { refused.add(key); return; }
+        this._handledAnswers.add(key);
+        this._saveState();
+        this.store.settleAnswer?.(item.product, item.id, answerTs(item));
+        if (r.held) this.store.modules.workItemsDisk.updateWorkItem(this.store.productDir(item.product), item.id, { result: heldThere(open.folder) }, { source: 'agent' });
+        else await this.store.holdChatOutside?.(item.product, item.id, HELD_IN.claude);
+      })
+      .catch((e) => { refused.add(key); console.warn(`zero: ${item.id} could not reach its terminal:`, e?.message ?? e); })
+      .finally(() => { going.delete(key); this.onChange?.(); this.wake(); });
+    return true;
+  }
+
+  _sayInTerminal(pid: number, text: string): Promise<{ ok: boolean; held?: boolean; reason?: string }> {
+    return replyToSession(pid, text, { wrap: carriedOnFromTheApp });
+  }
+
+  /** The live Claude Code process holding this row's chat, for a plain reply no run here has taken up. */
+  _openTerminalFor(item: WorkItem): { pid: number; folder?: string } | null {
+    const words = String(item.answer ?? '');
+    if (!words.trim() || words === '(withdrawn)' || /^\s*\//.test(words) || words.includes('attachments/')) return null;
+    const label = (item.labels ?? []).includes(THREAD_LABEL) ? (item.labels ?? []).find((l) => typeof l === 'string' && l.startsWith('thread:')) : null;
+    if (!label || this._rowSessions?.[item.id]?.sessionId || engineOf(this._engineFor(item)) !== 'claude') return null;
+    const product = this.store.listProducts?.().find((p) => p.slug === item.product);
+    if (!product || isShared(product as Parameters<typeof isShared>[0])) return null;
+    const state = claudeSessionState(label.slice(7).trim(), appSessionFolders({ config: this.config, supervisor: this, home: this.config.home || os.homedir() }).dirs);
+    return state?.pid ? { pid: state.pid, folder: state.folder } : null;
   }
 
   /**
@@ -5203,7 +5285,7 @@ export class Supervisor {
 
   /**
    * A CHAT BROUGHT IN, REWRITTEN AS A THREAD (main/catch-up.mts): its name, its
-   * context and its answer with options. Never awaited, like the namer, and
+   * answer with options and its context, and after the first time only that. Never awaited, like the namer, and
    * a few at once: the person is looking at these rows the moment setup ends. A miss waits a minute; after three the row keeps the
    * agent's own last message.
    */
@@ -5220,7 +5302,9 @@ export class Supervisor {
     return Promise.all(due.map((next) => {
       this._catchingUp.add(key(next));
       const labels = (next.labels ?? []).filter((l) => l !== CATCH_UP_LABEL);
-      return this._askSmall((opts) => catchUpRow(next, opts) as Promise<CatchUpCard | ''>, { product: next.product })
+      const project = this.store.listProducts?.().find((p) => p.slug === next.product)?.name ?? null;
+      const turns = turnsSaid(this.store.readHistory?.(next.product, next.id) ?? []);
+      return this._askSmall((opts) => catchUpRow({ ...next, project, turns }, opts) as Promise<CatchUpCard | ''>, { product: next.product })
         .then((card) => {
           if (!card) {
             const misses = (this._catchUpMisses.get(key(next))?.count ?? 0) + 1;
@@ -5229,7 +5313,10 @@ export class Supervisor {
             return;
           }
           this._catchUpMisses.delete(key(next));
-          this.store.catchUpItem(next.product, next.id, { label: card.title, problem: card.context, result: catchUpResult(card) });
+          // Carried on in its terminal while this was written: its newer answer is owed its own.
+          const row = this.store.readItem?.(next.product, next.id);
+          if (row && (row.result !== next.result || row.wrote?.saidOutside?.ts !== next.wrote?.saidOutside?.ts || row.status !== next.status)) return;
+          this.store.catchUpItem(next.product, next.id, { ...(next.label ? {} : { label: card.title }), problem: card.context, ...(writesTheAnswer(next) ? { result: catchUpResult(card) } : {}) });
           this.store.routeItem?.(next.product, next.id, { labels });
           this.onChange?.();
         })
@@ -5545,6 +5632,9 @@ export class Supervisor {
           continue;
         }
 
+        // Left silent on purpose: it runs again on the account the work moved to.
+        if (this._runsAgainElsewhere(item, { accountFault: { account: seen.account } })) continue;
+
         // A run already read to its end is not looked at again, or every stuck
         // thread costs a folder listing and a stamp every tick while it stays stuck.
         if (seen.quietAt != null && seen.quietAt === (seen.endedAt ?? 0)) continue;
@@ -5725,6 +5815,15 @@ export class Supervisor {
     this._fruitless[key] = { runs, endedAt: Date.now(), founderAt, ...(account ? { account } : {}) };
     this._saveState();
     return 'rested';
+  }
+
+  // A thread reopened by hand: its reply was heard before the close, and a
+  // close that stopped the run gave it back to the queue. Nothing starts until
+  // a new word, so the thread waits in Needs you (`stalled`).
+  keepReplyHeard(item: WorkItem) {
+    if (!item.answer || item.answer === '(withdrawn)') return;
+    this._handledAnswers.add(this._answerKey(item));
+    this._saveState();
   }
 
   // Give an answer its delivery back: the mark is written at spawn, so a
@@ -5984,7 +6083,7 @@ export class Supervisor {
     if (product && this.shipsThroughTheApp(product)) return null;
     // A push runs the project's own hooks, so it takes its turn at the memory check as a ship does.
     const beforePush = () => shipSlot(this._memoryGate?.gate ?? null, item, this.memoryGateScore(item.product, item.id) ?? 0, {
-      onWait: () => { try { this.store.noteItem?.(item.product, item.id, 'Waiting for memory on this computer before pushing.'); } catch { /* the push still waits */ } },
+      onWait: () => { try { this.store.noteItem?.(item.product, item.id, waitingForMemory('pushing')); } catch { /* the push still waits */ } },
     });
     const done = mergeHome(cwd, { beforePush }).then((merge) => {
       this._mergingHome?.delete(item.id);
@@ -6382,6 +6481,12 @@ export class Supervisor {
     return this._accountKey(engine, this._profilesFor(engine)[0] ?? 'default') !== account;
   }
 
+  // The work has moved off the account that refused this run, so the row runs
+  // again there with nothing said on it.
+  _runsAgainElsewhere(item: WorkItem, { accountFault }: Pick<RunState, 'accountFault'>) {
+    return !!accountFault && this._accountMovedOn(item, accountFault.account);
+  }
+
   _healthyProfiles() {
     const now = Date.now();
     return this._profiles().filter((p) => (this._profileCooldown?.[p] ?? 0) < now && !this._profileTrouble?.[p]);
@@ -6642,7 +6747,7 @@ export class Supervisor {
    */
   _capacityFor(engine: string) {
     const which = engineOf(engine);
-    if (!this.engineChoices().some((e) => e.id === which)) return 0;
+    if (!this.enginesHere().some((e) => e.id === which)) return 0;
     const perLogin = this._slotsPerAccount(which) * this._liveProfilesFor(which).length;
     // A NUMBER FOR THE WHOLE COMPUTER IS RUN EXACTLY (w-ec27ff1a51). Shared out
     // a login at a time it rounds up, so 7 on two logins is four and four, and
@@ -7327,7 +7432,7 @@ export class Supervisor {
   _waitsForCloud(item: WorkItem | null | undefined, engine: string) {
     return this._cloudFirstFor(item) && !!item?.id && this._cloudUsable(engine, { full: true }) && this._cloudSignedInAtAll(engine)
       && this._cloudEligible(item) && !this._mustRunHere(item, engine) && !this._cloudSlotFor(engine)
-      && (this._sentToCloud(item.id) || this._cloudInUseState(engine) !== 'limited');
+      && (this._sentToCloud(item.id) || !['limited', 'refused'].includes(this._cloudInUseState(engine)));
   }
 
   // The state of the one cloud account a run would take (`_cloudLoginRunnable`),
@@ -7374,8 +7479,8 @@ export class Supervisor {
       const inUse = cloudLoginInUse(which, this._cloudAccountAsk(which, now));
       if (!inUse) return false;
       const state = cloudLoginState(inUse, { now });
-      // Resting at its limit, or a Codex sign-in being renewed: back soon.
-      return mayRunOn(state) || state === 'limited' || state === 'renew';
+      // Resting at its limit or refused, or a Codex sign-in being renewed: back soon.
+      return mayRunOn(state) || state === 'limited' || state === 'refused' || state === 'renew';
     });
   }
 
@@ -7655,7 +7760,7 @@ export class Supervisor {
   _whyNoRoom(engine: string, item: WorkItem) {
     const which = engineOf(engine);
     if (this._localSlotFor(which)) return this._waitsForCloud(item, which) ? 'cloud' : 'memory';
-    if (!this.engineChoices().some((e) => e.id === which)) return 'engine';
+    if (!this.enginesHere().some((e) => e.id === which)) return 'engine';
     if (!this._liveProfilesFor(which).length) return 'login';
     if (which === DEFAULT_ENGINE && this._spawnBraked()) return 'brake';
     return 'slot';
@@ -7843,6 +7948,7 @@ export class Supervisor {
     if (noRoom) return { why: 'cloud-no-room', detail: noRoom.error };
     if (this._cloudVersionGaps().some((g) => g.engine === engineOf(engine) && g.blocks)) return { why: 'version', detail: engineOf(engine) };
     if (this._cloudInUseState(engine) === 'limited') return { why: 'cloud-account-limited' };
+    if (this._cloudInUseState(engine) === 'refused') return { why: 'cloud-account-refused' };
     return { why: 'other' };
   }
 
@@ -8198,6 +8304,7 @@ export class Supervisor {
     const joinedAt = Date.now();
     const view: JoinedRun = {
       itemId, product: rec.product, startedAt: rec.startedAt ?? joinedAt, engine, cloud: true,
+      ...(rec.turnStartedAt ? { turnStartedAt: rec.turnStartedAt } : {}),
       tail: [], saying: '', sayingAt: 0, stop: () => child.kill('SIGINT'),
     };
     const item: WorkItem = { id: itemId, product: rec.product };
@@ -8257,7 +8364,11 @@ export class Supervisor {
         if (trace) write(`\n# exited (${code}) ${new Date().toISOString()}${view.stoppedOnRequest ? STOPPED_ON_REQUEST : view.movedHere ? MOVED_HERE : ''}\n`);
         // Finished only when its work is home: 75 is the app going again, or
         // results that did not come back, and a later homecoming tries again.
-        const session = { ...view, startedAt: rec.startedAt, child: { ranToTheEnd: () => code === 0 && !helpersLost.length, helpersLost: () => [...helpersLost] } };
+        // A reply it heard began a turn, even in a record saved without that turn's start.
+        const replied = this.store.readItem?.(rec.product, itemId);
+        const heardAt = replied?.answer && this._heardIn(replied, rec.sessionId) ? answerTs(replied) : 0;
+        const turnStartedAt = Math.max(view.turnStartedAt ?? rec.startedAt ?? 0, heardAt) || undefined;
+        const session = { ...view, startedAt: rec.startedAt, turnStartedAt, child: { ranToTheEnd: () => code === 0 && !helpersLost.length, helpersLost: () => [...helpersLost] } };
         // Same as a run the app started: its reply was marked heard when it was
         // joined, so it is released here or nothing would run it on this Mac.
         if (this.runFinished(session) && this._noteCloudHandBack(item, session, rec.cwd)) {
@@ -8622,6 +8733,9 @@ export class Supervisor {
       const said = session.resultIsError ? troubleCause(session.result) : 'unknown';
       if (said === 'at-limit') {
         session.accountFault = { cause: 'at-limit', account: `cloud:${engineOf(session.engine)}` };
+        this._cloudConfigAt = 0;
+      } else if (accountRefused(said)) {
+        session.accountFault = { cause: said, account: session.cloudAccount ?? `cloud:${engineOf(session.engine)}` };
         this._cloudConfigAt = 0;
       }
       return;
@@ -9160,6 +9274,14 @@ export class Supervisor {
     // they have shipped or gone back to their agent.
     let shipping: string[] = [];
     try { shipping = this.shipQueue.waitingIds(allThreads(), this.store.listProducts?.() ?? []); } catch {}
+    // A run whose next command the memory gate holds, and for how long: its
+    // step was asked for, so it would read Running the whole time it waits.
+    const heldForMemory = new Map<string, number>();
+    try {
+      for (const w of this._memoryGate?.gate?.snapshot?.().waiting ?? []) {
+        if (w.item) heldForMemory.set(w.item, Math.max(heldForMemory.get(w.item) ?? 0, w.waitedMs));
+      }
+    } catch {}
     return {
       paused: this.paused,
       shipping,
@@ -9181,6 +9303,7 @@ export class Supervisor {
         product: s.product,
         startedAt: s.startedAt,
         ...('turnStartedAt' in s && s.turnStartedAt ? { turnStartedAt: s.turnStartedAt } : {}),
+        ...(heldForMemory.has(s.itemId) ? { memoryHeldMs: heldForMemory.get(s.itemId) } : {}),
         // WHICH CODING AGENT REALLY STARTED THIS ONE. `engineFacts` below is the
         // answer for the NEXT spawn on a row; this is the one that happened, so
         // the byline says what is in front of her rather than what would be next
@@ -9207,6 +9330,8 @@ export class Supervisor {
       stalled,
       queued,
       starting,
+      // Of those, the ones whose folder is being made now, which wait for nothing.
+      settingUp: queued.filter(settingUp),
       // Left out of `running`, but their claim is ours, not an agent elsewhere
       // (renderer/src/live-line.ts).
       remoteHeld: [...this.sessions.values()].filter((s) => s.remoteIdle).map((s) => s.itemId),
@@ -9914,7 +10039,10 @@ export class Supervisor {
     this._asleepQueue = asleep ? queue.filter((r) => !r.command).map(({ item, continuation }) => ({ item, continuation })) : [];
     if (asleep) for (const { item } of queue) this._noteNotStarting(item, 'asleep', this._engineFor(item));
 
+    // Ahead of the room and memory asked about below: a message to a terminal that is open needs neither.
+    for (const { item, continuation, command } of queue) if (continuation && !command) this._goesToItsTerminal(item);
     for (const { item, continuation, command } of asleep ? [] : queue) {
+      if (continuation && !command && this._goesToItsTerminal(item)) continue;
       // The cap is real for both kinds. Uncapped, one restart's respawn wave
       // put ten workers into one tick, which split the founder's rate limit
       // ten ways and slow-motioned everything, twice, before two agents
@@ -10301,9 +10429,17 @@ export class Supervisor {
       }
       if (this.sessions.has(current.id)) return;
       if (this._answerDelivered(current)) return;
-      this._handledAnswers.add(this._answerKey(current));
+      // The run closed its thread before it heard these words, and a closed
+      // thread refuses the claim the next run makes. One she closed stays closed.
+      let next = current;
+      if (current.status === 'done') {
+        if (current.wrote?.status?.source === 'founder') return;
+        this.store.answerItem(current.product, current.id, { status: 'open' });
+        next = { ...current, status: 'open' };
+      }
+      this._handledAnswers.add(this._answerKey(next));
       this._saveState();
-      this.spawnWorker(current, { continuation: true });
+      this.spawnWorker(next, { continuation: true });
     } catch {}
   }
 
@@ -10365,7 +10501,7 @@ export class Supervisor {
   // it did. It is here for the two resume paths only: a session belongs to the
   // harness that wrote it, and a thread id handed to the wrong CLI dies on
   // arrival with "No conversation found with session ID".
-  spawnPlan(item: WorkItem, product: Product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE, shipFailure = null, switched = false, movedHere = false, cloudNote = null }: { continuation?: boolean; resumeSessionId?: string | null; engine?: string; shipFailure?: string | null; switched?: boolean; movedHere?: boolean; cloudNote?: string | null } = {}): SpawnPlan {
+  spawnPlan(item: WorkItem, product: Product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE, shipFailure = null, switched = false, movedHere = false, cloudNote = null, cloud = false }: { continuation?: boolean; resumeSessionId?: string | null; engine?: string; shipFailure?: string | null; switched?: boolean; movedHere?: boolean; cloudNote?: string | null; cloud?: boolean } = {}): SpawnPlan {
     // A ROW'S OWN CHAT. Her reply on a row goes back to the session that wrote
     // what she is replying to. Four guards, and each one falls back to the old
     // behaviour rather than to anything worse:
@@ -10478,8 +10614,9 @@ export class Supervisor {
     if (earlyConflict) prompt = `${prompt}\n\n${earlyConflict}`;
     // WHAT HAPPENS TO WHAT IT LEAVES RUNNING, when that switch is on
     // (main/leftovers.mts): the rule, and the programs of this task still
-    // shutting down, which it must not reuse.
-    const leftoverNote = this.leftoverBriefNote(item);
+    // shutting down, which it must not reuse. Not in the cloud, whose machine
+    // goes with the run (main/cloud/run.mts `LIVE_NOTE`).
+    const leftoverNote = cloud ? null : this.leftoverBriefNote(item);
     if (leftoverNote) prompt = `${prompt}\n\n${leftoverNote}`;
     if (cloudNote) prompt = `${prompt}\n\n${cloudNote}`;
     // A request the cloud handed back (`_toldItMoved`).
@@ -11192,6 +11329,15 @@ export class Supervisor {
    * no second boolean anywhere that could disagree with it.
    */
   engineChoices() {
+    // Claude Code and Codex only. Everything drawn off this list (Settings, the
+    // usage corner, the cloud menu, small calls) was written for those two; a
+    // further harness is in `enginesHere` and reaches the screens as its own
+    // list (`engineFacts().further`).
+    return this.enginesHere().filter((e) => e.id === 'claude' || e.id === 'codex');
+  }
+
+  /** Every harness a thread may run on here: the two above, and any further one on offer whose binary was found. */
+  enginesHere() {
     // A Mac with only Codex is offered Codex whether or not the gate is open:
     // one engine is not a choice, so there is nothing for the gate to hold.
     if (this._homeEngine() !== DEFAULT_ENGINE) return availableEngines(this._enginesFound());
@@ -11213,7 +11359,12 @@ export class Supervisor {
     // come from the sign-in check (main/engine-setup.mts); until it has
     // answered, nothing moves.
     const claudeSignedOut = this.config.claudeSignedIn === false && codex && this.config.codexSignedIn === true && !this._addedClaudeSignedIn();
-    return { claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
+    // Any further harness on offer is here when its binary was found (main/config.mts).
+    const others: Record<string, boolean> = {};
+    for (const { id } of ENGINES) {
+      if (id !== 'claude' && id !== 'codex') others[id] = !!harnessFor(id).binary(this.config);
+    }
+    return { ...others, claude: this.config.claudeFound !== false && !claudeSignedOut, codex };
   }
 
   /** The launch check only asks the default login, so a signed-in added account must be counted here. */
@@ -11275,15 +11426,21 @@ export class Supervisor {
    */
   engineFacts(items: WorkItem[] = []) {
     const choices = this.engineChoices();
+    // A further harness, with its model list, which only it knows. Its own
+    // list, so nothing written for the two above meets a third.
+    const further = this.enginesHere()
+      .filter((e) => !choices.some((c) => c.id === e.id))
+      .map((e) => ({ ...e, models: harnessFor(e.id).models({ sup: this }) as { id: string; label: string }[] }));
     const workspace = this._engineFor(null);
     const byItem: Record<string, string> = {};
-    if (choices.length > 1) {
+    if (choices.length + further.length > 1) {
       for (const item of items) {
         const engine = this._engineFor(item);
         if (engine !== workspace) byItem[item.id] = engine;
       }
     }
-    return { choices, workspace, byItem };
+    // Absent rather than empty, so a computer with no further harness is told exactly what it always was.
+    return { choices, ...(further.length ? { further } : {}), workspace, byItem };
   }
 
   /**
@@ -11361,7 +11518,7 @@ export class Supervisor {
    */
   engineOffered(engine: unknown): string | null {
     if (!isEngine(engine)) return null;
-    if (!this.engineChoices().some((e) => e.id === engine)) return null;
+    if (!this.enginesHere().some((e) => e.id === engine)) return null;
     return engine === this._engineFor(null) ? null : engine as string;
   }
 
@@ -12241,6 +12398,27 @@ export class Supervisor {
     return this._codexCards?.changed(id, shown) ?? false;
   }
 
+  /**
+   * ONE WORKER'S CARDS, for an engine whose approval requests arrive inside
+   * this process (main/harnesses/acp.mts). They are the same in-process cards
+   * Codex's are, so the one answering door settles them and nothing new reads
+   * an answer off the disk. The adapter closes them when its worker exits.
+   */
+  approvalCardsFor(item: Pick<WorkItem, 'id' | 'product'>, say: (line: string) => unknown) {
+    const scope = this._codexApprovals().scope({ product: item.product, item: item.id, say });
+    let changes = 0;
+    return {
+      command: async (command: string, cwd: string | null) => await scope.handle('item/commandExecution/requestApproval', { command, cwd }) === 'accept',
+      // The card for a file change is drawn from the change itself, which this vocabulary sends first.
+      edit: async (files: { path: string; kind: 'add' | 'update' | 'delete'; diff: string }[]) => {
+        const itemId = `change-${changes += 1}`;
+        scope.remember('item/started', { item: { type: 'fileChange', id: itemId, changes: files.map((file) => ({ path: file.path, kind: { type: file.kind }, diff: file.diff })) } });
+        return await scope.handle('item/fileChange/requestApproval', { itemId }) === 'accept';
+      },
+      close: (why?: string) => scope.close(why),
+    };
+  }
+
   // A loaded app-server thread holds Codex's writer lock even after its turn
   // finishes. Closing an idle account returns its sessions to the native CLI.
   _releaseIdleCodex(profile: string = 'default') {
@@ -12459,7 +12637,7 @@ export class Supervisor {
     }
 
     const cloudNote = where === 'local' ? this._cloudNoteForHere(item, product, cwd, engine) : null;
-    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine, shipFailure, switched, movedHere: this._toldItMoved(item, where), cloudNote });
+    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine, shipFailure, switched, movedHere: this._toldItMoved(item, where), cloudNote, cloud: where === 'cloud' });
     const { args } = plan;
     // Why it runs locally, where a branch below says so rather than `_whyLocal`.
     let whyLocal: WhyLocal | null = null;
@@ -12609,7 +12787,7 @@ export class Supervisor {
       child, itemId: item.id, product: item.product, startedAt: adopted?.rec.startedAt ?? Date.now(), tail: [], profile,
       command: !!plan.command, engine,
       hosted: child instanceof HostedRun,
-      ...(adopted ? { sessionId: adopted.rec.sessionId, idRemembered: true, adopted: true } : {}),
+      ...(adopted ? { sessionId: adopted.rec.sessionId, idRemembered: true, adopted: true, ...(adopted.rec.turnStartedAt ? { turnStartedAt: adopted.rec.turnStartedAt } : {}) } : {}),
       // Picking up a conversation an earlier run had, so a death says "not finished".
       resumed: !!plan.resumeId,
       // What the row asked for when this run started, so a switch the agent
@@ -12627,6 +12805,7 @@ export class Supervisor {
       // Mac's slots (`_loadFor`), shown on the thread, remembered for a
       // restart (`_liveSessions`).
       cloud: where === 'cloud',
+      ...(where === 'cloud' ? { cloudAccount: this._accountKey(engine, this._profilesFor(engine)[0] ?? 'default') } : {}),
       carriesHandBack: adopted ? !!adopted.rec.carriesHandBack : where !== 'cloud' && this._noteCarryingHandBack(item.id),
       whyLocal:where === 'cloud' || plan.command ? null : whyLocal ?? this._whyLocal({ item, product, cwd, engine, remoteOnly }),
     } as WorkerSession;
@@ -13059,6 +13238,10 @@ export class Supervisor {
       this._forgetCloudStartThatLeftNothing(item, session);
       this.noteExitForBackoff(session, { onLine });
       this._noteStoppedByAccount(item, session);
+      // Before the row is judged, so it runs on the other account instead of coming to the inbox.
+      if (session.accountFault) {
+        try { this._moveOffALimitedAccount(); } catch (e) { console.warn('zero: could not move off the account that refused a run:', (e as Error).message); }
+      }
       if (session.cloud) this._sayCloudNews(cwd, item);
       const carryingAnswer = continuation && answerAtSpawn;
       if (carryingAnswer && !session.spawnAnswerSettled) this.settleDeliveryAndSay(item, answerAtSpawn, session, signal, { command: !!plan.command });
@@ -13108,7 +13291,7 @@ export class Supervisor {
           // ended with an error result. On Agentbox alone, 18 of the 74 rows this
           // touched still carried no word about it, one of them after 236 dead
           // runs on the same task. She read an inbox that looked idle.
-          if (saidNothingSheCanUse(session)) this.sayTheRunDied(item, session);
+          if (saidNothingSheCanUse(session) && !this._runsAgainElsewhere(item, session)) this.sayTheRunDied(item, session);
         }
       }
       this.onChange?.();
@@ -13784,7 +13967,7 @@ export class Supervisor {
     const fresh = product ? this.store.readItem?.(item.product, item.id) ?? item : null;
     if (!fresh) return;
     const engine = engineOf(session?.engine);
-    const plan = this.spawnPlan({ ...fresh, answer: REPLY_MARK, status: 'open', wrote: { ...(fresh.wrote ?? {}), answer: { ts: Date.now(), source: 'founder' } } }, product!, { continuation: true, engine });
+    const plan = this.spawnPlan({ ...fresh, answer: REPLY_MARK, status: 'open', wrote: { ...(fresh.wrote ?? {}), answer: { ts: Date.now(), source: 'founder' } } }, product!, { continuation: true, engine, cloud: true });
     const frame = plan.command ? null : replyFrame(plan.prompt);
     if (!frame) return;
     const profile = plan.resumeProfile ?? session.profile;
@@ -13887,7 +14070,7 @@ export class Supervisor {
   }
 
   _writeClaudeNewThreadKit({ slug, stub, product, root, defaultEngine, rec, plain }: NewKitCtx) {
-    const plan = this.spawnPlan(stub, product!, { continuation: false, engine: 'claude' });
+    const plan = this.spawnPlan(stub, product!, { continuation: false, engine: 'claude', cloud: true });
     if (plan.command || plan.resumeId) return;
     const frame = replyFrame(this.replyBrief({ ...stub, answer: REPLY_MARK }, { product }));
     if (!frame) return;
@@ -13913,7 +14096,7 @@ export class Supervisor {
   // names marked) with the turn's own settings, and its brief. Her title and
   // body go only into the first turn, so a start that carried them is none.
   _writeCodexNewThreadKit({ slug, stub, product, root, defaultEngine, rec, plain }: NewKitCtx) {
-    const plan = this.spawnPlan(stub, product!, { continuation: false, engine: 'codex' });
+    const plan = this.spawnPlan(stub, product!, { continuation: false, engine: 'codex', cloud: true });
     if (plan.command || plan.resumeId || plan.reviewTarget) return;
     const frame = replyFrame(this.replyBrief({ ...stub, answer: REPLY_MARK }, { product }));
     if (!frame) return;
@@ -14271,6 +14454,8 @@ export class Supervisor {
     session.answerOnRow = null;
     session.turnStartedAt = session.lastOutputAt = Date.now();
     session.turnEpoch = this.store.readItem?.(session.product, session.itemId)?.epoch ?? session.turnEpoch;
+    const rec = this._liveSessions?.[session.itemId];
+    if (rec) { rec.turnStartedAt = session.turnStartedAt; this._saveState(); }
     this.onChange?.();
   }
 
@@ -14716,7 +14901,8 @@ export class Supervisor {
     // AGENTBOX_KEEP=1 is still honoured but no longer asked for: the task's
     // rule decides what stays, not the agent's guess about what is needed.
     if (cleaner.enabled) {
-      parts.push('Anything you leave running after your turn (a dev server, a preview, a background job) keeps running while this task is open and is stopped when the person closes it, or sooner if this computer runs critically short of memory. '
+      parts.push('Anything you leave running after your turn (a dev server, a preview) keeps running while this task is open and is stopped when the person closes it, or sooner if this computer runs critically short of memory. '
+        + 'Start what the person will use so it outlives your turn, `nohup <command> > <log file> 2>&1 &`, not as a background job of your own (run_in_background): your answer waits until those end, and they end with your session. '
         + 'Stop anything you started that the person will not need before you finish.');
     }
     const stopping = cleaner.stoppingNote(item.id);

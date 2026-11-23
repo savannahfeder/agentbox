@@ -1,7 +1,7 @@
 /* Home. The sky sits under the main card's content; cards
    over it are glass. */
 
-.home-sky { position: absolute; z-index: 0; pointer-events: none; overflow: hidden; border-radius: var(--radius); }
+.home-sky { position: absolute; z-index: 0; pointer-events: none; overflow: hidden; border-radius: var(--pane-corner); }
 /* Pinned to the card's right edge and drawn as wide as the card with the
    sidebar folded, so the sidebar opening covers its left edge (sky-follows-the-card.ts). */
 .home-sky canvas { position: absolute; top: 0; right: 0; width: 100%; height: 100%; }
@@ -11,6 +11,20 @@
 /* The light card is white and the window around it takes the sky's tint. */
 :root[data-theme="light"][data-sky-frame] body,
 :root[data-theme="light"][data-sky-frame] .app.workspace-layout { background: var(--sky-frame) !important; }
+/* The orange mountains bring warm greys to go with the orange. */
+:root[data-theme="light"][data-sky-frame="mountains"] {
+  --text: #16171b; --text-dim: #4f5159; --text-faint: #75777f;
+  --line: rgba(40, 28, 16, .07); --line-strong: rgba(40, 28, 16, .14); --wash: rgba(40, 28, 16, .04); --wash-strong: rgba(40, 28, 16, .08);
+  --film-strong: rgba(40, 28, 16, .07); --select: rgba(238, 96, 24, .16);
+}
+/* The mountains rise behind the cards, so the cards are clear enough to show them, frosted.
+   The frost is drawn once under them (frost.ts): the browser's own is drawn again each time a bird moves. */
+:root[data-theme="light"][data-sky-frame="mountains"] .hm-glass,
+:root[data-theme="light"][data-sky-frame="mountains"] .hm-start .tc-card.tc-inline,
+:root[data-theme="light"][data-sky-frame="mountains"] .hm-door {
+  background: linear-gradient(180deg, rgba(255, 255, 255, .6), rgba(255, 255, 255, .42));
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
 
 .app.home-shown > .topbar { visibility: hidden; border-bottom-color: transparent; }
 .app.sky-shown .list-pane, .app.sky-shown .list-pane .th-table { background: transparent; }
@@ -94,6 +108,54 @@
 .hm-row.unread .hm-text b { font-weight: 500; }
 .hm-text small { display: block; font-size: 12.5px; line-height: 17px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hm-row time { font-size: 12.5px; color: var(--text-dim); white-space: nowrap; }
+.hm-mate-wrap + .hm-mate-wrap > .hm-row, .hm-mate-wrap + .hm-hidden, .hm-hidden + .hm-mate-wrap > .hm-row { border-top: 1px solid rgba(255, 255, 255, .065); }
+:root[data-theme="light"] :is(.hm-mate-wrap + .hm-mate-wrap > .hm-row, .hm-mate-wrap + .hm-hidden, .hm-hidden + .hm-mate-wrap > .hm-row) { border-top-color: rgba(30, 22, 36, .06); }
+/* A long name gives way before the pin does. */
+.hm-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.hm-name b { min-width: 0; }
+.hm-pin { display: flex; flex: none; color: var(--text-faint); transform: translateY(.5px); }
+
+/* The row's one action fades in where its week was, as a conversation's ⋯ does over its time. */
+.hm-mate-wrap { position: relative; }
+.hm-mate-act { position: absolute; right: 12px; top: 50%; width: 28px; height: 28px; margin-top: -14px; padding: 0; display: grid; place-items: center;
+  appearance: none; border: 0; border-radius: 50%; background: transparent; color: var(--text-dim); cursor: pointer;
+  opacity: 0; pointer-events: none; transition: opacity .14s ease, background-color .14s ease, color .14s ease; }
+.hm-mate-act:hover, .hm-mate-wrap.menu .hm-mate-act { background: rgba(255, 255, 255, .09); color: var(--text); }
+:root[data-theme="light"] :is(.hm-mate-act:hover, .hm-mate-wrap.menu .hm-mate-act) { background: rgba(30, 22, 36, .07); }
+.hm-mate-act:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 0; }
+.hm-mate-wrap:hover .hm-mate-act, .hm-mate-wrap.menu .hm-mate-act, .hm-mate-act:focus-visible { opacity: 1; pointer-events: auto; }
+.hm-week { transition: opacity .14s ease; }
+.hm-mate-wrap:hover .hm-week, .hm-mate-wrap.menu .hm-week, .hm-mate-wrap:focus-within .hm-week { opacity: 0; }
+.hm-mate-wrap:is(:hover, .menu) > .hm-row { background: rgba(255, 255, 255, .045); }
+:root[data-theme="light"] .hm-mate-wrap:is(:hover, .menu) > .hm-row { background: rgba(30, 22, 36, .04); }
+
+/* Who you hid: how many, and a turn of the chevron to list them. */
+.hm-hidden { cursor: pointer; }
+.hm-hidden .hm-text small { color: var(--text-dim); }
+.hm-face.hm-hid-mark { background: rgba(255, 255, 255, .06); color: var(--text-faint); }
+:root[data-theme="light"] .hm-face.hm-hid-mark { background: rgba(30, 22, 36, .045); }
+.hm-hidden:hover .hm-hid-mark { color: var(--text-dim); }
+.hm-chev { display: grid; place-items: center; width: 28px; height: 28px; margin-right: -6px; color: var(--text-faint); transition: transform .18s ease; }
+.hm-hidden.open .hm-chev { transform: rotate(180deg); }
+.hm-hidden:hover .hm-chev { color: var(--text-dim); }
+/* Clear of the card's foot fade when the list ends on it. */
+.hm-hidden:last-child { margin-bottom: 28px; }
+.hm-two.fits .hm-hidden:last-child { margin-bottom: 0; }
+/* A hidden teammate, listed: quieter, but still read. */
+.hm-mate-wrap.gone .hm-face { filter: grayscale(1); opacity: .6; }
+.hm-mate-wrap.gone .hm-text b { color: var(--text-dim); }
+.hm-mate-wrap.gone .hm-text small { color: var(--text-faint); }
+/* Its way back is always on screen, not only under the pointer. */
+.hm-mate-act.hm-show { right: 18px; width: auto; height: 26px; margin-top: -13px; padding: 0 11px; border-radius: 13px; font: inherit; font-size: 12.5px;
+  color: var(--text-dim); background: rgba(255, 255, 255, .06); opacity: 1; pointer-events: auto; }
+:root[data-theme="light"] .hm-mate-act.hm-show { background: rgba(30, 22, 36, .05); }
+.hm-mate-act.hm-show:hover { color: var(--text); background: rgba(255, 255, 255, .11); }
+:root[data-theme="light"] .hm-mate-act.hm-show:hover { background: rgba(30, 22, 36, .09); }
+
+/* The hidden ones, listed, arrive softly. */
+@keyframes hm-arrive { from { opacity: 0; transform: translateY(-3px); } }
+.hm-mate-wrap.gone { animation: hm-arrive .2s ease-out both; }
+@media (prefers-reduced-motion: reduce) { .hm-mate-wrap.gone { animation: none; } .hm-mate-act, .hm-week, .hm-chev { transition: none; } }
 
 .hm-face { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 500; color: var(--text); background: rgba(255, 255, 255, .12); position: relative; box-sizing: border-box; }
 .hm-face > .hm-photo { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
@@ -153,9 +215,11 @@
   mask-image: linear-gradient(to top, #000 0, #000 46px, transparent 90px); }
 /* Words over the sky sit in a soft patch of the sky's own dark, and controls
    are filled with it, so the streak never runs through a word on any sky.
-   --sky-under is set by InboxSky. */
-.app.sky-shown:not(.home-shown) > .topbar :is(h1, button), .app.sky-shown:not(.home-shown) :is(.tm-tab, .th-col-h, .th-col-empty, .td-top, .fp-bar, .cx-search, .pl-head, :is(.td-top, .fp-bar, .fp-tools, .cx-search, .pl-head) :is(button, input)) {
+   A menu opened from there sits on its own solid card, where the patch
+   reads as a black glow. --sky-under is set by InboxSky. */
+.app.sky-shown:not(.home-shown) > .topbar :is(h1, button):not([role="menu"] *, [role="dialog"] *), .app.sky-shown:not(.home-shown) :is(.tm-tab, .th-col-h, .th-col-empty, .td-top, .fp-bar, .cx-search, .pl-head, :is(.td-top, .fp-bar, .fp-tools, .cx-search, .pl-head) :is(button, input)):not([role="menu"] *, [role="dialog"] *) {
   text-shadow: 0 0 1px var(--sky-under, var(--bg)), 0 0 3px var(--sky-under, var(--bg)), 0 0 6px var(--sky-under, var(--bg)), 0 0 10px var(--sky-under, var(--bg)), 0 0 16px var(--sky-under, var(--bg)); }
+.app.sky-shown:not(.home-shown) :is([role="menu"], [role="dialog"]) { text-shadow: none; }
 .app.sky-shown:not(.home-shown) :is(.th-new, .th-disp, .fp-find, .cx-search, .pl-btn):not(:hover):not([aria-expanded="true"]) {
   background-color: color-mix(in srgb, var(--sky-under, var(--bg)) 82%, transparent);
   backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
@@ -163,7 +227,7 @@
 .app.sky-shown:not(.home-shown) > .topbar { border-bottom-color: transparent; }
 /* The board has no tabs, so the same sky sits 60px higher, its top cut off,
    and is gone before the column headings. */
-.app.sky-board .inbox-sky-head { transform: scaleY(-1) translateY(60px); clip-path: inset(0 0 60px 0 round var(--radius));
+.app.sky-board .inbox-sky-head { transform: scaleY(-1) translateY(60px); clip-path: inset(0 0 60px 0 round var(--pane-corner));
   -webkit-mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px);
   mask-image: linear-gradient(to top, #000 0, #000 105px, transparent 150px); }
 
@@ -181,12 +245,6 @@
 .app:has(> .inbox-sky-zero) .th-start .tc-chip { color: var(--text); }
 .app:has(> .inbox-sky-zero) .th-start .tc-send > button:disabled { opacity: 1; }
 .app:has(> .inbox-sky-zero) .th-start .tc-send kbd { opacity: 1; }
-/* The light purple sky draws its ink soft here (sky.ts emptySoft), and the
-   controls are filled white so no dot sits inside one. */
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-chip { background: #fff; }
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-send > button { background: #fff; box-shadow: inset 0 0 0 1px rgba(30, 22, 36, .14); }
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-send > button:hover:not(:disabled) { background: #f3f1f5; }
-:root[data-sky-frame="dusk-light"] .app:has(> .inbox-sky-zero) .th-start .tc-ideas { background: rgba(255, 255, 255, .55); }
 
 /* Team and Files wear the Inbox's sky; the Team list would cover it. */
 .app.sky-place .cx-list { background: transparent; }

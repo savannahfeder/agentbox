@@ -9,7 +9,7 @@
 // the bare place 0, which now held film-rules.md.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { threadFiles, stillInHand, whereAPressLands, versionForPath } from '../shared/artifact-marks.mts';
+import { pathsAPressKeeps, threadFiles, stillInHand, whereAPressLands, versionForPath } from '../shared/artifact-marks.mts';
 
 const D = 'designs/w-1';
 const rules = 'marketing/film-rules.md';
@@ -74,6 +74,7 @@ describe('the file in hand when its version goes', () => {
   it('the big view keeps the path it was opened on', () => {
     const view = fs.readFileSync(new URL('../renderer/src/components/ArtifactView.tsx', import.meta.url), 'utf8');
     expect(view).toContain('threadFiles(files, numbers, { keep: kept })');
-    expect(view).toMatch(/const kept = useMemo\(\(\) => \[open\.path, /);
+    expect(view).toMatch(/const kept = useMemo\(\(\) => pathsAPressKeeps\(open, /);
+    expect(pathsAPressKeeps({ path: v8 }, [])).toEqual([v8]);
   });
 });

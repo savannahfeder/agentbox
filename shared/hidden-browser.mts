@@ -2,7 +2,9 @@
 // person's Google Chrome: a headless copy of that app registers as
 // com.google.Chrome, and every Dock click, ⌘N and `open` on Chrome goes to it
 // and opens nothing, while Force Quit does not list it. Chrome for Testing and
-// Playwright's headless shell are not filed as Google Chrome.
+// Playwright's headless shell are not filed as Google Chrome. The shell comes
+// first: Chrome for Testing is an app, so on a Mac whose build of it crashes,
+// every crash puts a box on the person's screen.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -35,9 +37,9 @@ export const chromesForTesting = (root: string = PLAYWRIGHT_CACHE): string[] =>
 export const headlessShells = (root: string = PLAYWRIGHT_CACHE): string[] =>
   builds(root, /^chromium_headless_shell-(\d+)$/, ['chrome-headless-shell-mac-arm64', 'chrome-headless-shell-mac-x64'], 'chrome-headless-shell');
 
-/** Chrome for Testing, else the headless shell, else null. */
+/** The headless shell, else Chrome for Testing, else null. */
 export function hiddenBrowser({ forTesting = chromesForTesting, shells = headlessShells }: { forTesting?: () => string[]; shells?: () => string[] } = {}): string | null {
-  return forTesting()[0] ?? shells()[0] ?? null;
+  return shells()[0] ?? forTesting()[0] ?? null;
 }
 
 /** The binary a script spawns: on a Mac the hidden browser or a refusal; elsewhere `CHROME`, which the Linux box sets. */

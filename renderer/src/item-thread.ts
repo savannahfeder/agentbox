@@ -31,7 +31,7 @@
 // stamped it, and nothing is invented, dropped or merged to put them in order.
 
 import { changedFile, commandWork, isBookkeeping, plainCommand, saidCount, shortPath, threadWindow, unleaked, workVerb } from '../../shared/agents.mts';
-import { asTraced, said, traceLines } from './terminal';
+import { asTraced, said, traceLines } from '../../shared/trace-lines.mts';
 import { handsBack, withoutHandBack } from '../../shared/cloud-hand-back.mts';
 import { editOfLine, resolveEdits, type EditLine } from '../../shared/message-edits.mts';
 import type { TraceSession } from './notes';
@@ -79,6 +79,9 @@ export interface ItemOutcome {
   /** What wrote it (thread-history.ts, `ran`), so the newest answer is signed
    *  like the ones still in the stream. */
   ran?: { engine?: string; model?: string };
+  /** On a note, whether the app wrote it. Read off the message itself: the
+   *  row's newest note may be one the thread does not draw. */
+  app?: boolean;
 }
 
 /**
@@ -571,7 +574,7 @@ export function itemThread(
   // up again after a result has the agent talking below that result, and the
   // result is then no longer the end of the conversation.
   let spokeAt = -1;
-  let answer: { i: number; at: number; text: string; field: 'result' | 'note'; ran?: { engine?: string; model?: string } } | null = null;
+  let answer: { i: number; at: number; text: string; field: 'result' | 'note'; ran?: { engine?: string; model?: string }; app?: boolean } | null = null;
 
   // EVERY NODE WITH THE MOMENT IT HAPPENED, BEFORE ANYTHING IS PUT IN ORDER.
   //
@@ -626,9 +629,9 @@ export function itemThread(
         event.words = rest;
       }
       placed.push({
-        node: { at: event.at, who: event.who === 'you' ? 'you' : 'it', text: event.words, ...(event.by ? { by: event.by } : {}), ...(event.from ? { from: event.from } : {}), ...(event.fromId ? { fromId: event.fromId } : {}), ...(event.voice ? { voice: event.voice } : {}), ...(event.uid ? { uid: event.uid } : {}), ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}), ...(event.ran ? { ran: event.ran } : {}), ...(event.edited ? { edited: event.edited } : {}), ...(event.deleted ? { deleted: true } : {}), ...(event.fileMark ? { fileMark: event.fileMark } : {}), ...(event.says ? { says: event.says } : {}), ...(event.sendsAt ? { sendsAt: event.sendsAt } : {}) },
+        node: { at: event.at, who: event.who === 'you' ? 'you' : 'it', text: event.words, ...(event.by ? { by: event.by } : {}), ...(event.from ? { from: event.from } : {}), ...(event.fromId ? { fromId: event.fromId } : {}), ...(event.voice ? { voice: event.voice } : {}), ...(event.uid ? { uid: event.uid } : {}), ...(event.inReplyTo ? { inReplyTo: event.inReplyTo } : {}), ...(event.ran ? { ran: event.ran } : {}), ...(event.edited ? { edited: event.edited } : {}), ...(event.deleted ? { deleted: true } : {}), ...(event.fileMark ? { fileMark: event.fileMark } : {}), ...(event.says ? { says: event.says } : {}), ...(event.asked ? { asked: event.asked } : {}), ...(event.sendsAt ? { sendsAt: event.sendsAt } : {}) },
         run: null,
-        answer: isAnswer ? { at: event.at, text: event.words, field: event.field as 'result' | 'note', ...(event.ran ? { ran: event.ran } : {}) } : null,
+        answer: isAnswer ? { at: event.at, text: event.words, field: event.field as 'result' | 'note', ...(event.ran ? { ran: event.ran } : {}), app: event.says === 'app' } : null,
       });
       continue;
     }
@@ -756,7 +759,7 @@ export function itemThread(
   // finished result or checkpoint with nothing spoken under it. See ItemOutcome
   // above for why this exists and what draws it.
   const outcome: ItemOutcome | null = answer && answer.i === spokeAt
-    ? { at: answer.at, text: answer.text, field: answer.field, ...(answer.ran ? { ran: answer.ran } : {}) }
+    ? { at: answer.at, text: answer.text, field: answer.field, ...(answer.ran ? { ran: answer.ran } : {}), ...(answer.field === 'note' ? { app: !!answer.app } : {}) }
     : null;
   // Counted before it is lifted: it is still a message on this task, and the
   // head line says how many there are, not how many are in the stream.

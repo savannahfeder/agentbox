@@ -21,7 +21,8 @@ describe("a helper's view of a teammate's thread", () => {
   it('is set in the thread page\'s column with its markdown styles', () => {
     expect(page).toContain('<div className="focus-body markdown agent-thread" aria-label="The conversation">');
     expect(page).toContain('<h2 className="one-title">{title}</h2>');
-    expect(page).toContain('<QueueAnswer text={options.length ? stripOptionsSection(newest.text) : newest.text}');
+    // Asked onto it, the owner's own choices are left off too (a-reply-to-a-review-hands-it-back).
+    expect(page).toContain('<QueueAnswer text={options.length || unfolded ? stripOptionsSection(newest.text) : newest.text}');
     expect(page).not.toContain('appendix-label');
   });
   it('offers the step\'s options on the reply box, not as a list in the answer', () => {

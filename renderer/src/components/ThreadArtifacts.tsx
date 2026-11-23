@@ -8,7 +8,7 @@ import type { ArtifactMark, FileElsewhere, FileMarks, Person, WorkItem } from '.
 import { ArtifactView, NO_MARKS, type ArtifactOpen } from './ArtifactView';
 import { useFileLine } from '../file-numbers';
 import { filesInLines, threadFiles } from '../../../shared/artifact-marks.mts';
-import { withRunsSaid } from '../runs-said';
+import { withRunsSaid } from '../../../shared/runs-said.mts';
 import type { TraceSession } from '../notes';
 
 const FOLLOW_MS = 3000;
@@ -99,11 +99,13 @@ export function ThreadArtifacts({ item, open, withAgent, onClose, onBeside, onNo
       return key ? api.filesPlaceMark({ key, mark }) : api.fileMark({ product: item.product, id: item.id, mark });
     }}
     withAgent={withAgent}
+    onHandToAgent={withAgent ? undefined : (files) => { onClose(); window.dispatchEvent(new CustomEvent('zero:hand-comments', { detail: { product: item.product, id: item.id, files } })); }}
     onNewVersion={async (_name, text, path, _id, since) => {
       const out = await api.fileNewVersion({ product: item.product, id: item.id, path, text, since });
       return out.ok ? null : out.error ?? 'That did not save.';
     }}
     onOutside={(src) => { void api.openArtifactExternally({ product: item.product, src }).then((r) => { if (!r.ok) onNotice(r.error || `${src} could not be opened.`); }); }}
+    onNotice={onNotice}
     onClose={onClose}
     onBeside={onBeside}
   />;

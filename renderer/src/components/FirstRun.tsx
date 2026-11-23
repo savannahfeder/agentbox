@@ -290,7 +290,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
             {ready && !hasReady ? (
               <>
                 <h1 className="ob-big ob-in" style={{ animationDelay: '1.3s' }}>{gate.heading}</h1>
-                <div className="ob-actions ob-in" style={{ animationDelay: '1.6s', marginTop: 40 }}>
+                <div className="ob-actions ob-in" style={{ animationDelay: '1.6s', marginTop: 34 }}>
                   {gate.running ? <>
                     {gate.again && <button type="button" className="ob-btn" onClick={signInAgain}>Open the page again <Key k="↵" /></button>}
                     <button type="button" className="ob-btn ob-quiet" onClick={stopSetup}>Back <Key k="esc" /></button>
@@ -302,27 +302,27 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
               </>
             ) : (
               <>
-                <h1 className="ob-big ob-in" style={{ animationDelay: '1.3s' }}>An inbox for hundreds of agents.</h1>
-                <p className="ob-lede ob-in" style={{ animationDelay: '1.45s' }}>Start as many as you like. Each works on its own, and comes back to you only when it needs you.</p>
-                <div className="ob-actions ob-in" style={{ animationDelay: '1.6s', marginTop: 40 }}>
+                <h1 className="ob-big ob-in" style={{ animationDelay: '1.3s' }}>Your team and its agents, in one place.</h1>
+                <p className="ob-lede ob-in" style={{ animationDelay: '1.45s' }}>Messages, work and files that people and agents share.</p>
+                <div className="ob-actions ob-in" style={{ animationDelay: '1.6s', marginTop: 34 }}>
                   <button type="button" className="ob-btn" disabled={!hasReady || !threads} onClick={start}>Get started <Key k="↵" /></button>
                 </div>
               </>
             )}
-          </div>
-          <div className="ob-check ob-foot ob-in" style={{ animationDelay: '2.1s' }}>
-            {setup && setup.phase !== 'ready' ? (
-              <>
-                <span className="ob-sq ob-live" />{ENGINE_NAME[setup.engine]}
-                <b>{footWord(setup, signedOut)}</b>
-              </>
-            ) : ready?.length ? (
-              <><span className="ob-sq" />{ready.map((engine) => ENGINE_NAME[engine]).join(' and ')} <b>ready</b></>
-            ) : ready ? (
-              <><span className="ob-sq ob-off" />{foundLine(signedOut)[0]} <b>{foundLine(signedOut)[1]}</b></>
-            ) : (
-              <><span className="ob-sq ob-off" />Checking this computer</>
-            )}
+            <div className="ob-check ob-ready ob-in" style={{ animationDelay: '2.1s' }}>
+              {setup && setup.phase !== 'ready' ? (
+                <>
+                  <span className="ob-sq ob-live" />{ENGINE_NAME[setup.engine]}
+                  <b>{footWord(setup, signedOut)}</b>
+                </>
+              ) : ready?.length ? (
+                <><span className="ob-sq" />{ready.map((engine) => ENGINE_NAME[engine]).join(' and ')} <b>ready</b></>
+              ) : ready ? (
+                <><span className="ob-sq ob-off" />{foundLine(signedOut)[0]} <b>{foundLine(signedOut)[1]}</b></>
+              ) : (
+                <><span className="ob-sq ob-off" />Checking this computer</>
+              )}
+            </div>
           </div>
         </div>
       )}

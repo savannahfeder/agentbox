@@ -13,7 +13,8 @@ import path from 'node:path';
 import { opensAProgram, openForThePerson } from '../main/opens-a-program.mts';
 
 let dir: string;
-beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), 'launch-')); });
+// Resolved, because a file is opened at its checked real path and a Mac's temp folder is behind a link.
+beforeEach(() => { dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'launch-'))); });
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 const file = (name: string, mode = 0o644) => { const p = path.join(dir, name); fs.writeFileSync(p, '#!/bin/sh\necho hi\n'); fs.chmodSync(p, mode); return p; };
 const folder = (name: string) => { const p = path.join(dir, name); fs.mkdirSync(path.join(p, 'Contents'), { recursive: true }); return p; };
@@ -61,8 +62,44 @@ describe('opening a file for the person', () => {
   it('opens anything else as before', async () => {
     const shell = fakeShell();
     const p = file('report.pdf');
-    expect(await openForThePerson(shell, p)).toBe('');
+    expect(await openForThePerson(shell, p, { platform: 'linux' })).toBe('');
     expect(shell.calls).toEqual([['open', p]]);
+  });
+
+  it('shows a program in Finder on a Mac too, where files open another way', async () => {
+    const shell = fakeShell();
+    const ran: string[][] = [];
+    const p = file('notes.command', 0o755);
+    expect(await openForThePerson(shell, p, { platform: 'darwin', run: async (cmd, args) => { ran.push([cmd, ...args]); } })).toBe('');
+    expect(ran).toEqual([]);
+    expect(shell.calls).toEqual([['finder', p]]);
+  });
+});
+
+// The check resolved a link and open resolved it again, so a worker's process
+// swapping report.pdf to a link to its own Evil.app between the two had it
+// launched: 26 clicks in 300 with a fake opener (security review, 2026-11-23).
+// Now open gets the path that was checked and the app the Mac picked for it, so
+// whatever the path is by then reaches that app as a document.
+describe('a link swapped between the check and the open', () => {
+  it('opens the checked file in the app the Mac picked for it, whatever the link became', async () => {
+    const real = file('real.pdf');
+    const evil = folder('Evil.app');
+    const link = path.join(dir, 'report.pdf');
+    fs.symlinkSync(real, link);
+    const ran: string[][] = [];
+    const asked: string[] = [];
+    const defaultApp = async (p: string) => { asked.push(p); fs.unlinkSync(link); fs.symlinkSync(evil, link); return '/System/Applications/Preview.app'; };
+    expect(await openForThePerson({ openPath: async () => '', showItemInFolder: () => {} }, link, { platform: 'darwin', defaultApp, run: async (cmd, args) => { ran.push([cmd, ...args]); } })).toBe('');
+    expect(asked).toEqual([fs.realpathSync(real)]);
+    expect(ran).toEqual([['/usr/bin/open', '-a', '/System/Applications/Preview.app', fs.realpathSync(real)]]);
+  });
+
+  it('opens the checked file as before when the Mac names no app, without failing', async () => {
+    const real = file('real.pdf');
+    const ran: string[][] = [];
+    await openForThePerson({ openPath: async () => '', showItemInFolder: () => {} }, real, { platform: 'darwin', defaultApp: async () => null, run: async (cmd, args) => { ran.push([cmd, ...args]); } });
+    expect(ran).toEqual([['/usr/bin/open', fs.realpathSync(real)]]);
   });
 });
 

@@ -11,11 +11,11 @@ const luminance = (hex) => { const n = parseInt(hex.slice(1), 16); return 0.2126
 
 describe('the sky themes', () => {
   it('are the three dark skies and the two approved light ones', () => {
-    expect(SKY_THEMES.map((k) => k.id)).toEqual(['dusk', 'ember', 'aurora', 'sage', 'dusk-light']);
+    expect(SKY_THEMES.map((k) => k.id)).toEqual(['dusk', 'ember', 'aurora', 'mountains', 'sage']);
     expect(SKY_THEMES.filter((k) => k.dark).map((k) => k.id)).toEqual(['dusk', 'ember', 'aurora']);
   });
   it('offer none of the light skies that were not approved', () => {
-    for (const id of ['morning', 'slate', 'ember-light']) expect(skyTheme(id)).toBeNull();
+    for (const id of ['morning', 'slate', 'ember-light', 'dusk-light']) expect(skyTheme(id)).toBeNull();
     expect(skyTheme(null)).toBeNull();
   });
   it('keep the dark card off black', () => {

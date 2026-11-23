@@ -2,73 +2,50 @@
 //
 // What broke: on the Team page's Standup, a teammate's "Test day in the cloud"
 // link opened the thread, and Back from there went to the Inbox. The trail
-// never recorded the Team page (App.tsx gave it no stop), so Back skipped it
-// for the last place it knew. Measured by reading the trail: walking
-// Inbox, Standup, thread and stepping back landed on the Inbox.
+// never recorded the Team page, so Back skipped it for the last place it knew.
+// Measured by reading the trail: walking Inbox, Standup, thread and stepping
+// back landed on the Inbox.
+//
+// Since 2026-11-21 the arrows walk only threads and are drawn only on the
+// inbox, so the Team page has none. A teammate's thread opened there keeps
+// its own back, which names the Standup and goes to it.
 
 import { describe, it, expect } from 'vitest';
-import { arrive, stepBack, stepForward, sameStop, stopOnScreen, EMPTY_TRAIL, type Stop, type Trail } from '../renderer/src/back-and-forward';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { onInboxPage, stopOnScreen } from '../renderer/src/back-and-forward';
 
-const inbox: Stop = { at: 'list', view: 'inbox' };
-const standup: Stop = { at: 'team', place: 'team' };
-const mate = (id: string): Stop => ({ at: 'team', place: `mate:${id}` });
-const thread = (id: string): Stop => ({ at: 'thread', product: 'p', id });
-const walk = (...stops: Stop[]) => stops.reduce((t: Trail, s) => arrive(t, s), EMPTY_TRAIL);
+const here = path.dirname(fileURLToPath(import.meta.url));
+const read = (rel: string) => fs.readFileSync(path.join(here, '..', rel), 'utf8');
+const app = read('renderer/src/App.tsx');
 
-const screen = (over: Partial<Parameters<typeof stopOnScreen>[0]> = {}) => stopOnScreen({
-  settings: null, thread: null, card: null, home: false, files: null, connections: false,
-  group: null, teammate: null, teamPlace: null, unrecorded: false, view: 'inbox', ...over,
-});
-
-describe('the Team page is a place on the trail', () => {
-  it('the Standup on screen is recorded as the Standup', () => {
-    expect(screen({ teamPlace: 'team' })).toEqual(standup);
+describe('a thread opened on the Team page', () => {
+  it('is not on the inbox page, so no arrows are drawn over it', () => {
+    // App.tsx hands the arrows a teammate's thread only when its back says Inbox.
+    expect(app).toMatch(/card: openCard && onTeammateThread && !roomsUi\.roomName \?/);
+    expect(app).toContain('const onTeammateThread = teamShown && !!openCard && !cardFromPlace;');
+    expect(onInboxPage({ thread: null, card: null, group: null, list: null })).toBe(false);
+    expect(stopOnScreen({ thread: null, card: null, group: null, list: null })).toBeNull();
   });
 
-  it("a teammate's page and a person's page are each their own place", () => {
-    expect(screen({ teamPlace: 'mate:q' })).toEqual(mate('q'));
-    expect(screen({ teamPlace: 'person:m' })).toEqual({ at: 'team', place: 'person:m' });
+  it('keeps its own back, which names the Standup or the teammate it was opened from', () => {
+    expect(app).toContain("backLabel={roomsUi.roomName ?? (cardFromPlace ? (chatsPlace === 'team' ? 'Standup' : members.find((m) => m.key === chatsPlace)?.name ?? 'Team') : 'Inbox')}");
+    // It closes the thread and leaves the Team page under it on screen.
+    expect(app).toContain('onBack={() => { setOpenCard(null); setTeamOpen(false); }}');
   });
 
-  it('back from a thread opened on the Standup goes to the Standup, and forward to the thread', () => {
-    const t = walk(inbox, standup, thread('a'));
-    const back = stepBack(t)!;
-    expect(back.stop).toEqual(standup);
-    expect(stepForward(back.trail)!.stop).toEqual(thread('a'));
-    expect(stepBack(back.trail)!.stop).toEqual(inbox);
+  it('shows that back with its arrow, which is hidden only while the arrows are drawn', () => {
+    const css = read('renderer/src/styles.css');
+    expect(css).toMatch(/\.app\.back-forward-on \.thread-crumb-back svg \{ display: none; \}/);
+    expect(read('renderer/src/threads/Summary.tsx')).toMatch(/className="back-esc thread-crumb-back"[^>]*onClick=\{onBack\}/);
   });
 
-  it('tells the Standup and two teammates apart, and not the same page twice', () => {
-    expect(sameStop(standup, mate('q'))).toBe(false);
-    expect(sameStop(mate('q'), mate('r'))).toBe(false);
-    expect(sameStop(mate('q'), mate('q'))).toBe(true);
-    expect(walk(standup, mate('q'), mate('q')).stops).toEqual([standup, mate('q')]);
-  });
-
-  it("a group, a teammate's page and a teammate's thread are places too", () => {
-    expect(screen({ group: 'g1' })).toEqual({ at: 'group', id: 'g1' });
-    expect(screen({ teammate: 't1' })).toEqual({ at: 'teammate', id: 't1' });
-    expect(screen({ card: { person: 'm', thread: 'x' } })).toEqual({ at: 'card', person: 'm', thread: 'x' });
-    expect(sameStop({ at: 'group', id: 'g1' }, { at: 'group', id: 'g2' })).toBe(false);
-    expect(sameStop({ at: 'card', person: 'm', thread: 'x' }, { at: 'card', person: 'm', thread: 'y' })).toBe(false);
-    const t = walk(standup, { at: 'card', person: 'm', thread: 'x' }, thread('a'));
-    expect(stepBack(t)!.stop).toEqual({ at: 'card', person: 'm', thread: 'x' });
-  });
-
-  it('a thread open over the Team page is the thread, not the page', () => {
-    expect(screen({ teamPlace: null, thread: { product: 'p', id: 'a' } })).toEqual(thread('a'));
-  });
-
-  it('with no Team page on screen it is the list as before, and unknown pages are still not recorded', () => {
-    expect(screen()).toEqual(inbox);
-    expect(screen({ view: 'done' })).toEqual({ at: 'list', view: 'done' });
-    expect(screen({ unrecorded: true })).toBeNull();
-  });
-
-  it('the pages it already knew keep their order', () => {
-    expect(screen({ settings: { pane: 'claude' }, thread: { product: 'p', id: 'a' } })).toEqual({ at: 'settings', pane: 'claude' });
-    expect(screen({ home: true })).toEqual({ at: 'home' });
-    expect(screen({ files: { project: 'x' } })).toEqual({ at: 'files', project: 'x' });
-    expect(screen({ connections: true })).toEqual({ at: 'connections' });
+  // A chat is on the trail only once it is opened in the inbox
+  // (a-chat-opened-from-needs-you-stays-in-the-inbox).
+  it('is not on the trail, and nor is the Team page itself', () => {
+    const hook = read('renderer/src/back-and-forward.ts');
+    const stop = hook.slice(hook.indexOf('export type Stop'), hook.indexOf('export type Trail'));
+    expect(stop).not.toMatch(/'team'|'teammate'|'home'|'files'|'settings'|'connections'/);
   });
 });
