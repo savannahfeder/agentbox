@@ -53,11 +53,11 @@ const limits = () => readUsage(HERS, NOW, ZONE);
 // component. Not paraphrased and not regenerated.
 
 const WAS = '<div class="usage-box"><button type="button" class="usage-pill " aria-expanded="false"'
-  + ' aria-label="This session: 45% used, 2h 14m left. This week: 7% used, 2d 2h left.'
+  + ' aria-label="This session: 45% used, resets in 2h 14m. This week: 7% used, resets in 2d 2h.'
   + ' This week, Fable: 0% used."><span class="usage-meter" aria-hidden="true">'
   + '<i style="width:45%"></i></span></button></div>';
 
-const WAS_SENTENCE = 'This session: 45% used, 2h 14m left. This week: 7% used, 2d 2h left.'
+const WAS_SENTENCE = 'This session: 45% used, resets in 2h 14m. This week: 7% used, resets in 2d 2h.'
   + ' This week, Fable: 0% used.';
 
 const WAS_ROWS = [

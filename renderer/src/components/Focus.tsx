@@ -1525,7 +1525,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         const value = String(children ?? '');
         if (!className && ticketReference(value)) return <code>{children}</code>;
         const source = !className && sourceReference(value);
-        if (source) return <ArtifactLink kind="code" product={product} src={source} fallback={resolveSrc(source)} onOpen={(click, from) => openHref(source, from, click)}>{mentionName(value)}</ArtifactLink>;
+        if (source) return <ArtifactLink kind="code" product={product} src={source} fallback={resolveSrc(source)} onOpen={(click, from) => openHref(source, from, click)}>{mentionName(shortPath(value.trim(), null, taskFolder(repoDir, item.id)) ?? value)}</ArtifactLink>;
         // Written out in full into this product's folder, or the thread's own,
         // counts as the short path it names, as a full path in a sentence does.
         const shown = value.trim();
