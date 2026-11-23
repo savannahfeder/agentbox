@@ -59,9 +59,11 @@ describe('the name a mention shows', () => {
     expect(mentionName('decisions.md')).toBe('decisions.md');
   });
 
+  // Code keeps its folder too (a-code-reference-keeps-its-folder).
   it('keeps a line number, which is the point of naming one', () => {
-    expect(mentionName('renderer/src/App.tsx:12')).toBe('App.tsx:12');
-    expect(mentionName('main/x.mjs#L40')).toBe('x.mjs#L40');
+    expect(mentionName('renderer/src/App.tsx:12')).toBe('renderer/src/App.tsx:12');
+    expect(mentionName('main/x.mjs#L40')).toBe('main/x.mjs#L40');
+    expect(mentionName('App.tsx:12')).toBe('App.tsx:12');
   });
 
   it('is the last folder for a folder', () => {

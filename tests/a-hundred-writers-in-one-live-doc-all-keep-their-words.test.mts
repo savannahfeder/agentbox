@@ -116,12 +116,12 @@ describe('a live doc', () => {
     const { room, writers } = setUp(4);
     await settle(writers, room);
     writers[1].live.awareness.setLocalStateField('at', { cell: 'r1|c2' });
-    await new Promise((r) => setTimeout(r, 80));
-    const seen = () => [...writers[0].live.awareness.getStates().values()].map((s) => s.who?.name).filter(Boolean).sort();
-    expect(seen()).toEqual(['Writer 0', 'Writer 1', 'Writer 2', 'Writer 3']);
-    expect([...writers[0].live.awareness.getStates().values()].find((s) => s.who?.name === 'Writer 1').at).toEqual({ cell: 'r1|c2' });
+    const states = () => [...writers[0].live.awareness.getStates().values()];
+    const seen = () => states().map((s) => s.who?.name).filter(Boolean).sort();
+    // Polled, not slept: a loaded macOS runner took over 80ms to pass the cursor on.
+    await expect.poll(seen, { timeout: 3000 }).toEqual(['Writer 0', 'Writer 1', 'Writer 2', 'Writer 3']);
+    await expect.poll(() => states().find((s) => s.who?.name === 'Writer 1')?.at, { timeout: 3000 }).toEqual({ cell: 'r1|c2' });
     writers[3].live.close();
-    await new Promise((r) => setTimeout(r, 80));
-    expect(seen()).toEqual(['Writer 0', 'Writer 1', 'Writer 2']);
+    await expect.poll(seen, { timeout: 3000 }).toEqual(['Writer 0', 'Writer 1', 'Writer 2']);
   });
 });

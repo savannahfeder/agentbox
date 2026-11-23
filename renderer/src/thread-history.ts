@@ -245,6 +245,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
   // her.
   const claudeCode = (engine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;
   let askedACommand = false;
+  // The status before this line's, so an open after a done reads as a reopen.
+  let wasStatus = '';
   // When an ask's verdict was written: the close right after it is the hand-back (shared/thread-asks.mts).
   let verdictAt = -Infinity;
   // The newest ask written from your side, for an imported Codex
@@ -607,6 +609,8 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
       // 'claimed' with no claim beside it is a lease line that lost its claim,
       // and the pickup above already said it.
       if (status === 'claimed') continue;
+      const before = wasStatus;
+      wasStatus = status;
       if (status === 'done') {
         // Handing it over closes your copy; "Given to …" just above already says what happened.
         const prev = events.at(-1);
@@ -651,7 +655,7 @@ export function threadEvents(lines: LedgerLine[], engine?: string | null, number
         if (line.source === 'system' && events.at(-1)?.field === 'result') continue;
         // Nor is the app reopening the row for a teammate's words (`tellItem`).
         if (line.source === 'system' && events.at(-1)?.from && events.at(-1)?.field === 'answer') continue;
-        const said = mine ? 'You sent it back' : 'It handed this back';
+        const said = mine ? (before === 'done' ? 'You reopened it' : 'You sent it back') : 'It handed this back';
         // One press can write the reopening twice (the notes path does), so the same words within a second are one.
         const last = events.at(-1);
         if (last?.said === said && Math.abs(at - last.at) < 1000) continue;
