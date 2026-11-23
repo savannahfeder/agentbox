@@ -173,10 +173,11 @@ anywhere else. `--ide` is the user's to switch on, never ours.
 
 Nor does an agent start the person's Google Chrome headless: the Mac files that
 copy as their Chrome, and their own Chrome then opens no window. Every hidden
-browser comes from `shared/hidden-browser.mjs` (Chrome for Testing or
-Playwright's headless shell), and
-`tests/no-agent-browser-is-the-persons-own-chrome.test.mjs` fails if any other
-file names Google Chrome's binary.
+browser comes from `shared/hidden-browser.mts` (Playwright's headless shell,
+else Chrome for Testing) and starts with its `KEEPS_OFF_THE_KEYCHAIN` flags,
+even a one-off from the shell; without them it asks for the person's keychain
+password. `tests/no-agent-browser-is-the-persons-own-chrome.test.mts` fails if
+any other file names Google Chrome's binary.
 
 ## Billing
 
