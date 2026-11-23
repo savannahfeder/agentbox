@@ -9536,6 +9536,9 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .cloud-plans-terms { color: var(--text-dim); }
 .cloud-plans-terms a { color: var(--text); text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; }
 
+/* Under a hand-back, the question it answers. */
+.msg-asked { color: var(--text-dim); }
+
 /* What a message is, beside its time: Comment, Checkpoint, Note on a file. */
 .msg-kind { display: inline-flex; align-items: baseline; gap: 6px; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: var(--tag-radius); background: none; font: 11px var(--mono); letter-spacing: .02em; color: var(--text-dim); text-align: left; }
 /* In a narrow column the label drops under the name whole, lined up with it, rather than breaking inside its box. */

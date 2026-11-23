@@ -1,6 +1,7 @@
 // PURE. The words around a teammate's shared thread, and finding one by name.
 import type { AgentEvent, LinkCommentWaiting, ThreadCard } from '../types';
-import { askIsOpen, askOf, handBackReadBy, isHandBack, type AskRow } from '../../../shared/thread-asks.mts';
+import { approvedDuring, askIsOpen, askOf, handBackMessage, handBackReadBy, isHandBack, type AskKind, type AskRow } from '../../../shared/thread-asks.mts';
+import { JUST_ITS_NAME } from '../media-row';
 import { filesInLines, otherFilesInLines, otherKind, placeWords, threadFiles, versionForPath, type FileNote, type ThreadLine } from '../../../shared/artifact-marks.mts';
 
 /**
@@ -12,7 +13,8 @@ export function shownOnTheirThread(events: readonly AgentEvent[], { me, helping,
   const helped = typeof helping === 'function' ? helping : () => helping;
   return events.map((e) => {
     if (e.kind || !me) return e;
-    // The owner's copy wrote "You asked" for its owner; here the reader is the helper.
+    // The owner's copy wrote "You asked" for its owner; here the reader is someone else.
+    if (e.says === 'hand-back') return e.asked && owner ? { ...e, asked: e.asked.replace(/^You asked: /, `${owner} asked: `) } : e;
     if (isHandBack(e.text)) return { ...e, text: handBackReadBy(e.text ?? '', e.fromId === me ? 'helper' : 'other', owner) };
     if (e.fromId === me && !isHandBack(e.text)) {
       const { from: _from, fromId: _fromId, ...rest } = e;
@@ -67,6 +69,12 @@ const CLOCKS_DIFFER_MS = 2 * 60_000;
 export function stillOnItsWay(events: readonly AgentEvent[], sent: { at: number; text: string } | null): boolean {
   if (!sent) return false;
   return !events.some((e) => !e.kind && e.at >= sent.at - CLOCKS_DIFFER_MS && String((e as { text?: string }).text ?? '').includes(sent.text));
+}
+
+/** A reply that hands a review back, as the owner's thread will draw it once it arrives. */
+export function handBackAsSent({ kind, words, approvals, me, since, pathOf }: { kind: AskKind; words: string; approvals: readonly { file: string; by: string | null; ts: number }[]; me: string; since: number; pathOf: (name: string) => string | null }): string {
+  const link = (name: string) => { const at = pathOf(name); return at ? `[${name}](<${at}> "${JUST_ITS_NAME}")` : name; };
+  return handBackMessage({ kind, verdict: 'done', words, approved: approvedDuring(approvals, { by: me, from: since }), link });
 }
 
 /**

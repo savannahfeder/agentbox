@@ -313,8 +313,8 @@ const A_TEAMMATE_MAY_SET = ['problem', 'progress', 'solution', 'blockedBy', 'blo
 //
 // AND THE NAME THE APP GAVE THE ROW, so a task is called one thing on both
 // computers. Only its maker's computer writes one (main/row-label.mts).
-// AND HOW AN ASK WAS ANSWERED (`verdict`), which only says how the hand-back is drawn.
-const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'note', 'result', 'people', 'status', 'react', 'inReplyTo', 'edit', 'due', 'artifact', 'voice', 'forAgent', 'fromNotes', 'typed', 'label', 'verdict'];
+// AND HOW AN ASK WAS ANSWERED (`verdict`, `approvedFiles`), which only says how the hand-back is drawn.
+const IN_A_MESSAGE_ALSO = ['title', 'body', 'answer', 'note', 'result', 'people', 'status', 'react', 'inReplyTo', 'edit', 'due', 'artifact', 'voice', 'forAgent', 'fromNotes', 'typed', 'label', 'verdict', 'approvedFiles'];
 // AND THE LEVEL THE SENDER PICKED, ON THE OPENING LINE ALONE (w-7ba439c883).
 // A message now carries how urgent its sender thought it was, and that number
 // decides where it sits in the inbox it lands in, so it has to survive the

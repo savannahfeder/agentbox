@@ -143,6 +143,8 @@ export interface WorkItem {
   ask?: { kind: 'help' | 'review'; owner: string; thread: string; product: string; step?: string; note?: string };
   /** How that ask was handed back. */
   verdict?: 'done' | 'yes' | 'changes';
+  /** The files approved while it was out, by name. */
+  approvedFiles?: string[];
   // Set only on the synthesized rows that stand for a running Claude Code
   // agent. Its presence is what every action path checks: an agent row is drawn
   // by the same list and reached by the same keys, and nothing may write it to
@@ -1178,8 +1180,10 @@ export interface AgentTurn {
   voice?: AgentVoice;
   /** A comment on a file: the link that opens the file at it. */
   fileMark?: FileMarkLink;
-  /** A teammate's comment, an agent's checkpoint, or the app's own note (thread-history.ts). */
-  says?: 'comment' | 'progress' | 'to-agent' | 'app';
+  /** A teammate's comment, an agent's checkpoint, the app's own note, or an ask handed back (thread-history.ts). */
+  says?: 'comment' | 'progress' | 'to-agent' | 'app' | 'hand-back';
+  /** On a hand-back, what the asker had asked, drawn under it. */
+  asked?: string;
   // THE MESSAGE'S OWN NAME, the uid of the ledger line it was written as. A
   // reaction is stored against it (w-560647d4db), so only a message that has
   // one can wear chips: a message still on its way has not been written down
