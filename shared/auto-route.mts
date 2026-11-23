@@ -158,6 +158,8 @@ export function routePrompt(
     'build, goes to a teammate only when its job is building that very thing.',
     'A job of watching or fixing a part of the app is not building something',
     'new in that part: answer 0.',
+    'A problem a teammate already works on is different: a task asking how to',
+    "fix it for good, even by rebuilding or rewriting, is that teammate's.",
     '',
     'The second line says whether this is work an AI teammate of its own would',
     'do better than a one-off agent, because none of the teammates above covers',
