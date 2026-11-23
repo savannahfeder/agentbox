@@ -14,8 +14,8 @@ export function rememberedFor<O extends object, R>(work: (o: O) => R): (o: O) =>
 }
 
 /**
- * `work` for a text, worked out once and kept, for the `keep` texts asked
- * for most recently. Only for work whose answer depends on the text alone.
+ * `work` for a text, worked out once and kept, for the `keep` texts worked
+ * out most recently. Only for work whose answer depends on the text alone.
  */
 export function remembered<R>(work: (text: string) => R, keep: number): (text: string) => R {
   const kept = new Map<string, R>();
