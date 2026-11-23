@@ -27,10 +27,22 @@ export function noteWrittenElsewhere(
   } catch { /* the next note trims it */ }
 }
 
+// The list as last parsed, by its file's size and time: every name nothing else
+// found asks for it, on the app's own thread, and it is up to 256 KB of lines.
+const parsed = new Map<string, { fs: typeof fsDefault; size: number; mtimeMs: number; files: string[] }>();
+
 /** Every file noted for this project, newest first, each once. */
 export function writtenElsewhere(projectDir: string, { home, fs = fsDefault }: ElsewhereOptions = {}): string[] {
+  const at = listFile(projectDir, home);
+  // A stand-in fs with no stat is read each time, as before.
+  let stat: { size: number; mtimeMs: number } | null = null;
+  if (typeof fs.statSync === 'function') {
+    try { stat = fs.statSync(at); } catch { parsed.delete(at); return []; }
+    const had = parsed.get(at);
+    if (had && had.fs === fs && had.size === stat.size && had.mtimeMs === stat.mtimeMs) return [...had.files];
+  }
   let text: string;
-  try { text = fs.readFileSync(listFile(projectDir, home), 'utf8'); } catch { return []; }
+  try { text = fs.readFileSync(at, 'utf8'); } catch { return []; }
   const seen = new Set<string>();
   const out: string[] = [];
   for (const line of text.split('\n').filter(Boolean).slice(-KEEP).reverse()) {
@@ -40,7 +52,11 @@ export function writtenElsewhere(projectDir: string, { home, fs = fsDefault }: E
     seen.add(e.file);
     out.push(e.file);
   }
-  return out;
+  if (stat) {
+    if (parsed.size >= 64) parsed.delete(parsed.keys().next().value!);
+    parsed.set(at, { fs, size: stat.size, mtimeMs: stat.mtimeMs, files: out });
+  }
+  return [...out];
 }
 
 const WRITING_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);

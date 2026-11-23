@@ -204,16 +204,18 @@ const keptFor = (k: WalkEntry) => k.watched && !k.dirty ? WATCHED_WALK_KEPT_MS :
 // its window. A look that must be current waits for it and then walks again,
 // since the running walk may have read a folder before the file was there.
 // Each key is only ever read by the one caller that wrote it, so its value comes back as that caller's T.
-function freshly<T>(key: string, fs: ArtifactFs, now: number, read: () => T | Promise<T>, fresh = false, watched = false): Promise<T> {
+// `watch` starts the folder's watch and says whether it took. It is asked only
+// when a walk starts: a folder that cannot be watched throws each time it is tried.
+function freshly<T>(key: string, fs: ArtifactFs, now: number, read: () => T | Promise<T>, fresh = false, watch: () => boolean = () => false): Promise<T> {
     const kept = walks.get(key);
     if (kept && kept.fs === fs && kept.running && fresh) {
-        kept.again ??= kept.value.then(() => freshly(key, fs, now, read, true, watched));
+        kept.again ??= kept.value.then(() => freshly(key, fs, now, read, true, watch));
         return kept.again as Promise<T>;
     }
     if (kept && kept.fs === fs && (kept.running || (!fresh && now - kept.at < keptFor(kept))))
         return kept.value as Promise<T>;
     const started = performance.now();
-    const entry: WalkEntry = { at: now, fs, value: Promise.resolve(), running: true, took: 0, watched, dirty: false };
+    const entry: WalkEntry = { at: now, fs, value: Promise.resolve(), running: true, took: 0, watched: watch(), dirty: false };
     const value = Promise.resolve(read()).finally(() => {
         entry.running = false;
         entry.took = performance.now() - started;
@@ -283,7 +285,7 @@ export function stopWatchingFolders(): void {
         clearTimeout(kept.timer);
     walks.clear();
 }
-const namesIn = (tree: string, fs: ArtifactFs, now: number, fresh: boolean): Promise<TreeNames> => freshly(tree, fs, now, () => walkNames(tree, fs), fresh, watchTree(tree, fs));
+const namesIn = (tree: string, fs: ArtifactFs, now: number, fresh: boolean): Promise<TreeNames> => freshly(tree, fs, now, () => walkNames(tree, fs), fresh, () => watchTree(tree, fs));
 // Hunt the file down by NAME inside one product's trees, newest match wins.
 // Workers write links relative to whatever directory they were standing in, so
 // a fixed root list will always miss some of them, and every miss cost her a
@@ -329,8 +331,9 @@ async function fileInCheckout(own: Pick<ArtifactProduct, 'dir' | 'repoPath'>, ra
         return null;
     const root = path.join(own.repoPath, '.claude', 'worktrees');
     const base = path.basename(raw);
-    const within = async (id: string): Promise<{ id: string; file: string; at: number } | null> => {
-        for (const rel of [raw, base, path.join('shots', base), path.join('designs', base)]) {
+    const within = async (id: string): Promise<CheckoutHit | null> => {
+        // A name with no folder in it is its own base: the same place once.
+        for (const rel of new Set([raw, base, path.join('shots', base), path.join('designs', base)])) {
             const file = path.join(root, id, rel);
             try {
                 return { id, file, at: (await fs.promises.stat(file)).mtimeMs };
@@ -344,11 +347,26 @@ async function fileInCheckout(own: Pick<ArtifactProduct, 'dir' | 'repoPath'>, ra
         if (mine)
             return mine.file;
     }
-    const list = (): Promise<string[]> => fs.promises.readdir(root).catch(() => []);
-    const ids = (await freshly(`checkouts:${root}`, fs, now, list, fresh)).filter((id) => THREAD_ID.test(id));
-    const hits = (await Promise.all(ids.map(within))).filter((hit) => hit !== null).sort((a, b) => b.at - a.at);
-    return hits.find((hit) => threadNames(own.dir, hit.id, base))?.file ?? null;
+    // A thread's view asks for every name it mentions on each change in the app,
+    // so the look through every checkout is kept for as long as a folder's list.
+    const key = `${root}\0${raw}`;
+    const had = looked.get(key);
+    let hits = had && had.fs === fs && !fresh && now >= had.at && now - had.at < HUNT_FRESH_MS ? had.hits : null;
+    if (!hits) {
+        const list = (): Promise<string[]> => fs.promises.readdir(root).catch(() => []);
+        hits = freshly(`checkouts:${root}`, fs, now, list, fresh)
+            .then((all) => Promise.all(all.filter((id) => THREAD_ID.test(id)).map(within)))
+            .then((found) => found.filter((hit) => hit !== null).sort((a, b) => b.at - a.at));
+        if (looked.size >= LOOKS_KEPT)
+            looked.delete(looked.keys().next().value!);
+        looked.delete(key);
+        looked.set(key, { at: now, fs, hits });
+    }
+    return (await hits).find((hit) => threadNames(own.dir, hit.id, base))?.file ?? null;
 }
+interface CheckoutHit { id: string; file: string; at: number }
+const looked = new Map<string, { at: number; fs: ArtifactFs; hits: Promise<CheckoutHit[]> }>();
+const LOOKS_KEPT = 2048;
 // A finished thread's folder is given back, and work that came home from the
 // cloud may never have had one. Until its branch is merged, the file there is
 // newer than the checkout's copy of the same name. A copy is read out for viewing.
@@ -393,18 +411,37 @@ async function fileOnThreadBranch(repoPath: string | null | undefined, raw: stri
     const kept = await branchCopies.get(key);
     if (kept && fsDefault.existsSync(kept))
         return kept;
-    if (branchCopies.size > 256)
-        branchCopies.clear();
+    // The oldest goes, not all of them: a pass over every thread asks thousands.
+    if (branchCopies.size >= BRANCH_COPIES_KEPT)
+        branchCopies.delete(branchCopies.keys().next().value!);
     const copying = copyFromCommit(repoPath, tip, raw, String(thread));
     branchCopies.set(key, copying);
     return copying;
+}
+const BRANCH_COPIES_KEPT = 4096;
+// What a branch's own commits touched, by its tip: asked of git once for the
+// branch, not once for each name asked of it.
+const branchFiles = new Map<string, Promise<string[]>>();
+function filesOnBranch(repoPath: string, tip: string): Promise<string[]> {
+    const key = `${repoPath}\0${tip}`;
+    const kept = branchFiles.get(key);
+    if (kept)
+        return kept;
+    if (branchFiles.size >= 512)
+        branchFiles.delete(branchFiles.keys().next().value!);
+    const listing = gitOut(repoPath, ['log', '--format=', '--name-only', '-z', `HEAD..${tip}`])
+        .then((out) => String(out).split('\0').map((f) => f.trim()).filter(Boolean));
+    // A read that failed is asked again next time.
+    listing.catch(() => { if (branchFiles.get(key) === listing) branchFiles.delete(key); });
+    branchFiles.set(key, listing);
+    return listing;
 }
 async function copyFromCommit(repoPath: string, tip: string, raw: string, thread: string): Promise<string | null> {
     try {
         // Only a file the thread's own commits touched: the rest of its branch is
         // main as it was when the thread began, older than the checkout's copy.
         // An answer names a file it committed by its name as often as by its path.
-        const changed = String(await gitOut(repoPath, ['log', '--format=', '--name-only', '-z', `HEAD..${tip}`])).split('\0').map((f) => f.trim()).filter(Boolean);
+        const changed = await filesOnBranch(repoPath, tip);
         const file = changed.find((f) => f === raw) ?? changed.find((f) => f.endsWith(`/${raw}`));
         // A fetched branch can carry a tree entry named "..", which git lists as
         // part of the path and path.join would climb out of the copies with.
@@ -543,7 +580,8 @@ export async function resolveArtifact({ src, product, products = [], accountRoot
         ? path.join(own.repoPath, '.claude', 'worktrees', String(thread)) : null;
     if (mine)
         candidates.unshift(path.join(mine, raw));
-    if (mine && !fs.existsSync(mine)) {
+    const mineIsThere = !!mine && fs.existsSync(mine);
+    if (mine && !mineIsThere) {
         const onBranch = await fileOnThreadBranch(own?.repoPath, raw, thread, fs, now, fresh);
         if (onBranch)
             return withCarry({ ok: true, path: onBranch });
@@ -552,7 +590,8 @@ export async function resolveArtifact({ src, product, products = [], accountRoot
         if (fs.existsSync(full))
             return withCarry({ ok: true, path: full });
     }
-    if (mine && raw.split('/')[0] !== 'runs') {
+    // A folder given back has nothing to walk: most threads asked about are finished.
+    if (mine && mineIsThere && raw.split('/')[0] !== 'runs') {
         const found = await huntByName(path.basename(raw), [mine], fs, now, fresh, raw);
         if (found)
             return withCarry({ ok: true, path: found });
