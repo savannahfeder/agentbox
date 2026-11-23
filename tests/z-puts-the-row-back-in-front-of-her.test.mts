@@ -63,7 +63,7 @@ describe('what a Z past the grace window puts in front of her', () => {
 describe('the app uses that rule on every row it puts back', () => {
   it('names the row on the close, the approval and the pick', () => {
     // markDone's reopen
-    expect(app).toMatch(/undoes: `reopen “\$\{clipToSentence\(item\.title, TOAST_TITLE\)\}”`, brings: item,/);
+    expect(app).toMatch(/undoes: `reopen “\$\{clipToSentence\(rowTitle\(item\), TOAST_TITLE\)\}”`, brings: item,/);
     // approval withdrawn, back in your inbox
     expect(app).toMatch(/label: 'Approval withdrawn, back in your inbox', undoes: '[^']+', brings: item,/);
     // option withdrawn, back in your inbox

@@ -51,7 +51,8 @@ const draw = (item, product, tab, fleet = { queued: [] }) => renderToStaticMarku
 // The text inside one cell, tags removed.
 const cell = (html, name) => {
   const at = html.indexOf(`th-cell-${name}`);
-  const next = html.indexOf('<div class="th-cell-', at + 1);
+  // Up to the next cell or the row's second line (w-6714ad1360), which sits after the status.
+  const next = html.indexOf('<div class="th-', at + 1);
   return html.slice(html.indexOf('>', at) + 1, next < 0 ? undefined : next).replace(/<[^>]+>/g, '').trim();
 };
 const cells = (html) => html.match(/<div class="th-cell-[a-z]+/g);

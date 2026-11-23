@@ -208,6 +208,16 @@ export function loggedCodexLimits(home: string | null, { now = Date.now() }: { n
   return reading;
 }
 
+/**
+ * When the newest run under this home was refused at its limit, or null. A
+ *  refused run's figures are all null, so the reading alone cannot tell a spent
+ *  login from one that has not run yet. */
+export function refusedAt(home: string | null): number | null {
+  if (!home) return null;
+  const [newest] = newestLogs(home, 1);
+  return newest && lastLimitsIn(newest.file) === 'empty' ? newest.at : null;
+}
+
 /** Drop what was remembered. For tests, and for a home that has changed under us. */
 export function forgetLoggedLimits() {
   remembered.clear();
