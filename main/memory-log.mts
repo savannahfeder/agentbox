@@ -27,8 +27,9 @@ import type { ProcessRecord } from './leftovers.mts';
 import { readMacPressure } from './memory-gate-server.mts';
 import { pressureFrom } from './memory-gate.mts';
 import type { PressureReading } from './memory-gate.mts';
-import { overAllowance, standing, SETTLE_MS } from './memory-allowance.mts';
+import { heaviestOver, overAllowance, standing, SETTLE_MS, STALE_MS } from './memory-allowance.mts';
 import type { StampedStanding } from './memory-allowance.mts';
+import type { Holding } from './memory-give-back.mts';
 
 /** Days of files kept, today included. */
 export const KEEP_DAYS = 7;
@@ -123,8 +124,10 @@ export function summarizeReading(reading: PressureReading = {}, at = Date.now())
   };
 }
 
-/** One minute's line, from one listing. Pure. */
-export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, at = Date.now(), reading = {} }: { appPid?: number; at?: number; reading?: PressureReading } = {}) {
+interface TaskPrograms { item: string; product: string | null; list: ProcessRecord[] }
+
+/** Whose each program is: the app's, a thread's (by the tag it or a parent carries), or neither. Pure. */
+function byOwner(procs: ProcessRecord[], appPid: number): { app: ProcessRecord[]; tasks: Map<string, TaskPrograms>; others: ProcessRecord[] } {
   const byPid = new Map(procs.map((p) => [p.pid, p]));
   const owner = new Map<number, Owner>();
   const ownerOf = (p: ProcessRecord): Owner => {
@@ -139,7 +142,7 @@ export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, 
     owner.set(p.pid, found);
     return found;
   };
-  const tasks = new Map<string, { item: string; product: string | null; list: ProcessRecord[] }>();
+  const tasks = new Map<string, TaskPrograms>();
   const app: ProcessRecord[] = [];
   const others: ProcessRecord[] = [];
   for (const p of procs) {
@@ -152,13 +155,20 @@ export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, 
       tasks.set(o.item, t);
     } else others.push(p);
   }
-  const sum = (list: ProcessRecord[]) => Math.round(list.reduce((n, p) => n + (Number(p.mb) || 0), 0));
+  return { app, tasks, others };
+}
+
+const mbOf = (list: ProcessRecord[]) => Math.round(list.reduce((n, p) => n + (Number(p.mb) || 0), 0));
+
+/** One minute's line, from one listing. Pure. */
+export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, at = Date.now(), reading = {} }: { appPid?: number; at?: number; reading?: PressureReading } = {}) {
+  const { app, tasks, others } = byOwner(procs, appPid);
   return {
     ...summarizeReading(reading, at),
-    totalMb: sum(procs),
-    app: { mb: sum(app), procs: app.length, top: top(app, 3) },
+    totalMb: mbOf(procs),
+    app: { mb: mbOf(app), procs: app.length, top: top(app, 3) },
     tasks: [...tasks.values()]
-      .map((t) => ({ item: t.item, product: t.product, mb: sum(t.list), procs: t.list.length, top: top(t.list, 3) }))
+      .map((t) => ({ item: t.item, product: t.product, mb: mbOf(t.list), procs: t.list.length, top: top(t.list, 3) }))
       .sort((a, b) => b.mb - a.mb),
     others: top(others, 5),
   };
@@ -184,6 +194,7 @@ export class MemoryLog {
   declare _busy?: boolean;
   declare _listedAt?: number;
   declare _standings: StampedStanding[];
+  declare _heaviest: Holding | null;
 
   constructor({
     dir, appPid = process.pid, list = listProcesses, readPressure = readMacPressure,
@@ -195,11 +206,22 @@ export class MemoryLog {
     Object.assign(this, { dir, appPid, list, readPressure, now, facts, own, keepDays, footprints, ramMb });
     this._pruned = null;
     this._standings = [];
+    this._heaviest = null;
   }
 
   /** Whether the app and its agents are over their allowance, on the listings of the last minutes. */
   overAllowance(now: number = this.now()): boolean {
     return overAllowance(this._standings, now);
+  }
+
+  /**
+   * The thread to ask for memory back, with its programs
+   * (main/memory-give-back.mts): the newest listing's alone. One that is back
+   * inside names nobody, since the settling the doors wait out is not a
+   * reason to ask anyone anything.
+   */
+  heaviest(now: number = this.now()): Holding | null {
+    return this._heaviest && now - this._heaviest.at <= STALE_MS ? this._heaviest : null;
   }
 
   /** Writes this minute's line. Never throws: a log that breaks the app is worse than a gap in the log. */
@@ -233,6 +255,8 @@ export class MemoryLog {
           line.allowance = stands;
           this._standings = [...this._standings.filter((s) => at - s.at <= SETTLE_MS), { ...stands, at }];
         }
+        const most = heaviestOver(summed.tasks, stands, this.ramMb);
+        this._heaviest = most && { ...most, programs: byOwner(procs, this.appPid).tasks.get(most.item)?.list ?? [], at };
       }
       if (this.own) { try { line.own = this.own() ?? null; } catch { line.own = null; } }
       fs.mkdirSync(this.dir, { recursive: true });

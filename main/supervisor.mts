@@ -202,6 +202,7 @@ import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPre
 import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
 import { MemoryLog } from './memory-log.mts';
 import type { WindowLagCollector } from './window-lag.mts';
+import type { Holding } from './memory-give-back.mts';
 import { StartBudget, cloudStartPressure } from './cloud/start-budget.mts';
 import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mts';
 import { asksToClose } from '../shared/asks-to-close.mts';
@@ -8656,6 +8657,19 @@ export class Supervisor {
     try { return this._memoryLog?.overAllowance() === true; } catch { return false; }
   }
 
+  /** The thread the command gate asks for memory back, while Agentbox is over (main/memory-give-back.mts). */
+  _heaviestOver(): Holding | null {
+    if (!this._memoryGateOn()) return null;
+    try { return this._memoryLog?.heaviest() ?? null; } catch { return null; }
+  }
+
+  /** The pids of the workers running a thread now, which the gate must never name as something to stop. */
+  _workerPids(itemId: string): number[] {
+    const pids: number[] = [];
+    for (const s of this.sessions.values()) if (s.itemId === itemId && Number.isInteger(s.child?.pid)) pids.push(s.child.pid!);
+    return pids;
+  }
+
   /** The fleet-wide brake, as a clock rather than a state. */
   _spawnBraked() {
     return !!this._spawnCooldownUntil && Date.now() < this._spawnCooldownUntil;
@@ -14836,6 +14850,8 @@ export class Supervisor {
       ownerOf: (sessionId) => this.memoryGateOwner(sessionId),
       urgentFor: (product, itemId) => this.memoryGateUrgent(product, itemId),
       overAllowance: () => this._overAllowance(),
+      heaviest: () => this._heaviestOver(),
+      agentPids: (item) => this._workerPids(item),
       log: (line) => console.log(`zero: ${line}`),
     });
     this._memoryGate = server;

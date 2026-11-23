@@ -61,3 +61,13 @@ export function overAllowance(standings: readonly StampedStanding[] | null | und
 export function gatePressure(pressure: Pressure, over: boolean): Pressure {
   return over && pressure === 'normal' ? 'tight' : pressure;
 }
+
+/**
+ * The thread asked to give memory back (main/memory-give-back.mts): the one
+ * holding the most while Agentbox is over, if it holds enough to give. Pure.
+ */
+export function heaviestOver(tasks: readonly { item: string; mb: number }[], stands: Standing | null | undefined, ramMb: number): { item: string; mb: number } | null {
+  if (!stands?.over) return null;
+  const most = tasks.reduce<{ item: string; mb: number } | null>((best, t) => (!best || t.mb > best.mb ? t : best), null);
+  return most && most.mb >= ramMb * AGENTS_SHARE ? { item: most.item, mb: most.mb } : null;
+}
