@@ -34,7 +34,25 @@
 .fh-head .fh-name-box { width: 280px; height: 30px; font-size: 17px; font-weight: 600; }
 
 .fh-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+
+/* Recent, on the left of a project's page and All files, as approved in r9-2-recent-left-by-day (round 9, Nov 23). */
+.fh-split { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 44px; align-items: start; }
+.fh-split .fh-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.fh-main { min-width: 0; }
+.fh-rail { position: sticky; top: 16px; min-width: 0; margin-top: 38px; }
+.fh-rday-box { margin: 0 -10px 10px; }
+.fh-rday { padding: 0 10px; margin: 2px 0; font-size: 12.5px; line-height: 20px; color: var(--text-faint); }
+.fh-rrow { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; padding: 6px 10px; border: 0; border-radius: 9px; background: none; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.fh-rrow:hover, .fh-rrow:focus-visible { border-radius: 9px; background: var(--wash); outline: none; }
+.fh-rrow .fh-glyph { width: 20px; height: 20px; }
+.fh-rrow .fh-glyph svg { width: 19px; height: 19px; }
+.fh-rname { min-width: 0; font-size: 14px; line-height: 20px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1100px) {
+  .fh-split { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .fh-rail { position: static; }
+}
 .fh-tile { position: relative; min-width: 0; }
+.fh-tile.is-dragging .fh-open { opacity: .45; }
 .fh-open {
   width: 100%; height: 164px; box-sizing: border-box; display: flex; flex-direction: column; align-items: stretch; padding: 16px 18px 14px; border: 0;
   border-radius: 14px; background: var(--surface); box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(17, 25, 48, .04), 0 4px 14px rgba(17, 25, 48, .05);

@@ -17,7 +17,7 @@ import type { FileFolder, FileFolderAct, FileKind, FileSentIn, FilesCloudStatus,
 import { apartScratch, changedBy, crumbsTo, docBlocks, filesBelow, filesInPlace, filesShown, foldersInPlace, foldersMatching, inOrderOf, KIND_ONE, KIND_PLURAL, kindsIn, MACHINE, missingWords, drawnOf, moreTiles, needsReview, onMacOf, scratchLine, shownName, showsTotal, sizeWords, sortFiles, TILES_AT_ONCE, versionWord, type FileSort } from './files-shown';
 import { fileRenameUndo, moveUndo, renameUndo } from './files-undo';
 import { FilesHome, type HomeActs, type HomePage, type ProjectShelf } from './FilesHome';
-import { crumbsFor, FILE_DRAG, folderFiles, homeOf, NOT_IN_A_FOLDER } from './files-home';
+import { crumbsFor, FILE_DRAG, folderFiles, homeOf, NOT_IN_A_FOLDER, recentOf } from './files-home';
 import { cleanName, withChanges, type Shown } from './files-changes';
 import './files-place.css';
 
@@ -146,7 +146,8 @@ const DRAGGED = FILE_DRAG;
 function dropsFile(onFile: (key: string) => void, setOver?: (on: boolean) => void) {
   return {
     onDragOver: (e: DragEvent) => { if (e.dataTransfer.types.includes(DRAGGED)) { e.preventDefault(); setOver?.(true); } },
-    onDragLeave: () => setOver?.(false),
+    // Crossing a tile inside the folder is not leaving it.
+    onDragLeave: (e: DragEvent) => { if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) setOver?.(false); },
     onDrop: (e: DragEvent) => {
       setOver?.(false);
       const key = e.dataTransfer.getData(DRAGGED);
@@ -688,12 +689,13 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
   };
   const headSlot = useSlot('fp-head-slot');
   const home = useMemo(() => (project ? homeOf(all.files, folders, project) : null), [all.files, folders, project]);
-  const shelves = useMemo<ProjectShelf[]>(() => (project ? [] : all.projects.map((p) => {
-    const h = homeOf(all.files, folders, p);
+  const homes = useMemo(() => (project ? [] : all.projects.map((p) => ({ p, h: homeOf(all.files, folders, p) }))), [all.files, all.projects, folders, project]);
+  const recent = useMemo(() => recentOf(project ? [home!] : homes.map((x) => x.h)), [home, homes, project]);
+  const shelves = useMemo<ProjectShelf[]>(() => homes.map(({ p, h }) => {
     const kept = h.kept.reduce((n, s) => n + s.files.length, 0);
     const newest = [...h.kept.map((s) => s.files[0].at), ...h.loose.slice(0, 1).map((f) => f.at)];
     return { name: p, kept, loose: h.loose.length, at: newest.length ? Math.max(...newest) : null };
-  })), [all.files, all.projects, folders, project]);
+  }), [homes]);
   const openFile = openKey && <OpenFile key={openKey} fileKey={openKey} typing={openKey === madeKey} onClose={() => { setOpenKey(null); setMadeKey(null); readAgain(); }} onNotice={onNotice} onRename={renameFile}
     onPlace={(p) => { setOpenKey(null); onPlace(p); }} />;
 
@@ -711,7 +713,7 @@ export function FilesPlace({ project, onProject, now, onPlace, onNotice, onUndoa
 
   if (!chosen && !everything) return <div className="fp-page fh-page">
     <FilesHome title={project ?? 'Files'} crumbs={crumbsFor(folders, project, folderId)} onCrumb={(c) => { if (c.project !== project) onProject(c.project); setFolderId(c.folder); }}
-      page={page} home={home} projects={shelves} found={query.trim() ? found : null} query={query} onQuery={setQuery} findRef={box}
+      page={page} home={home} projects={shelves} recent={recent} found={query.trim() ? found : null} query={query} onQuery={setQuery} findRef={box}
       newMenu={<NewMenu project={project} projects={mine} canDocument={project ? isMine(project) : true} canFolder={canNest} onPick={pick} />}
       naming={naming?.what === 'folder' && project ? <NameBox placeholder="Folder name" onCancel={() => setNaming(null)} onDone={(name) => { setNaming(null); void act({ do: 'make', project, name, parent: folder }); }} /> : null}
       loaded={!!list} me={team?.me ?? null} nameOf={nameOf} now={now} onOpen={setOpenKey}
