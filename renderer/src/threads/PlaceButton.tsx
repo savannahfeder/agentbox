@@ -44,7 +44,7 @@ const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 // No reply of the thread can go to the cloud while one of these holds, so Cloud cannot be picked.
 const STAYS = new Set(['folder', 'project', 'teammate', 'codex-reply', 'no-account', 'version']);
 // The cloud is out for now, so the next reply may run here as well.
-const FOR_NOW = new Set(['cloud-failing', 'cloud-account-limited']);
+const FOR_NOW = new Set(['cloud-failing', 'cloud-account-limited', 'cloud-account-refused']);
 const MOVING = 'Working on this Mac now. It moves to the cloud as soon as the cloud has room.';
 
 // A reply under way here while the thread may use the cloud. A keep just

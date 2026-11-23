@@ -31,7 +31,7 @@
 // stamped it, and nothing is invented, dropped or merged to put them in order.
 
 import { changedFile, commandWork, isBookkeeping, plainCommand, saidCount, shortPath, threadWindow, unleaked, workVerb } from '../../shared/agents.mts';
-import { asTraced, said, traceLines } from './terminal';
+import { asTraced, said, traceLines } from '../../shared/trace-lines.mts';
 import { handsBack, withoutHandBack } from '../../shared/cloud-hand-back.mts';
 import { editOfLine, resolveEdits, type EditLine } from '../../shared/message-edits.mts';
 import type { TraceSession } from './notes';

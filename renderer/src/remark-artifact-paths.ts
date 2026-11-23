@@ -4,7 +4,7 @@
 import { keepConnectionLinks } from './connections/connections-shown';
 import { threadOfHref } from './ticket-references';
 
-export { CODE_PATH, isMediaPath, linkArtifactPaths, productPath, remarkArtifactPaths, shortPath, type Options } from './artifact-paths';
+export { CODE_PATH, accountFilePath, isMediaPath, linkArtifactPaths, productPath, remarkArtifactPaths, shortPath, type Options } from './artifact-paths';
 
 // Local file links are handled by the app's click handler, never navigated to
 // by the browser. Keep all of markdown's other protocol restrictions.

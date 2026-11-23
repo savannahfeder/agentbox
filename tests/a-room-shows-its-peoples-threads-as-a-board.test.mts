@@ -174,7 +174,7 @@ describe('a menu label beside rows of chips', () => {
 describe('wired in the app', () => {
   const app = readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8');
   it('the header shows the room’s filters button over a room', () => {
-    expect(app).toMatch(/<HeaderActions[\s\S]{0,1400}view=\{roomShown \? roomsUi\.viewButton : null\}/);
+    expect(app).toMatch(/<HeaderActions[\s\S]{0,1400}view=\{mateCorner \?\? \(roomShown \? roomsUi\.viewButton : null\)\}/);
   });
   it('the Inbox’s people go through the Rooms rule', () => {
     expect(app).toMatch(/inboxEveryone\([\s\S]{0,160}roomsOn\)/);

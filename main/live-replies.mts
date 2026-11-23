@@ -4,6 +4,7 @@
 // neither an out-of-order response nor a rejected input reorders the history.
 import { NAME } from '../shared/product-name.mjs';
 import { TURN_CLOSED } from './claude-input.mts';
+import { isHandBack } from '../shared/thread-asks.mts';
 // WHAT A WORKER IS TOLD WHEN THEY TYPE AT IT WHILE IT IS STILL WORKING.
 //
 // The other half of `replyBrief` in supervisor.mts, which frames a reply handed
@@ -211,15 +212,21 @@ export function queuedReplyText(item: QueuedItem, history: QueuedLine[], deliver
  const pending: { answer: string; from: string | null | undefined }[]=[];
  const latestTs=item.wrote?.answer?.ts;
  const settled=item.answeredThrough??0;
+ let before=false;
  for(let i=history.length-1;i>=0;i--){
   const line=history[i];
   if(line.heartbeat||line.release)continue;
-  if(line.patch?.result)break;
-  if(line.ts<=settled)break;
+  if(line.patch?.result||line.ts<=settled)before=true;
   const answer=line.patch?.answer;
   if(typeof answer!=='string'||!answer.trim())continue;
   if(answer==='(withdrawn)')break;
   const from=line.source==='system'?line.patch?.from?.name:null;
+  // A hand-back is held for the person, so one that came during the last run never reached the agent.
+  if(before){
+   if(line.source==='founder')break;
+   if(from&&isHandBack(answer))pending.unshift({answer,from});
+   continue;
+  }
   if(line.source!=='founder'&&!from)continue;
   const candidate={...item,answer,wrote:{...item.wrote,answer:{ts:line.ts}}};
   // The queue marks the newest reply at spawn. It is still part of this input.

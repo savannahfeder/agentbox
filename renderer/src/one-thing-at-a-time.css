@@ -116,7 +116,8 @@
    open on the side and the phone keep their own layouts. `.focus-scroll > .focus`
    because xterm also uses `.focus`. */
 @media (min-width: 701px) and (min-height: 521px) {
-  .app.one-at-a-time.workspace-layout:not(.doc-open) .focus-pane {
+  /* And a chat opened from Needs you, which is set on the same column (rooms.css). */
+  .app.one-at-a-time.workspace-layout:not(.doc-open) .focus-pane, .workspace-layout .gr-page.in-inbox {
     container-type: inline-size;
     --task-type: clamp(16px, calc(0.25cqi + 13px), 18px);
     --task-summary: max(13.5px, calc(var(--task-type) * 0.76));

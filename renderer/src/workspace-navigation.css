@@ -1062,13 +1062,13 @@ html:root[data-glass][data-theme="light"] .app.workspace-layout { background: tr
 
 /* The whole band drags the window; it comes before the header in the page, so
    the arrows' and its own no-drag buttons win over it. It lies over the
-   arrows, so it lets clicks through and only its buttons take them. */
+   arrows, so it lets clicks through and only its buttons take them. Its
+   buttons keep the arrows' room on pages without them, so they never move. */
 .glass-band { display: none; }
 :root[data-glass] .glass-band {
   position: fixed; top: 0; left: 0; right: 0; height: 50px; box-sizing: border-box; padding: 12px 20px 0 160px;
   display: flex; align-items: flex-start; gap: 4px; z-index: 3; -webkit-app-region: drag; pointer-events: none;
 }
-:root[data-glass] .app:not(.back-forward-on) .glass-band { padding-left: 94px; }
 .glass-band button {
   height: 26px; padding: 0 11px; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 8px; background: none;
   font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; -webkit-app-region: no-drag; pointer-events: auto;

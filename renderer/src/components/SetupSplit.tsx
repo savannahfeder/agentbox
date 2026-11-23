@@ -20,6 +20,7 @@ import { ENGINE_CHOSEN, writeLastEngine } from '../engines';
 import { startProTrial } from '../pro-trial';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import FolderPicker from './FolderPicker';
+import { EngineLogo } from './EngineLogos';
 import { PERK_ICONS, ProShowcase } from './ProShowcase';
 import { SignInPage } from '../team/SignInPage';
 import { Name } from '../../../shared/product-name.mjs';
@@ -57,7 +58,7 @@ const Check = ({ on }: { on: boolean }) => <span className={`ss-check${on ? ' ss
 function Strip({ look }: { look: string }) {
   if (look === 'light') return <span className="ss-strip ss-strip-light" />;
   if (look === 'dark') return <span className="ss-strip ss-strip-dark" />;
-  if (look === MATCH_SKY) return <span className="ss-strip ss-strip-pair"><SkyArt id="ember" /><SkyArt id="sage" /></span>;
+  if (look === MATCH_SKY) return <span className="ss-strip ss-strip-pair"><SkyArt id="ember" /><SkyArt id="mountains" /></span>;
   return <span className="ss-strip"><SkyArt id={look} /></span>;
 }
 function SkyArt({ id }: { id: string }) {
@@ -300,7 +301,7 @@ export function SetupSplit(p: SetupSplitProps) {
       <div className="ss-acts">{go(ticked.length ? `Add ${ticked.length} to your inbox` : 'Continue', () => void bring(), true, 'Adding…')}{quiet('Skip', next)}</div>
     </>;
   } else if (step === 'folder') {
-    head = ['Pick a folder for your first project.', 'Agents can read and change the files in it.'];
+    head = ['Pick a folder for your first project.', ''];
     body = done.project ? <>
       <div className="ss-list"><Row face={<span className="ss-ok"><Tick /></span>} name={done.project} sub="Your first project" /></div>
       <div className="ss-acts">{go('Continue', next)}{quiet('Choose another', () => void chooseFolder())}</div>
@@ -356,7 +357,7 @@ export function SetupSplit(p: SetupSplitProps) {
     choose.current = (by) => setEngine(nextChoice(['claude', 'codex'] as const, engine, by));
     body = <>
       <div className="ss-list">
-        {(['claude', 'codex'] as const).map((id) => <Row key={id} face={<span className="ss-ai">{id === 'claude' ? 'C' : 'X'}</span>} name={id === 'claude' ? 'Claude Code' : 'Codex'}
+        {(['claude', 'codex'] as const).map((id) => <Row key={id} face={<span className="ss-ai"><EngineLogo engine={id} size={18} /></span>} name={id === 'claude' ? 'Claude Code' : 'Codex'}
           end={<Check on={engine === id} />} on={engine === id} onClick={() => setEngine(id)} />)}
       </div>
       <div className="ss-acts">{go('Continue', () => { void api.setWorkspaceSetting({ key: 'engine', value: engine }); writeLastEngine(engine === 'codex' ? 'codex' : null); dispatchEvent(new CustomEvent(ENGINE_CHOSEN, { detail: engine })); next(); })}</div>
@@ -368,7 +369,7 @@ export function SetupSplit(p: SetupSplitProps) {
     choose.current = (by) => p.onLook(nextChoice(looks, p.look, by));
     body = <>
       <div className="ss-list">
-        {looks.map((id) => <Row key={id} face={<Strip look={id} />} name={LOOK_NAME(id)} sub={id === MATCH_SKY ? 'Orange in dark mode, green in light' : undefined}
+        {looks.map((id) => <Row key={id} face={<Strip look={id} />} name={LOOK_NAME(id)} sub={id === MATCH_SKY ? 'Orange sky in dark mode, mountains in light' : undefined}
           end={<Check on={id === p.look} />} on={id === p.look} onClick={() => p.onLook(id)} />)}
       </div>
       <div className="ss-acts">{go('Continue', next)}</div>
