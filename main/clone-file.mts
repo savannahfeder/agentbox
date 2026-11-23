@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import { promisify } from 'node:util';
 
-type Run = (cmd: string, args: string[], o: { timeout: number }) => Promise<unknown>;
+type Run = (cmd: string, args: string[], o: { timeout: number; windowsHide: boolean }) => Promise<unknown>;
 const runFile = promisify(execFile) as unknown as Run;
 
 /**
@@ -13,7 +13,7 @@ const runFile = promisify(execFile) as unknown as Run;
 export async function cloneFile(src: string, to: string, { platform = process.platform, run = runFile }: { platform?: NodeJS.Platform; run?: Run } = {}): Promise<void> {
   if (platform === 'darwin') {
     try {
-      await run('/bin/cp', ['-c', src, to], { timeout: 60_000 });
+      await run('/bin/cp', ['-c', src, to], { timeout: 60_000, windowsHide: true });
       return;
     } catch { fs.rmSync(to, { force: true }); }
   }
