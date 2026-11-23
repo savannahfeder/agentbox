@@ -141,7 +141,7 @@ export function StatusMark({ status }: { status: StatusCell }) {
 /** An agent is on the thread now: the half-dot on this Mac, a cloud in the cloud, both pulsing. */
 export function RunningMark({ cloud = false }: { cloud?: boolean }) {
   if (!cloud) return <StateGlyph state="running" live />;
-  return <svg className="th-st-cloud" ref={inStep} width="14" height="11" viewBox="2 5 21 15" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" role="img" aria-label="An agent is on it now, in the cloud">
+  return <svg className="th-st-cloud" ref={inStep} width="14" height="11" viewBox="1.2 4.2 21.6 15.6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" role="img" aria-label="An agent is on it now, in the cloud">
     <title>An agent is on it now, in the cloud</title><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
   </svg>;
 }

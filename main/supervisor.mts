@@ -201,6 +201,8 @@ import { runsOn } from './runs-on.mts';
 import { MemoryGateServer, defaultSocketPath as memoryGateSocketPath, readMacPressure } from './memory-gate-server.mts';
 import { startDecision, readMacPressureNow, SETTLE_MS, STALE_MS } from './start-hold.mts';
 import { MemoryLog } from './memory-log.mts';
+import type { WindowLagCollector } from './window-lag.mts';
+import type { Holding } from './memory-give-back.mts';
 import { StartBudget, cloudStartPressure } from './cloud/start-budget.mts';
 import { isPlainMerge, mergeHome, mergedSentence } from './cloud/merge-home.mts';
 import { asksToClose } from '../shared/asks-to-close.mts';
@@ -1356,6 +1358,8 @@ export class Supervisor {
   declare count: ((name: string, props?: Record<string, unknown>) => void) | undefined;
   declare idleMs: (() => number | null | undefined) | undefined;
   declare stalls: { take(): Record<string, unknown> | undefined; longestNow?(): number } | undefined;
+  /** What the window said of its own lag this minute (main/window-lag.mts). */
+  declare windowLag: WindowLagCollector | undefined;
   /** The app's own memory and CPU (main/own-use.mts); the desktop sets it. */
   declare ownUse: (() => unknown) | undefined;
   declare hostRuns: boolean | undefined;
@@ -1908,7 +1912,7 @@ export class Supervisor {
     clearInterval(this._memoryLogTimer);
     this._memoryLog ??= new MemoryLog({
       dir: path.join(this.userDir, 'memory-log'),
-      facts: () => ({ running: this._load(), capacity: this._capacity(), holding: this.startHoldStatus().holding, ...this.stalls?.take() }),
+      facts: () => ({ running: this._load(), capacity: this._capacity(), holding: this.startHoldStatus().holding, ...this.stalls?.take(), ...this.windowLag?.take() }),
       own: () => this.ownUse?.() ?? null,
     });
     this._memoryLogTimer = setInterval(() => this._memoryLog!.tick(), 60_000);
@@ -8573,6 +8577,7 @@ export class Supervisor {
       lastStartAt: this._lastStartAt ?? 0,
       heldSince: this._memHeldSince ?? null,
       roomy: autoAgents({ ...this._machine(), gated: false, nudge: this.config.agentsNudge }),
+      over: this._overAllowance(),
     });
     if (d.start) {
       if (d.why === 'off' || d.why === 'normal' || d.why === 'no-reading') this._memHeldSince = null;
@@ -8645,6 +8650,25 @@ export class Supervisor {
   }
 
   _readPressure() { return readMacPressure(); }
+
+  /** Whether the app and its agents are over their memory allowance, by the minute log's own listings (main/memory-allowance.mts). */
+  _overAllowance(): boolean {
+    if (!this._memoryGateOn()) return false;
+    try { return this._memoryLog?.overAllowance() === true; } catch { return false; }
+  }
+
+  /** The thread the command gate asks for memory back, while Agentbox is over (main/memory-give-back.mts). */
+  _heaviestOver(): Holding | null {
+    if (!this._memoryGateOn()) return null;
+    try { return this._memoryLog?.heaviest() ?? null; } catch { return null; }
+  }
+
+  /** The pids of the workers running a thread now, which the gate must never name as something to stop. */
+  _workerPids(itemId: string): number[] {
+    const pids: number[] = [];
+    for (const s of this.sessions.values()) if (s.itemId === itemId && Number.isInteger(s.child?.pid)) pids.push(s.child.pid!);
+    return pids;
+  }
 
   /** The fleet-wide brake, as a clock rather than a state. */
   _spawnBraked() {
@@ -14825,6 +14849,9 @@ export class Supervisor {
       scoreFor: (product, itemId) => this.memoryGateScore(product, itemId),
       ownerOf: (sessionId) => this.memoryGateOwner(sessionId),
       urgentFor: (product, itemId) => this.memoryGateUrgent(product, itemId),
+      overAllowance: () => this._overAllowance(),
+      heaviest: () => this._heaviestOver(),
+      agentPids: (item) => this._workerPids(item),
       log: (line) => console.log(`zero: ${line}`),
     });
     this._memoryGate = server;

@@ -90,7 +90,7 @@ export const Tick = ({ size = 22, tint = 'rgba(238, 96, 24, 0.5)' }: P) => (
 
 /** A run in the cloud (threads/Pages.tsx `RunningMark`). */
 export const Cloud = ({ tint = color.accent }: P) => (
-  <Svg width={14} height={11} viewBox="2 5 21 15" fill="none" stroke={tint} strokeWidth={1.6} strokeLinejoin="round"><Path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></Svg>
+  <Svg width={14} height={11} viewBox="1.2 4.2 21.6 15.6" fill="none" stroke={tint} strokeWidth={1.6} strokeLinejoin="round"><Path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></Svg>
 );
 
 export const GoogleMark = ({ size = 16 }: P) => (
