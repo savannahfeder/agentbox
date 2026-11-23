@@ -101,3 +101,13 @@ store build to TestFlight only if the app opened. `launch-test-ios.yml` runs
 the open-the-app half alone and sends nothing. Do not send a build with
 `eas build --auto-submit`: builds 11 to 15 went out that way and none of them
 opened.
+
+The build App Review gets is the same workflow with the store switch set,
+`.eas/workflows/release-ios-store.yml`. The listing's words are
+`store.config.json`, sent with `npx eas-cli@latest metadata:push`. That command
+does not send screenshots: the listing's images are in
+`store/screenshots/en-US/`, in the order their names give, and go into App
+Store Connect under the 6.9" iPhone, by hand or with fastlane deliver. They are
+taken from the store build with the preview's made-up threads
+(`EXPO_PUBLIC_STORE_BUILD=1 EXPO_PUBLIC_PREVIEW=1`), so they show only what the
+App Store app shows.
