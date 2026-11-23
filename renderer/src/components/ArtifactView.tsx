@@ -739,7 +739,7 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     if (asking && askingFor.length) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setAsking({ ...asking, sel: (asking.sel + 1) % askingFor.length }); return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); setAsking({ ...asking, sel: (asking.sel - 1 + askingFor.length) % askingFor.length }); return; }
-      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); nameInto(askingFor[asking.sel]); return; }
+      if ((e.key === 'Enter' && !e.metaKey && !e.ctrlKey) || e.key === 'Tab') { e.preventDefault(); nameInto(askingFor[asking.sel]); return; }
     }
     const does = noteBoxKey({ key: e.key, chord: e.metaKey || e.ctrlKey, shift: e.shiftKey, composing: e.nativeEvent.isComposing, typed: !!words.trim() || !!pictures.length, waiting: unsent.ids.length });
     if (does === 'leave') return;
