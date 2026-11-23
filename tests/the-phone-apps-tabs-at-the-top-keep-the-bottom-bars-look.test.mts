@@ -24,21 +24,19 @@ describe("the phone app's tabs, at the top", () => {
     expect(tabs).not.toMatch(/border(Top|Bottom)Width/);
     expect(tabs).not.toMatch(/foot/);
   });
-  // Closer only on a screen too narrow for all of them (QA M-33,
-  // tests/the-phones-tab-row-shows-it-goes-on-past-the-edge).
   it('start where the title does: a pill pads its word 12pt, so the row starts 12pt before it', () => {
-    expect(rules).toMatch(/TAB_GAP = \{ loose: 4, tight: 0 \}/);
-    expect(tabs).toMatch(/paddingLeft: size\.inset - 12, paddingRight: 8, gap: tight \? TAB_GAP\.tight : TAB_GAP\.loose/);
-    expect(tabs).toMatch(/height: 36, paddingHorizontal: 12,/);
+    expect(rules).toMatch(/TAB_GAP = 4;/);
+    expect(tabs).toMatch(/paddingLeft: size\.inset - 12, paddingRight: 8, gap: TAB_GAP \}\}/);
+    expect(tabs).toMatch(/height: 40, paddingHorizontal: 12,/);
   });
-  it('draw each word at 15pt in the one weight, picked or not', () => {
-    // 15pt until large text pushes the row off the screen (the-phones-tabs-shrink-to-fit-a-small-screen-with-large-text).
-    expect(tabs).toMatch(/const words = \{ fontSize: 15 \* fit\.scale, count: 12\.5 \* fit\.scale \}/);
+  it('draw each word at 17pt in the one weight, picked or not', () => {
+    expect(rules).toMatch(/TAB_WORDS = \{ fontSize: 17, count: 13\.5 \}/);
+    expect(tabs).toMatch(/fontSize: TAB_WORDS\.fontSize/);
     expect(tabs).not.toMatch(/font\.medium : font\.regular/);
   });
-  it('keep each count beside its word, closer when the row is tight', () => {
-    expect(rules).toMatch(/COUNT_GAP = \{ loose: 7, tight: 5 \}/);
-    expect(tabs).toMatch(/marginLeft: tight \? COUNT_GAP\.tight : COUNT_GAP\.loose/);
+  it('keep each count beside its word', () => {
+    expect(rules).toMatch(/COUNT_GAP = 7;/);
+    expect(tabs).toMatch(/marginLeft: COUNT_GAP,/);
   });
   it('mark the picked tab on the tab itself, not on the bar', () => {
     expect(tabs).toMatch(/backgroundColor: on === t\.id \? color\.graphite : 'transparent'/);

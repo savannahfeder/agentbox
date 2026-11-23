@@ -17,7 +17,7 @@ const labels = (team: boolean, board = false) => bottomTabs(team, board).map((t)
 
 describe('the tabs', () => {
   it('are the four states, then Chats and Files, with a team on', () => {
-    expect(labels(true)).toEqual(['Needs you', 'In progress', 'Later', 'Done', 'Chats', 'Files']);
+    expect(labels(true)).toEqual(['Needs you', 'In progress', 'Chats', 'Later', 'Done', 'Files']);
   });
   it('are the four states and Files with no team, as they were', () => {
     expect(labels(false)).toEqual(['Needs you', 'In progress', 'Later', 'Done', 'Files']);

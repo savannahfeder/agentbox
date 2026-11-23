@@ -19,11 +19,10 @@ describe('the tabs', () => {
     expect(tabs).not.toMatch(/foot/);
     expect(inbox).toMatch(/below=\{<Tabs /);
   });
-  it('sit close, since each pill pads itself, and still tighten on a narrow screen', () => {
-    expect(TAB_GAP.loose).toBeLessThanOrEqual(6);
-    expect(TAB_GAP.tight).toBeLessThan(TAB_GAP.loose);
-    expect(COUNT_GAP.tight).toBeLessThan(COUNT_GAP.loose);
-    expect(tabs).toMatch(/gap: tight \? TAB_GAP\.tight : TAB_GAP\.loose/);
+  it('sit close, since each pill pads itself', () => {
+    expect(TAB_GAP).toBeLessThanOrEqual(6);
+    expect(COUNT_GAP).toBeGreaterThan(TAB_GAP);
+    expect(tabs).toMatch(/gap: TAB_GAP \}\}/);
   });
 });
 

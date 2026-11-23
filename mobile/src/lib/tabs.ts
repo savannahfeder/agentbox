@@ -73,38 +73,24 @@ export interface Row {
   item: WorkItem;
 }
 
-/** The gaps between the inbox's tabs, and before a tab's count; tight when the loose ones do not fit. */
 /** The select bar's button, which says what it closes so it does not read as closing the bar beside Cancel. */
 export const closeWords = (n: number) => (n === 1 ? 'Close 1 thread' : n > 1 ? `Close ${n} threads` : 'Close');
 
-export const TAB_GAP = { loose: 4, tight: 0 };
-export const COUNT_GAP = { loose: 7, tight: 5 };
+/** The gap between the inbox's tabs, and before a tab's count. */
+export const TAB_GAP = 4;
+export const COUNT_GAP = 7;
 
-/**
- * Whether the tabs take their tight gaps. `content` was measured with the gaps
- * `tight` gave it, so it is put back to its loose width before asking whether
- * that fits: the answer does not flip once the tight row fits.
- */
-export function tabsTighten({ view, content }: { view: number; content: number }, tight: boolean, { tabs, counted }: { tabs: number; counted: number }) {
-  if (view <= 0 || content <= 0) return tight;
-  const saved = (tabs - 1) * (TAB_GAP.loose - TAB_GAP.tight) + counted * (COUNT_GAP.loose - COUNT_GAP.tight);
-  return content + (tight ? saved : 0) > view + 1;
+/** The tab words never shrink to fit: the row scrolls. */
+export const TAB_WORDS = { fontSize: 17, count: 13.5 };
+
+/** Where the tab row scrolls so the picked tab sits in its middle, held to the row's two ends. */
+export function tabScrollTo(tab: { x: number; width: number }, { view, content }: { view: number; content: number }) {
+  if (view <= 0 || content <= view) return 0;
+  return Math.round(Math.min(content - view, Math.max(0, tab.x + tab.width / 2 - view / 2)));
 }
 
-/** The smallest the tab words go before the row is left to scroll. */
-export const TABS_SMALLEST = 0.7;
-
-/**
- * How much the tab words shrink so the tight row fits: large text on a narrow
- * phone pushed Done off the edge. Only ever down for one width, so it settles;
- * `measuredAt` is the width it was worked out for, and a new width starts over.
- */
-export function tabsScale({ view, content }: { view: number; content: number }, tight: boolean, now: { scale: number; measuredAt: number }) {
-  if (view <= 0 || content <= 0) return now;
-  const from = now.measuredAt === view ? now.scale : 1;
-  if (!tight || content <= view + 1) return { scale: from, measuredAt: view };
-  return { scale: Math.max(TABS_SMALLEST, Math.floor(from * (view / content) * 100) / 100), measuredAt: view };
-}
+/** Whether a sideways row has scrolled past its left edge (iOS bounces below zero). */
+export const moreToTheLeft = ({ x }: { x: number }) => x > 1;
 
 /** Whether a sideways row runs on past its right edge (a 1px slack for rounding). */
 export const moreToTheRight = ({ view, content, x }: { view: number; content: number; x: number }) =>

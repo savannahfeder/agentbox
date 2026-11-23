@@ -38,7 +38,7 @@ describe('the bottom bar', () => {
   // 2026-11-22: each state its own tab, as on a computer, with your groups under Chats.
   it('is the four tabs, Chats and Files when Groups is on', () => {
     const tabs = bottomTabs(true);
-    expect(tabs.map((t) => t.label)).toEqual(['Needs you', 'In progress', 'Later', 'Done', 'Chats', 'Files']);
+    expect(tabs.map((t) => t.label)).toEqual(['Needs you', 'In progress', 'Chats', 'Later', 'Done', 'Files']);
   });
   it('has the four tabs and Files, and no Chats, when it is off', () => {
     expect(bottomTabs(false).map((t) => t.label)).toEqual(['Needs you', 'In progress', 'Later', 'Done', 'Files']);

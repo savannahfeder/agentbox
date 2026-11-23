@@ -150,7 +150,7 @@ describe('a teammate\'s chat as the phone draws it', () => {
 
 describe('Chats on the phone', () => {
   it('is the tab before Files while a team is on, holding your groups too', () => {
-    expect(bottomTabs(true).map((t) => t.label)).toEqual(['Needs you', 'In progress', 'Later', 'Done', 'Chats', 'Files']);
+    expect(bottomTabs(true).map((t) => t.label)).toEqual(['Needs you', 'In progress', 'Chats', 'Later', 'Done', 'Files']);
     expect(bottomTabs(false).map((t) => t.label)).not.toContain('Chats');
   });
   it('lists teammates, then your groups, and opens a teammate\'s chat', () => {

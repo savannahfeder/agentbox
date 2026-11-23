@@ -8,12 +8,16 @@ export type PlaceId = TabId | 'chats' | 'files';
 
 /**
  * The tabs: the four states, each its own as on a computer (threads/Pages.tsx
- * `StateTabsRow`), then Chats with a team on (Groups or AI teammates), then
- * Files. The board holds the four as columns, so one tab stands for them.
+ * `StateTabsRow`), Chats with a team on (Groups or AI teammates), and Files.
+ * Chats comes third, since the row scrolls and a phone is opened for Needs
+ * you, In progress and Chats. The board holds the four as columns, so one tab
+ * stands for them.
  */
 export function bottomTabs(team: boolean, board = false): { id: PlaceId; label: string }[] {
-  const states = board ? [{ id: 'inbox' as const, label: 'Board' }] : TABS;
-  return [...states, ...(team ? [{ id: 'chats' as const, label: 'Chats' }] : []), { id: 'files' as const, label: 'Files' }];
+  const chats = team ? [{ id: 'chats' as const, label: 'Chats' }] : [];
+  const files = { id: 'files' as const, label: 'Files' };
+  if (board) return [{ id: 'inbox' as const, label: 'Board' }, ...chats, files];
+  return [...TABS.slice(0, 2), ...chats, ...TABS.slice(2), files];
 }
 
 export const LAST_GROUP_KEY = 'groups.last';

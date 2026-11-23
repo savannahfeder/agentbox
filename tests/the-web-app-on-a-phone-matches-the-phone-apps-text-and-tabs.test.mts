@@ -130,10 +130,11 @@ describe('the tabs on the phone app', () => {
   it('draw no line of their own', () => {
     expect(tabs).not.toMatch(/border(Top|Bottom)Width: 1/);
   });
-  it('are 15pt, start where the title does, and scroll on a phone set larger still', () => {
-    expect(tabs).toMatch(/fontSize: 15 \* fit\.scale,/);
+  // 17pt since 2026-11-23 (the-phones-tabs-are-big-enough-to-read-and-the-row-scrolls); the website's are still 15.
+  it('are 17pt, start where the title does, and scroll', () => {
+    expect(tabs).toMatch(/fontSize: TAB_WORDS\.fontSize,/);
     expect(tabs).toMatch(/paddingLeft: size\.inset - 12/);
-    expect(tabs).toMatch(/<ScrollView horizontal/);
+    expect(tabs).toMatch(/<ScrollView ref=\{row\} horizontal/);
   });
   it('leave the new-thread button on the home bar room, and a row its 14pt above and below', () => {
     expect(inbox).toMatch(/bottom: foot \+ PEN\.lift,/);

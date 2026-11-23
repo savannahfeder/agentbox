@@ -4,13 +4,13 @@
 // board: one column a swipe.
 import { Redirect } from 'expo-router';
 import { router } from '../lib/router';
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { backWords, emptyTabWords, readDisplay, rowPriorityId, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { InboxComposer } from '../ui/NewThreadForm';
-import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, tabsScale, tabsTighten, type Row, type TabId } from '../lib/tabs';
+import { closeWords, COUNT_GAP, filterCount, moreToTheLeft, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TAB_WORDS, tabScrollTo, type Row, type TabId } from '../lib/tabs';
 import { agentChoices, type Harness } from '../lib/agent-filter';
 import { FilesPlace } from '../ui/FilesPlace';
 import { bottomTabs, type PlaceId } from '../lib/groups';
@@ -178,45 +178,52 @@ function RepeatRows({ repeats, items, now }: { repeats: PhoneRepeat[]; items: Wo
   );
 }
 
-/** The tabs under the title, inside the top bar, with Groups fifth while it
- * is on: a pill each, the picked one filled. They stay at the top ("all that
- * stuff is best placed at the top") and scroll sideways when they do not fit. */
+// Each place draws its own tab row, so the next one starts where the last was left.
+const rowAt = { x: 0 };
+
+/** The tabs under the title, inside the top bar: a pill each, the picked one
+ * filled. They stay at the top ("all that stuff is best placed at the top"),
+ * and the row scrolls sideways, bringing the picked tab to its middle. */
 function Tabs({ on, counts, pick, team, board = false }: { on: PlaceId; counts: Record<PlaceId, number>; pick: (t: PlaceId) => void; team: boolean; board?: boolean }) {
-  const [span, setSpan] = useState({ view: 0, content: 0, x: 0 });
+  const [span, setSpan] = useState({ view: 0, content: 0, x: rowAt.x });
+  const [at, setAt] = useState<Partial<Record<PlaceId, { x: number; width: number }>>>({});
+  const row = useRef<ComponentRef<typeof ScrollView>>(null);
   const tabs = bottomTabs(team, board);
   // The board's one tab is lit whichever state was open under it.
   if (board && on !== 'chats' && on !== 'files') on = 'inbox';
-  const counted = tabs.filter((t) => t.id !== 'done' && counts[t.id] > 0).length;
-  const [tight, setTight] = useState(false);
-  useEffect(() => { setTight((now) => tabsTighten(span, now, { tabs: tabs.length, counted })); }, [span.view, span.content, tabs.length, counted]);
-  const [fit, setFit] = useState({ scale: 1, measuredAt: 0 });
-  useEffect(() => { setFit((now) => tabsScale(span, tight, now)); }, [span.view, span.content, tight]);
-  const words = { fontSize: 15 * fit.scale, count: 12.5 * fit.scale };
+  const picked = at[on];
+  useEffect(() => {
+    if (!picked || span.view <= 0 || span.content <= 0) return;
+    row.current?.scrollTo({ x: tabScrollTo(picked, span), animated: true });
+  }, [on, picked?.x, picked?.width, span.view, span.content]);
   return (
     <View style={{ height: size.tabs, flexDirection: 'row', alignItems: 'center' }}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ alignItems: 'center', paddingLeft: size.inset - 12, paddingRight: 8, gap: tight ? TAB_GAP.tight : TAB_GAP.loose }}
+      <ScrollView ref={row} horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentOffset={{ x: rowAt.x, y: 0 }} contentContainerStyle={{ alignItems: 'center', paddingLeft: size.inset - 12, paddingRight: 8, gap: TAB_GAP }}
         onLayout={(e) => { const view = e.nativeEvent.layout.width; setSpan((s) => ({ ...s, view })); }}
         onContentSizeChange={(content) => setSpan((s) => ({ ...s, content }))}
-        onScroll={(e) => { const x = e.nativeEvent.contentOffset.x; setSpan((s) => ({ ...s, x })); }} scrollEventThrottle={32}>
+        onScroll={(e) => { const x = e.nativeEvent.contentOffset.x; rowAt.x = x; setSpan((s) => ({ ...s, x })); }} scrollEventThrottle={32}>
         {tabs.map((t) => (
           <Pressable key={t.id} onPress={() => { if (on !== t.id) feel.pick(); pick(t.id); }} accessibilityRole="tab" accessibilityState={{ selected: on === t.id }}
-            style={{ height: 36, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', borderRadius: corner.pill, backgroundColor: on === t.id ? color.graphite : 'transparent' }}>
-            <T style={{ fontSize: words.fontSize, lineHeight: 20, fontFamily: font.medium, color: on === t.id ? color.ink : color.dim }}>{t.label}</T>
-            {t.id !== 'done' && counts[t.id] > 0 && <T style={{ fontSize: words.count, lineHeight: 20, fontFamily: font.medium, marginLeft: tight ? COUNT_GAP.tight : COUNT_GAP.loose, color: on === t.id ? color.ink : color.faint, opacity: on === t.id ? 0.62 : 1 }}>{counts[t.id]}</T>}
+            onLayout={(e) => { const { x, width } = e.nativeEvent.layout; setAt((was) => (was[t.id]?.x === x && was[t.id]?.width === width ? was : { ...was, [t.id]: { x, width } })); }}
+            style={{ height: 40, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', borderRadius: corner.pill, backgroundColor: on === t.id ? color.graphite : 'transparent' }}>
+            <T style={{ fontSize: TAB_WORDS.fontSize, lineHeight: 22, fontFamily: font.medium, color: on === t.id ? color.ink : color.dim }}>{t.label}</T>
+            {t.id !== 'done' && counts[t.id] > 0 && <T style={{ fontSize: TAB_WORDS.count, lineHeight: 22, fontFamily: font.medium, marginLeft: COUNT_GAP, color: on === t.id ? color.ink : color.faint, opacity: on === t.id ? 0.62 : 1 }}>{counts[t.id]}</T>}
           </Pressable>
         ))}
       </ScrollView>
-      {moreToTheRight(span) && <EdgeFade />}
+      {moreToTheLeft(span) && <EdgeFade side="left" />}
+      {moreToTheRight(span) && <EdgeFade side="right" />}
     </View>
   );
 }
 
-/** Tabs still past the edge fade out there, so the row reads as one that scrolls. */
-function EdgeFade() {
+/** Tabs past either edge fade out there, so the row reads as one that scrolls. */
+function EdgeFade({ side }: { side: 'left' | 'right' }) {
+  const id = `tabs-fade-${side}`;
   return (
-    <Svg style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 32 }} width={32} height="100%" pointerEvents="none">
-      <Defs><LinearGradient id="tabs-fade" x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor={color.bg} stopOpacity={0} /><Stop offset="1" stopColor={color.bg} stopOpacity={1} /></LinearGradient></Defs>
-      <Rect width="100%" height="100%" fill="url(#tabs-fade)" />
+    <Svg style={{ position: 'absolute', [side]: 0, top: 0, bottom: 0, width: 32 }} width={32} height="100%" pointerEvents="none">
+      <Defs><LinearGradient id={id} x1="0" y1="0" x2="1" y2="0"><Stop offset="0" stopColor={color.bg} stopOpacity={side === 'left' ? 1 : 0} /><Stop offset="1" stopColor={color.bg} stopOpacity={side === 'left' ? 0 : 1} /></LinearGradient></Defs>
+      <Rect width="100%" height="100%" fill={`url(#${id})`} />
     </Svg>
   );
 }
