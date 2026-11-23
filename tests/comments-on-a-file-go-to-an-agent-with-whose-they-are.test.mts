@@ -156,6 +156,13 @@ describe('every way to an agent carries them', () => {
     expect(app).toContain("window.addEventListener('zero:hand-file-comments', ask)");
     expect(app.match(/caret: \[0, 0\]/g)?.length).toBeGreaterThanOrEqual(4);
   });
+  // Rerun 5: a designer sent a comment she meant to leave out, because it sat below
+  // the six lines the box showed.
+  it('the box is tall enough to show the comments it opens with', () => {
+    const css = fs.readFileSync(new URL('../renderer/src/threads/thread-composer.css', import.meta.url), 'utf8');
+    expect(card).toContain("comments.length && !person ? ' tc-text-tall' : ''");
+    expect(css).toMatch(/\.tc-text\.tc-text-tall \{ height: min\(440px, 52vh\); \}/);
+  });
   it('the card has no picker: the comments are in its words, and the ones left in are remembered', () => {
     expect(card).not.toContain('HandedComments');
     expect(fs.existsSync(new URL('../renderer/src/threads/HandedComments.tsx', import.meta.url))).toBe(false);

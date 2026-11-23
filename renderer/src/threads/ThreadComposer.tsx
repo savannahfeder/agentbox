@@ -1501,7 +1501,7 @@ export function ThreadComposer({
         <PhoneStatus message={statusLine} className="tc-note tc-connection-status" />
         <textarea
           ref={textRef}
-          className={`tc-text ${named.over}`}
+          className={`tc-text ${named.over}${comments.length && !person ? ' tc-text-tall' : ''}`}
           rows={inline ? 1 : undefined}
           value={text}
           onChange={(e) => { talk.typed(); setText(e.target.value); setCaret(e.target.selectionStart); named.track(e.target); }}
