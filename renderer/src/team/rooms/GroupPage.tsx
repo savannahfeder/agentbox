@@ -66,7 +66,7 @@ export function GroupWaits({ row, onDone }: { row: Pick<RoomMention, 'byName'> |
   return <div className="gr-waits"><span>{row.byName || 'Someone'} is waiting on you here</span><button type="button" className="rm-btn" onClick={onDone}>Mark done</button></div>;
 }
 
-/** Every group down the left, the open one's chat, and who is in it. */
-export function GroupPage({ notice = null, chat, people, list = null, inline = false }: { notice?: ReactNode; chat: ReactNode; people: ReactNode; list?: ReactNode; inline?: boolean }) {
-  return <div className="gr-page"><div className="gr-body">{inline ? null : list}<div className="gr-chat">{notice}{chat}</div>{people}</div></div>;
+/** Every group down the left, the open one's chat, and who is in it. In the inbox, set on a thread's column. */
+export function GroupPage({ notice = null, chat, people, list = null, inline = false, inbox = false }: { notice?: ReactNode; chat: ReactNode; people: ReactNode; list?: ReactNode; inline?: boolean; inbox?: boolean }) {
+  return <div className={`gr-page${inbox ? ' in-inbox' : ''}`}><div className="gr-body">{inline ? null : list}<div className="gr-chat">{notice}{chat}</div>{people}</div></div>;
 }

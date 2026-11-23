@@ -124,15 +124,23 @@ export async function startFromHandedCommits({ repoPath, dir, id, body, labels }
   if (!root) return false;
   const branch = `refs/heads/${taskBranch(id)}`;
   if (await git(root, ['rev-parse', '--verify', '-q', branch]) !== null) return false;
+  // Handed over twice, it names both changes: the later one's commits sit on the earlier one's.
+  let tip: string | null = null;
   for (const m of String(body ?? '').matchAll(CHANGE_LINK)) {
     const carried = await commitsIn(path.join(dir, 'attachments', path.basename(m[1])));
-    if (!carried || !await branchFrom(root, branch, carried)) continue;
-    const mark = markOf(dir, id);
-    await fs.promises.mkdir(path.dirname(mark), { recursive: true });
-    await fs.promises.writeFile(mark, JSON.stringify({ branch, tip: carried.tip }));
-    return true;
+    if (!carried || carried.tip === tip) continue;
+    if (!tip) { if (await branchFrom(root, branch, carried)) tip = carried.tip; continue; }
+    const next = `${branch}-next`;
+    if (!await branchFrom(root, next, carried)) continue;
+    if (await git(root, ['merge-base', '--is-ancestor', tip, carried.tip]) !== null
+      && await git(root, ['update-ref', branch, carried.tip, tip]) !== null) tip = carried.tip;
+    await git(root, ['update-ref', '-d', next]);
   }
-  return false;
+  if (!tip) return false;
+  const mark = markOf(dir, id);
+  await fs.promises.mkdir(path.dirname(mark), { recursive: true });
+  await fs.promises.writeFile(mark, JSON.stringify({ branch, tip }));
+  return true;
 }
 
 /** What a thread's first run is told when its branch was made from the commits it was handed over with. */
