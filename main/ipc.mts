@@ -47,6 +47,7 @@ import { cardsInFront } from '../shared/which-card-is-in-front.mts';
 import { restartNeeded } from './staleness.mts';
 import { artifactRoots, resolveArtifact } from './artifact-path.mts';
 import { filesKeeper, filesSettingsOf, type FilesKeeper, type FilesStorage } from './files-cloud.mts';
+import { answerFileAsks, setFilesComeBack } from './files-come-back.mts';
 import { folderPictures } from './folder-pictures.mts';
 import { docUrl } from './doc-scheme.mts';
 import { readDoc, writeDoc } from './doc-file.mts';
@@ -86,6 +87,7 @@ import { agentKey } from '../shared/agents.mts';
 import { machineryPath } from './store/home.mts';
 import { EVENT_NAMES } from '../shared/analytics-events.mts';
 import { appFinder } from './everything-found.mts';
+import { openedOf } from '../shared/opened-lately.mts';
 import { appFilesPlace } from './files-place.mts';
 import { Name } from '../shared/product-name.mjs';
 import { ghToken, setUpGit, startGhLogin } from './github-browser-sign-in.mts';
@@ -298,7 +300,7 @@ const NO_UPDATER: IpcUpdater = {
 };
 
 const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', 'remove', 'post', 'goAhead', 'remember', 'forget', 'method', 'unsend']);
-const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markDone', 'markUnread', 'react', 'decide','edit', 'deleteMessage', 'putFile', 'putFileFrom', 'file', 'fileOnDisk', 'fileText', 'markFile', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute'] as const);
+const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markDone', 'undoDone', 'later', 'markUnread', 'react', 'decide','edit', 'deleteMessage', 'putFile', 'putFileFrom', 'file', 'fileOnDisk', 'fileText', 'markFile', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute'] as const);
 type RoomOp = typeof ROOM_OPS extends Set<infer O> ? O : never;
 
 export function registerIpc<W extends IpcWindow>({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, froze = null, liveAt = null, glass = () => {} }: IpcDeps<W>) {
@@ -2688,9 +2690,9 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   // first ask, read ahead when the search opens.
   let finder: ReturnType<typeof appFinder> | null = null;
   const finderNow = () => (finder ??= appFinder({ store, team, readableProducts, accountRoot: config.accountRoot, storeRoot: config.storeRoot }));
-  ipcMain.handle('zero:find-in-threads', async (_e, { query, limit }: { query?: unknown; limit?: { lines?: number; files?: number; comments?: number } } = {}) => {
-    try { return { ok: true, ...(await finderNow().search(String(query ?? '').slice(0, 200), limit)) }; }
-    catch (err) { return { ok: false, error: String((err as Error)?.message ?? err), lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 } }; }
+  ipcMain.handle('zero:find-in-threads', async (_e, { query, limit, opened }: { query?: unknown; limit?: { lines?: number; files?: number; comments?: number }; opened?: unknown } = {}) => {
+    try { return { ok: true, ...(await finderNow().search(String(query ?? '').slice(0, 200), { ...limit, opened: openedOf(opened) })) }; }
+    catch (err) { return { ok: false, error: String((err as Error)?.message ?? err), lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 }, threads: [] }; }
   });
   ipcMain.handle('zero:warm-find-in-threads', () => { finderNow().warm().catch(() => {}); return true; });
   const cloudHome = () => ({ home: supervisor.config.home || os.homedir() });
@@ -2732,6 +2734,12 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
   supervisor.onStarting = (item) => { void filesPlaceNow().bringBackFor({ product: item.product, id: item.id }).catch(() => {}); };
   // Files is read when it is open; the keeper also passes while it is not.
   if (config.accountRoot) setInterval(() => { void filesPlaceNow().list().catch(() => {}); }, 15 * 60_000).unref?.();
+  // A cloud run asking for a file, and an agent's bring_back_files, get what the keeper took off this computer.
+  setFilesComeBack(keeperNow);
+  if (config.accountRoot) {
+    const asks = path.join(config.accountRoot, '.files-cloud', 'asks');
+    setInterval(() => { void answerFileAsks({ dir: asks, bases: () => store.listProducts().map((p) => p.dir).filter(Boolean) }); }, 2000).unref?.();
+  }
   ipcMain.handle('zero:files-place-trash', async (_e, { keys, older }: { keys?: unknown; older?: unknown } = {}) => {
     try {
       const out = await filesPlaceNow().trash({ keys: Array.isArray(keys) ? keys.map(String) : [], older: older === true });

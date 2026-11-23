@@ -98,6 +98,26 @@ export function claudeActivity(session: ActivitySession, line: string) {
     return changed;
   } catch { return false; }
 }
+/** An ACP run, off the joined tool events its worker sends (main/acp-worker.mts). */
+export function acpActivity(session: ActivitySession, method: string, params: { id?: string; kind?: string; detail?: string; status?: string } | null | undefined) {
+  if (method === 'agentbox/turn') return clear(session);
+  if (method !== 'agentbox/tool' || !params?.id) return false;
+  if (params.status !== 'started') return finish(session, params.id);
+  const detail = clean(params.detail);
+  if (params.kind === 'execute') {
+    const plain = commandWork(detail);
+    return add(session, params.id, plain ? `${plain.doing} ${plain.subject}`.trim() : `Running ${plainCommand(detail) || 'command'}`, params.detail);
+  }
+  const file = detail ? shortPath(detail) : '';
+  const label = params.kind === 'edit' ? `Editing ${file || 'files'}`
+    : params.kind === 'read' ? `Reading ${file || 'a file'}`
+    : params.kind === 'delete' ? `Deleting ${file || 'a file'}`
+    : params.kind === 'move' ? `Moving ${file || 'a file'}`
+    : params.kind === 'search' ? 'Searching'
+    : params.kind === 'fetch' ? 'Fetching a page'
+    : params.kind === 'think' ? '' : `Using ${detail || 'a tool'}`;
+  return add(session, params.id, label, params.detail);
+}
 export function codexActivity(session: ActivitySession, method: string, params: { item?: CodexItem } | null | undefined) {
   if (method === 'turn/completed' || method === 'turn/failed') return clear(session);
   const item = params?.item;
