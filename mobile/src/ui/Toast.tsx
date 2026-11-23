@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, PanResponder, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { penOnScreen, threadOnScreen, toastLife, toastPlace, toastTapOpens, TOAST_GOES_MS, TOAST_SWIPE_PX } from '../lib/overlays';
+import { penAtFoot, threadOnScreen, toastLife, toastPlace, toastTapOpens, TOAST_GOES_MS, TOAST_SWIPE_PX } from '../lib/overlays';
 import { useCloud, type Toast as Said } from '../state/cloud';
 import { footRoom, T } from './parts';
 import { color, corner, font, lift } from './theme';
@@ -104,7 +104,7 @@ export function Toast() {
     // By its key alone: the cloud redraws every few seconds, and a timer started over each time would never end.
   }, [toast?.key]);
   if (!toast) return null;
-  const { bottom, right } = toastPlace(threadOnScreen(segments, params) ? 'thread' : penOnScreen(segments) ? 'inbox' : 'other', footRoom(inset), c.approvalRoom);
+  const { bottom, right } = toastPlace(threadOnScreen(segments, params) ? 'thread' : penAtFoot(segments, c.view.approvals.length) ? 'inbox' : 'other', footRoom(inset), c.approvalRoom);
   return (
     <View pointerEvents="box-none" style={{ position: 'absolute', left: 12, right, bottom }}>
       <Card key={toast.key} toast={toast} dismiss={dismiss} />

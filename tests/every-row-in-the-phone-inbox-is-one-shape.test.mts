@@ -65,6 +65,22 @@ describe('what a thread\'s row carries', () => {
     const [row] = rows([asked({ title: 'Draw three versions of the inbox.', body: 'Draw three versions of the inbox. Make one of them dense.' })]).inbox;
     expect(row.summary).toBe('Make one of them dense.');
   });
+  // Seen on the iPhone 17 simulator, 2026-11-23: "Cut the launch film to 60 seconds"
+  // over ". Open on the inbox." The title's own full stop was left on the summary.
+  it.each(['.', '!', '?', '…'])('drops the mark that ended the title\'s sentence (%s)', (stop) => {
+    const [row] = rows([asked({ title: 'Cut the launch film to 60 seconds', body: `Cut the launch film to 60 seconds${stop} Open on the inbox.` })]).inbox;
+    expect(row.summary).toBe('Open on the inbox.');
+  });
+  it('has none when that mark is all the title left behind', () => {
+    const [row] = rows([asked({ title: 'Cut the launch film to 60 seconds', body: 'Cut the launch film to 60 seconds.' })]).inbox;
+    expect(row.summary).toBe('');
+  });
+  it('keeps a dot that starts a word, cut from the title or not', () => {
+    const [cut] = rows([asked({ title: 'Check which', body: 'Check which .env files are skipped.' })]).inbox;
+    expect(cut.summary).toBe('.env files are skipped.');
+    const [whole] = rows([done({ id: 'w-1', title: 'Tidy the ignores', body: 'Tidy.', result: '.gitignore now lists the build folder.' })]).inbox;
+    expect(whole.summary).toBe('.gitignore now lists the build folder.');
+  });
   it('keeps a summary that starts small when it was not cut from the title', () => {
     const [row] = rows([done({ id: 'w-1', title: 'Make fizz say FizzBuzz', body: 'Fix fizz.', result: 'fizz(15) now returns FizzBuzz.' })]).inbox;
     expect(row.summary).toBe('fizz(15) now returns FizzBuzz.');

@@ -121,9 +121,11 @@ export const rowTime = (i: WorkItem): number => (i.status === 'done' ? i.wrote?.
 /** The line under a row's title. The desktop reads title and summary as one sentence; the phone sets them on two lines, so the tail of the title's own sentence gives way to what the agent last told you. */
 function summaryUnder(i: WorkItem, tab: TabId): string {
   const view = tab === 'done' ? 'done' : 'inbox';
-  const said = asideBesides(rowTitle(i), rowSummary(i, view)) ?? '';
-  const cutFromTitle = said !== rowSummary({ ...i, title: '' }, view);
-  if (!cutFromTitle || !/^[\p{Ll},;:]/u.test(said)) return said;
+  const whole = asideBesides(rowTitle(i), rowSummary(i, view)) ?? '';
+  if (whole === rowSummary({ ...i, title: '' }, view)) return whole;
+  // The mark that ended the title's sentence is left at the front of the cut.
+  const said = whole.replace(/^[.!?…]+(\s+|$)/u, '');
+  if (!/^[\p{Ll},;:]/u.test(said)) return said;
   return clipToSentence(firstRealLine(i.note ?? ''));
 }
 

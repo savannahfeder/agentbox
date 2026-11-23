@@ -37,6 +37,8 @@ const TOAST_SIDE = 12;
 const PEN_GAP = 12;
 /** The inbox is the one screen with the pen. */
 export const penOnScreen = (segments: readonly string[]) => segments.length === 0 || segments[0] === 'index';
+/** With permission asks waiting, the inbox moves the pen up into its bar. */
+export const penAtFoot = (segments: readonly string[], asks: number) => penOnScreen(segments) && asks === 0;
 
 /**
  * Where the toast sits, from the foot's room. On the inbox it sits above the

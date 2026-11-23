@@ -7,7 +7,7 @@
 // and the pen 314 to 370, both within 20pt of the foot.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import { PEN, penOnScreen, toastPlace } from '../mobile/src/lib/overlays';
+import { PEN, penAtFoot, penOnScreen, toastPlace } from '../mobile/src/lib/overlays';
 
 const inbox = fs.readFileSync(new URL('../mobile/src/app/index.tsx', import.meta.url), 'utf8');
 const toast = fs.readFileSync(new URL('../mobile/src/ui/Toast.tsx', import.meta.url), 'utf8');
@@ -30,6 +30,24 @@ describe('on the inbox, where the pen is', () => {
   it('the pen is drawn from the same numbers', () => {
     expect(inbox).toMatch(/right: PEN\.right, bottom: foot \+ PEN\.lift, width: PEN\.size, height: PEN\.size/);
     expect(toast).toMatch(/toastPlace\(/);
+  });
+});
+
+// Seen on the iPhone 17 simulator, 2026-11-23: with permission asks waiting the
+// pen is up in the bar, and the toast still sat 84pt over the foot, above nothing.
+describe('on the inbox while the pen is up in the bar', () => {
+  it('the pen is at the foot only on the inbox with no ask waiting', () => {
+    expect(penAtFoot([], 0)).toBe(true);
+    expect(penAtFoot(['index'], 0)).toBe(true);
+    expect(penAtFoot([], 1)).toBe(false);
+    expect(penAtFoot(['settings'], 0)).toBe(false);
+  });
+  it('the toast sits at the foot, as on any page without a pen', () => {
+    expect(toast).toMatch(/penAtFoot\(segments, c\.view\.approvals\.length\) \? 'inbox' : 'other'/);
+    expect(toastPlace('other', 34)).toEqual({ bottom: 34 + 20, right: 12 });
+  });
+  it('the inbox moves the pen up on the same count', () => {
+    expect(inbox).toMatch(/const penUp = c\.view\.approvals\.length > 0;/);
   });
 });
 
