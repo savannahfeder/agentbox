@@ -187,9 +187,10 @@ describe('the page keeps the corner clear', () => {
       ['renderer/src/styles.css', '.pv-top', 'right'],
       ['renderer/src/components/file-views.css', '.file-sheet-head', 'padding-right'],
       ['renderer/src/styles.css', '.zoom-readout', 'right'],
-      ['renderer/src/components/tour-frame.css', '.tour-frame .tf-skip', 'right'],
       ['renderer/src/team/sign-in.css', '.si-skip-corner', 'right'],
     ];
+    // The walkthrough's column, Skip included, keeps to the window's left edge.
+    expect(read('renderer/src/components/tour-frame.css')).toMatch(/\.tour-frame \{[^}]*position: fixed; left: 0; top: 0; bottom: 0; width: var\(--tf-w\);/);
     for (const [file, sel, prop] of views) {
       const css = read(file);
       const m = new RegExp(`:root\\[data-window-buttons="right"\\] ${sel.replace('.', '\\.')} \\{[^}]*${prop}:\\s*(\\d+)px`).exec(css);

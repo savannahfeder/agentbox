@@ -81,6 +81,32 @@ describe('a thread an agent files because you asked for it', () => {
     const out = await file(call.id, { title: 'Old copy of the script picked up', parent: call.id, startBecause: ASKED });
     expect(read(out.id).answer).toBe(RUN_IT);
   });
+
+  it('starts one the agent made to solve part of what you asked', async () => {
+    const call = yourThread({ reply: 'Get the demo copy ready for Saturday.' });
+    const out = await file(call.id, { title: 'Rename the demo company', parent: call.id, startBecause: 'Get the demo copy ready for Saturday' });
+    expect(read(out.id).answer).toBe(RUN_IT);
+  });
+});
+
+// Your rule (w-0e21f73f90): a thread you told an agent to make starts, and so
+// does one it makes to solve what you asked; something you did not expect
+// waits for your yes. Only the agent knows which, so this is what it is told.
+describe('what a filing agent is told', () => {
+  const source = (file) => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+
+  it('quotes you for a thread you asked for or one that solves part of your ask', () => {
+    const tools = source('mcp/tools.mts');
+    const said = tools.slice(tools.indexOf('startBecause: z.'), tools.indexOf('startBecause: z.') + 800);
+    expect(said).toMatch(/a thread they told you to make, or one that does part of what they asked/);
+    expect(source('briefs/worker.md')).toMatch(/part of what they asked[^;]*startBecause/);
+  });
+
+  it('leaves out what they did not ask for, which waits for their yes', () => {
+    const tools = source('mcp/tools.mts');
+    const said = tools.slice(tools.indexOf('startBecause: z.'), tools.indexOf('startBecause: z.') + 800);
+    expect(said).toMatch(/Leave it out for anything they did not ask for/);
+  });
 });
 
 describe('without your words it waits for your yes, as before', () => {

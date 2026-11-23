@@ -189,7 +189,7 @@ import { runOfRule } from './first-run';
 import { Tour, TourFinished } from './components/Tour';
 import { TourFrame } from './components/TourFrame';
 import { laterTabShown } from './later-tab';
-import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
+import { type Lesson as TourLesson, FINISH_MS, PRACTICE_RUN_MS, THREAD_CLOSED, awayFromWalk, replyTeaches, walkBackTo, closeFinish, finishLesson, firstTask, tourFinishing, isTourPractice, madeUrgent, noteSent, practiceReplied, readTour, saveTour, skipFromPalette, skipTour, startTour, tourLive, tourOver, withPractice, type Tour as TourState } from './tour';
 import {
   ANSWER_AFTER_MS, FIRST_RUN_LABEL, firstRunDone, firstRunNeeded, projectsOfTheirOwn, restartFirstRun,
   finishFirstRun, TASK_BODY, TASK_TITLE, practiceDraftLeft, whyNotMade, replyWritten,
@@ -282,7 +282,7 @@ import { MATCH_SKY, PLAIN, SKY_THEMES, skyTheme, wearsInboxSky } from './home/sk
 import { busiestFirst, engineLetter, engineName, greeting, homeRowOpens, rowEngine, somethingCoversTheList, teamRowState, weekCounts } from './home/home-model';
 import { sentFrom } from './team/company';
 import { reachAudienceOf } from '../../shared/teammate-reach.mts';
-import { stopOnScreen, useBackAndForward, type Stop as TrailStop } from './back-and-forward';
+import { onInboxPage, stopOnScreen, useBackAndForward, type Screen as TrailScreen, type Stop as TrailStop } from './back-and-forward';
 import { BackForward } from './components/BackForward';
 
 
@@ -1221,7 +1221,7 @@ export default function App() {
     // through to whatever the Mac preferred and a light Mac turned the walk
     // white after the third screen.
     //
-    // WHAT IT SEEDS IS PLAIN DARK, NOT A PICTURE. The `else` branch that used
+    // WHAT IT SEEDS IS LIGHT, NOT A PICTURE. The `else` branch that used
     // to sit under this line put Gouache Valley on any Mac that had chosen no
     // picture, every time the walk ran, and that is how a look nobody
     // picked reached the window. It is deleted, and so is the function behind
@@ -1340,7 +1340,9 @@ export default function App() {
     if (!tourGone || !tour?.practice) return;
     // Skipped with the practice thread open: it goes with its project, and you land back on your list.
     if (focused?.product === tour.practice.slug) setFocused(null);
-    void api.firstRunPracticeEnd().then(() => refreshRef.current?.());
+    // E on the practice thread can be what ended it, and is still held for Z: it is written before its project goes.
+    const held = pendingRef.current?.item.product === tour.practice.slug ? flushPending().catch(() => {}) : Promise.resolve();
+    void held.then(() => api.firstRunPracticeEnd()).then(() => refreshRef.current?.());
   }, [tourGone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Starting a setup or the walkthrough from ⌘K hands it the whole window, so
@@ -4649,7 +4651,7 @@ export default function App() {
     return true;
   };
   const answerWith = useCallback(async (item: WorkItem, text: string, priority?: number, sent?: SentDraft, mode?: AnswerMode | null, engine?: string | null, pick?: ReplyPick, runAt?: number) => {
-    if (tourLive(tourRef.current)) {
+    if (replyTeaches(tourRef.current, item)) {
       let t = finishLesson(tourRef.current!, 'reply');
       if (isTourPractice(t, item)) t = practiceReplied(t);
       setTour(t);
@@ -6848,52 +6850,64 @@ export default function App() {
   // opened from Needs you lands back on the Chats screen with another reply box.
   const openView = (next: View) => { roomsUi.leave(); setChatsDirect(null); teammatesUi.leave(); setFilesPage(null); setConnectionsPage(null); setTeamOpen(false); setOpenCard(null); setSettingsOpen(false); setSettingsPane(null); closeSearch(); setView(next); setFocused(null); setFocusedRepeat(null); setSelected(0); setMultiSel(new Set()); setEvPick(null); setTodayOn(false); setChatsPlace(null); setHomeOpen(false); };
 
-  // BACK AND FORWARD, on every computer. Above the early returns below, because
-  // it is a hook; `homeShown` is worked out again here for the same reason.
+  // THE WALKTHROUGH'S WAY BACK, from a page it has no tip on to where its last tip stood.
+  const walkElsewhere = settingsOpen || teamShown || filesShown || connectionsShown || teammatesShown || roomShown || chatsPlaceShown || search !== null;
+  const walkAway = awayFromWalk(tour, { elsewhere: walkElsewhere, home: homeOpen && !focused && !walkElsewhere, thread: !!focused, practiceThread: !!focused && focused.id === tourPractice?.item });
+  const walkSpot = useRef<{ view: View; home: boolean; item: WorkItem | null } | null>(null);
+  // Only when the tip changes: a change of page reaches here before its tip has gone.
+  useEffect(() => {
+    if (tourNow && !walkAway) walkSpot.current = { view, home: homeOpen, item: focused };
+  }, [tourNow]); // eslint-disable-line react-hooks/exhaustive-deps
+  const backToWalk = () => {
+    const s = walkSpot.current;
+    if (!s) { const to = walkBackTo(tour); openView('inbox'); if (to === 'home') setHomeOpen(true); else if (to === 'practice' && practiceRow) setFocused(practiceRow); return; }
+    openView(s.view); if (s.home) setHomeOpen(true); if (s.item) setFocused(s.item);
+  };
+
+  // BACK AND FORWARD WALK THE LIST AND THE THREADS YOU WERE IN, on every
+  // computer and only on the inbox page. A thread opened inside another page
+  // keeps that page's own back. Above the early returns below, because it is a
+  // hook; `homeShown` is worked out again here for the same reason.
   const backForwardOn = !onPhone();
   const homeHere = homeOn && homeOpen && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
-  const groupHere = roomShown && roomsUi.openId !== 'groups' ? roomsUi.openId : null;
-  const stopHere = stopOnScreen({
-    settings: settingsOpen ? { pane: settingsAt } : null,
-    thread: focused ? { product: focused.product, id: focused.id } : null,
-    card: teamShown && openCard ? { person: openCard.personId, thread: openCard.threadId } : null,
-    home: homeHere,
-    files: filesShown ? { project: filesPage?.project ?? null } : null,
-    connections: connectionsShown,
-    group: groupHere,
-    groupInInbox: roomShown && roomsUi.inInbox,
-    teammate: teammatesShown ? teammatesUi.open : null,
-    teamPlace: chatsPlaceShown ? chatsPlace : null,
-    unrecorded: search !== null || teamShown || roomShown || teammatesShown || chatsPlaceShown || !!focusedRepeat || todayOn,
-    view,
-  });
+  // A teammate's direct record is one of your groups, so Groups is the page it is on.
+  const directOpen = !!focused && !isTaskRow(focused) && isDirect(snap?.products.find((p) => p.slug === focused.product));
+  const inChats = !!focused && directOpen && !!chatsValue && focused.id === chatsDirect;
+  // A chat pressed in Needs you is drawn in the inbox, as a thread is.
+  const groupInInbox = roomShown && roomsUi.inInbox && roomsUi.openId !== 'groups' ? roomsUi.openId : null;
+  // The Inbox button is only on an inbox thread: anywhere else the sidebar's
+  // own Inbox is as close, and on the inbox it would lead to itself.
+  const onInboxThread = (!!focused && !settingsOpen && !inChats) || (roomShown && roomsUi.inInbox);
+  // A teammate's thread opened from the Inbox is an inbox thread too.
+  const onTeammateThread = teamShown && !!openCard && !cardFromPlace;
+  const screenHere: TrailScreen = {
+    thread: focused && !settingsOpen && !inChats && !teamOpen && !(directOpen && roomsUi.openId) ? { product: focused.product, id: focused.id } : null,
+    card: openCard && onTeammateThread && !roomsUi.roomName ? { person: openCard.personId, thread: openCard.threadId } : null,
+    group: groupInInbox,
+    list: !focused && !settingsOpen && !teamShown && !homeHere && !filesShown && !connectionsShown && !roomShown && !teammatesShown && !chatsPlaceShown ? view : null,
+  };
   const cardOf = (s: { person: string; thread: string }) => cards.find((c) => c.personId === s.person && c.threadId === s.thread);
   const trail = useBackAndForward({
     on: backForwardOn,
-    here: stopHere,
+    inbox: onInboxPage(screenHere),
+    here: stopOnScreen(screenHere),
     exists: (s) => s.at === 'thread' ? selectable.some((i) => i.id === s.id && i.product === s.product)
       : s.at === 'card' ? !!cardOf(s)
-      : s.at === 'team' ? s.place === 'team' || members.some((m) => m.key === s.place)
       : true,
+    // The list comes back as Esc leaves it, cursor and all, unless it was on
+    // another tab. Anything else opens over the inbox, so its own back says Inbox.
     go: (s) => {
-      if (s.at === 'home') { openView('inbox'); setHomeOpen(true); }
-      else if (s.at === 'list') openView(s.view);
-      else if (s.at === 'files') openFiles(s.project);
-      else if (s.at === 'connections') openConnectionsPage(null);
-      else if (s.at === 'team') openChatsPlace(s.place);
-      else if (s.at === 'group') { openView(view); roomsUi.open(s.id, s.inbox ? 'inbox' : null); }
-      else if (s.at === 'teammate') teammatesUi.go(s.id);
+      if (s.at === 'list') {
+        if (s.view !== view) openView(s.view);
+        else { roomsUi.leave(); setOpenCard(null); setTeamOpen(false); setFocused(null); }
+      } else if (s.at === 'group') { openView(view); roomsUi.open(s.id, 'inbox'); }
       else if (s.at === 'card') {
         const card = cardOf(s);
-        // The page it was opened from stays, so its Back still names it.
-        if (card) { setSettingsOpen(false); setSettingsPane(null); closeSearch(); setFocused(null); setFocusedRepeat(null); openTeammateCard(card); }
-      } else if (s.at === 'settings') {
-        setTeamOpen(false); closeSearch(); setFocused(null);
-        setSettingsPane(s.pane); setSettingsVisit((n) => n + 1); setSettingsOpen(true);
+        if (card) { openView(view); openTeammateCard(card); }
       } else {
-        const card = selectable.find((i) => i.id === s.id && i.product === s.product);
-        if (card) { openView(view); setFocused(card); }
+        const item = selectable.find((i) => i.id === s.id && i.product === s.product);
+        if (item) { openView(view); setFocused(item); }
       }
     },
   });
@@ -6901,15 +6915,9 @@ export default function App() {
     const thread = selectable.find((i) => i.id === s.id && i.product === s.product);
     return thread ? rowTitle(thread) : 'the thread';
   };
-  const stopName = (s: TrailStop): string => s.at === 'home' ? 'Home'
-    : s.at === 'list' ? (INBOX_TABS.find((t) => t.view === s.view)?.label ?? 'Inbox')
-    : s.at === 'files' ? 'Files'
-    : s.at === 'connections' ? 'Connections'
-    : s.at === 'settings' ? 'Settings'
-    : s.at === 'team' ? (s.place === 'team' ? 'Standup' : members.find((m) => m.key === s.place)?.name ?? 'Team')
-    : s.at === 'group' ? (roomsUi.groups.find((g) => g.key === `room:${s.id}`)?.name ?? 'the group')
-    : s.at === 'teammate' ? (teammatesUi.list.find((t) => t.id === s.id)?.name ?? 'the teammate')
+  const stopName = (s: TrailStop): string => s.at === 'list' ? (INBOX_TABS.find((t) => t.view === s.view)?.label ?? 'Inbox')
     : s.at === 'card' ? (cardOf(s)?.title ?? 'the thread')
+    : s.at === 'group' ? (roomsUi.groups.find((g) => g.key === `room:${s.id}`)?.name ?? 'the group')
     : threadName(s);
   useEffect(() => {
     if (!onPhone()) return;
@@ -7271,15 +7279,7 @@ export default function App() {
   // neither, so only there does the list draw a magnifier, and it opens ⌘K.
   const searchInTheList = onPhone() ? () => setModal('palette') : undefined;
   const sideFolded = sidebarFolded({ phone: onPhone(), shrinks: sidebarShrinks, pointedAt: railOpen });
-  // A teammate's direct record is one of your groups, so Groups is the page it is on.
-  const directOpen = !!focused && !isTaskRow(focused) && isDirect(snap?.products.find((p) => p.slug === focused.product));
-  const inChats = !!focused && directOpen && !!chatsValue && focused.id === chatsDirect;
-  // The Inbox button is only on an inbox thread: anywhere else the sidebar's
-  // own Inbox is as close, and on the inbox it would lead to itself.
-  const onInboxThread = (!!focused && !settingsOpen && !inChats) || (roomShown && roomsUi.inInbox);
-  // A teammate's thread opened from the Inbox is an inbox thread too.
-  const onTeammateThread = teamShown && !!openCard && !cardFromPlace;
-  const backForward = backForwardOn
+  const backForward = backForwardOn && onInboxPage(screenHere)
     ? <BackForward backTo={trail.backTo} forwardTo={trail.forwardTo} onBack={trail.back} onForward={trail.forward}
       onInbox={onInboxThread ? () => openView('inbox') : onTeammateThread ? () => { setOpenCard(null); setTeamOpen(false); openView('inbox'); } : undefined} name={stopName} />
     : null;
@@ -8508,7 +8508,7 @@ export default function App() {
               const said = firstNames(how.toMany ?? [how.to ?? '']);
               // Named for O, like a new thread (w-5513afd09a). No Z: a message
               // has reached the team cloud by now and there is no taking it back.
-              showToast(how.given ? `Task sent to ${said}` : said ? `Sent to ${said}` : 'Message sent', how.made ? { product: how.made.product, id: how.made.id } : undefined);
+              showToast(how.given ? `To-do sent to ${said}` : said ? `Sent to ${said}` : 'Message sent', how.made ? { product: how.made.product, id: how.made.id } : undefined);
               await refresh();
               return;
             }
@@ -8855,7 +8855,7 @@ export default function App() {
         // is one line however many projects she has (w-aa3fa4cbf0).
         onOpenFilter={() => setModal('filter')}
         onClearFilter={() => { setBoxFilter(NO_FILTER); setModal(null); }}
-        onEndTutorial={tourLive(tour) ? () => { setTour(skipTour(tour!)); setModal(null); } : undefined}
+        onEndTutorial={tourLive(tour) ? () => { setTour(skipFromPalette(tour!)); setModal(null); } : undefined}
         onView={(v) => { setModal(null); openView(v); }}
         teamLayout={!!teamTabs}
         onPause={async (paused) => { await api.pauseSupervisor(paused); setModal(null); await refresh(); }}
@@ -9047,7 +9047,7 @@ export default function App() {
           A ?modes= drawing stands INSTEAD of it, never over it: two full
           surfaces at once would photograph the welcome screen. */}
       {fresh && !modeDraft && <FirstRunFlow snap={snap} home={home} onDone={finishFresh}
-        look={setupLook({ skies: homeOn, picked: homeSet.picked, worn: homeSet.skyTheme, light: resolveTheme(theme) === 'light' })} skies={homeOn}
+        look={setupLook({ skies: homeOn, picked: homeSet.picked, worn: homeSet.skyTheme, light: resolveTheme(theme) === 'light', follows: theme === 'match' })} skies={homeOn}
         onLook={(id) => { if (id === 'light') chooseLook('light'); else if (id === 'dark') chooseLook('ember-grid'); else chooseSkyTheme(id); }}
         onProject={(slug) => { rememberProject(slug); setPickProject(slug); }}
         onSetup={() => {
@@ -9055,11 +9055,11 @@ export default function App() {
           if (homeOn) setHomeOpen(true);
         }}
         onLeave={setupStartedAgain.current ? leaveSetupAgain : undefined} />}
-      {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
+      {tourFramed && createPortal(<TourFrame done={tour!.done} now={tourNow} finished={finishing} away={walkAway} onBack={backToWalk} onSkip={() => setTour(finishing ? closeFinish(tour!) : skipTour(tour!))} />, document.body)}
       {finishing && <TourFinished covered={settingsOpen || teamOpen || newProject || modal !== null} onDone={() => { if (tourFinishing(tourRef.current)) setTour(closeFinish(tourRef.current!)); }} />}
-      {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} view={view} thread={!!focused}
+      {!fresh && <Tour tour={tour} practice={!!tourTask} practiceId={tourPractice?.item ?? null} practiceOpen={!!focused && focused.id === tourPractice?.item} view={view} thread={!!focused}
         answering={practiceAnswering}
-        covered={settingsOpen || teamOpen || newProject || (modal !== null && modal !== 'compose' && modal !== 'palette')}
+        covered={settingsOpen || teamOpen || newProject || walkElsewhere || (modal !== null && modal !== 'compose' && modal !== 'palette')}
         palette={modal === 'palette'}
         onChange={setTour}
         onStep={setTourNow}
