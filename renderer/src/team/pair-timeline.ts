@@ -4,7 +4,6 @@
 import { baseName, numberInName } from '../../../shared/artifact-marks.mts';
 import { isTaskRow, taskGiver } from '../../../shared/team-rules.mts';
 import { handedFrom } from '../../../shared/thread-link.mts';
-import { TALK_TEXT } from '../../../shared/work-items.mts';
 import type { RoomMessage, ThreadTalk } from '../types';
 
 export type { ThreadTalk };
@@ -19,7 +18,7 @@ export interface PairTask {
   createdBy?: string | null;
   createdAt?: number;
   labels?: string[];
-  talk?: { chat: readonly { by: string; ts: number; text: string }[] } | null;
+  talk?: { chat: readonly { by: string; ts: number; text: string; cut?: boolean }[] } | null;
   /** Help or a review asked on a thread (shared/thread-asks.mts), and what came back. */
   ask?: { kind?: string } | null;
   verdict?: string | null;
@@ -74,8 +73,8 @@ export function fileLabel(file: string, v?: number): string {
 }
 
 /** A reply the record cut at its length, ended at its last whole word with an ellipsis; the task it is on holds all of it. */
-const endsWhole = (text: string): string => {
-  if (text.length < TALK_TEXT) return text;
+const endsWhole = (text: string, cut: boolean): string => {
+  if (!cut) return text;
   const space = text.trimEnd().lastIndexOf(' ');
   return `${(space > 0 ? text.slice(0, space) : text).replace(/[\s,;:.-]+$/, '')}…`;
 };
@@ -114,7 +113,7 @@ export function pairTimeline({ me, other, rooms, messages, directItems, talk, ti
       const where = { label: `on ${title}`, open };
       const twin = chat.find((m) => m.by === line.by && said(m.body) === said(line.text) && Math.abs(m.at - line.ts) <= SAME_REPLY_MS && !wheres.has(m.id));
       if (twin) { wheres.set(twin.id, where); continue; }
-      out.push({ key: `reply:${t.id}:${k}`, at: line.ts, kind: 'reply', by: line.by, to: otherOf(line.by), text: endsWhole(line.text), where });
+      out.push({ key: `reply:${t.id}:${k}`, at: line.ts, kind: 'reply', by: line.by, to: otherOf(line.by), text: endsWhole(line.text, !!line.cut), where });
     }
   }
 
