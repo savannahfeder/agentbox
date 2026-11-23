@@ -303,7 +303,7 @@ export function buildTools({ holder, ownItem: givenItem, ownProduct = process.en
         runAt: z.number().int().optional().describe('epoch ms before which nothing happens with this item: it cannot be claimed and will not start. Use it when the work genuinely belongs to a later moment. A missed moment is not lost; the item simply becomes available once it passes.'),
         model: z.string().max(80).optional().describe(MODEL_WORDS),
         effort: z.string().optional().describe(EFFORT_WORDS),
-        startBecause: z.string().optional().describe('when they asked for this thread to be made and worked on ("file that so it gets fixed", "give this to the other agent as its own thread"): their own words asking for it, quoted exactly from the thread you are working for. It then starts at once, as if they had approved it; without them it waits for their yes'),
+        startBecause: z.string().optional().describe('when this thread is work they asked for, a thread they told you to make, or one that does part of what they asked you to do: their own words asking for it, quoted exactly from the thread you are working for. It then starts at once, as if they had approved it. Leave it out for anything they did not ask for, such as something you noticed on the way, which waits for their yes'),
       },
       run: ({ product, startBecause, ...fields }: { product: string; startBecause?: string } & ItemFields & { model?: string; effort?: string }) => {
         runWords(fields);

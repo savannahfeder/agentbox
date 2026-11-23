@@ -137,7 +137,7 @@ import { CATCH_UP_LABEL, CATCH_UP_TRIES, catchUpDue, importedAgentBrief, importe
 import { readTranscriptHead } from './agent-sessions.mts';
 import { claudeSessionOpen } from './claude-session-open.mts';
 import { planStamp, readPlan } from './claude-plan.mts';
-import { troubleCause, refineCause, needsHerHands, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown, modelForAnotherEngineSentence } from '../shared/spawn-trouble.mts';
+import { troubleCause, refineCause, needsHerHands, accountRefused, troubleSentence, troubleRemedy, deadRunSentence, deadRunCause, deadRunPromisesARetry, undeliveredAnswerSentence, stoppedStartingSentence, limitResetsAt, limitResetMoment, strandedSentence, strandedRemedy, causeBreakdown, modelForAnotherEngineSentence } from '../shared/spawn-trouble.mts';
 import { readDeadRunTrace, traceShowsASilentDeath, tracesAToolCall, STOPPED_ON_REQUEST, MOVED_HERE } from '../shared/dead-run-trace.mts';
 import { commandPrompt } from '../shared/claude-commands.mts';
 import { machineryPath, storeRootEnv } from './store/home.mts';
@@ -440,6 +440,8 @@ export type RunState = {
   ranOn?: { model: string | null; effort: string | null };
   exitFailed?: boolean;
   accountFault?: AccountFault | null;
+  /** The account in use when a cloud run started, as `_accountKey` spells it. */
+  cloudAccount?: string | null;
   lastOutputAt?: number;
   /** Whether the run has put anything in its trace: said or done one thing. */
   traced?: boolean;
@@ -1074,6 +1076,8 @@ const LOGIN_ASK_EVERY_MS = 2 * 60_000;
 const AT_LIMIT_REST_MS = 5 * 60_000;
 // How long past a limit's printed reset hour the fleet waits before trying.
 const LIMIT_RESET_GRACE_MS = 30_000;
+// How long the cloud button says the work moved off an account Claude refused.
+const REFUSED_NOTICE_MS = 24 * 3_600_000;
 // A run on a capped login that lives this long shows the login has room
 // (Claude reports a weekly limit in about 35 s, Codex in about two minutes).
 const LIMIT_TRY_PROVES_MS = 3 * 60_000;
@@ -1400,7 +1404,7 @@ export class Supervisor {
   declare _profileStrikes: Record<string, number> | undefined;
   declare _movedWhy: Record<string, MovedWhy>;
   declare _accountChosenAt: number | undefined;
-  declare _accountSwitch: { from: string; to: string; until: number } | null | undefined;
+  declare _accountSwitch: { from: string; to: string; until: number; why?: 'refused' } | null | undefined;
   declare _movedToCloudAt: Record<string, number> | undefined;
   declare _hungReaps: Record<string, { count: number; at: number }> | undefined;
   declare _modelRefused: Record<string, string[]> | undefined;
@@ -2007,7 +2011,11 @@ export class Supervisor {
     const cause = this._profileTrouble?.[key]?.cause;
     if (cause === 'at-limit' || cause === 'subscription-ended') this._clearProfileTrouble(key);
     else if (this._profileCooldown) this._profileCooldown[key] = 0;
-    if (engineOf(engine) === DEFAULT_ENGINE) this._spawnCooldownUntil = 0;
+    if (engineOf(engine) === DEFAULT_ENGINE) {
+      this._spawnCooldownUntil = 0;
+      const inCloud = this._cloudLoginOf(profile);
+      if (inCloud?.refusedUntil) markCloudLogin(DEFAULT_ENGINE, inCloud.key, inCloud.id, { refusedUntil: null }, { home: this.config.home });
+    }
     this._saveState();
     this.wake();
     return true;
@@ -2016,7 +2024,8 @@ export class Supervisor {
   /**
    * AN ACCOUNT AT ITS LIMIT HANDS THE WORK TO ONE WITH ROOM (2026-11-10, their
    * call: "your Mac and the cloud move to your account with room by
-   * themselves"). Claude only: a second Codex login is kept for testing. The
+   * themselves"), and so does one Claude refuses (w-3e97e1531d).
+   * Claude only: a second Codex login is kept for testing. The
    * cloud follows because it runs on whatever account this Mac is set to.
    * Another folder of the same subscription shares its limit, so it is no way
    * out; with nowhere to go, the limit is waited out as before.
@@ -2025,7 +2034,8 @@ export class Supervisor {
     const engine = DEFAULT_ENGINE;
     const from = this._profilesFor(engine)[0];
     if (!from) return null;
-    const until = this._limitedUntil(from, now);
+    const refused = this._refusedUntil(from, now);
+    const until = refused ? now + REFUSED_NOTICE_MS : this._limitedUntil(from, now);
     if (!until) return null;
     const home = this.config.home || os.homedir();
     const idOf = (p: string) => accountIdentity(p === 'default' ? null : p, { home });
@@ -2033,7 +2043,7 @@ export class Supervisor {
     const same = (a: AccountIdentity | null) => !!a && !!mine && ((!!a.accountUuid && a.accountUuid === mine.accountUuid) || a.email.toLowerCase() === mine.email.toLowerCase());
     const room = this._profiles().filter((p) => p !== from && !!idOf(p) && !same(idOf(p))
       && !this._profileTrouble?.[this._accountKey(engine, p)] && !this._profileResting(this._accountKey(engine, p))
-      && !this._limitedUntil(p, now));
+      && !this._limitedUntil(p, now) && !this._refusedUntil(p, now));
     if (!room.length) return null;
     const cloudRuns = (p: string) => { const r = this._cloudLoginOf(p); return !!r && mayRunOn(cloudLoginState(r, { now })); };
     const to = room.find(cloudRuns) ?? room[0];
@@ -2042,10 +2052,10 @@ export class Supervisor {
       console.warn('zero: could not save the account switch:', (e as Error).message);
       this.config.activeAccount = { ...(this.config.activeAccount ?? {}), [engine]: to };
     }
-    this._accountSwitch = { from, to, until };
+    this._accountSwitch = { from, to, until, ...(refused ? { why: 'refused' as const } : {}) };
     this._cloudConfigAt = 0;
     this._cloudInUseSeen?.delete(engine);
-    console.log(`zero: ${from} is at its usage limit, so work moves to ${to}`);
+    console.log(`zero: ${from} is ${refused ? 'refused by Claude' : 'at its usage limit'}, so work moves to ${to}`);
     this._saveState();
     this.onChange?.();
     this.wake?.();
@@ -2071,6 +2081,15 @@ export class Supervisor {
     return !picked && r.limitedUntil && r.limitedUntil > now ? r.limitedUntil : null;
   }
 
+  // Until when an account whose subscription Claude refuses sits out, or null:
+  // refused here, or in the cloud, whose login is the same subscription.
+  _refusedUntil(profile: string, now = Date.now()): number | null {
+    const key = this._accountKey(DEFAULT_ENGINE, profile);
+    const here = accountRefused(this._profileTrouble?.[key]?.cause) ? this._profileCooldown?.[key] ?? 0 : 0;
+    const until = Math.max(here, this._cloudLoginOf(profile)?.refusedUntil ?? 0);
+    return until > now ? until : null;
+  }
+
   _cloudLoginOf(profile: string) {
     const home = this.config.home || os.homedir();
     const ids = this._profiles().map((p) => ({ ...accountIdentity(p === 'default' ? null : p, { home }), profile: p }));
@@ -2083,7 +2102,7 @@ export class Supervisor {
     const s = this._accountSwitch;
     if (!s || s.until <= now || this._profilesFor(DEFAULT_ENGINE)[0] !== s.to) return null;
     const name = (p: string) => this._accountNameFor(DEFAULT_ENGINE, this._accountKey(DEFAULT_ENGINE, p)) ?? 'your other Claude account';
-    return { from: name(s.from), to: name(s.to), until: s.until };
+    return { from: name(s.from), to: name(s.to), until: s.until, ...(s.why ? { why: s.why } : {}) };
   }
 
   /**
@@ -5545,6 +5564,9 @@ export class Supervisor {
           continue;
         }
 
+        // Left silent on purpose: it runs again on the account the work moved to.
+        if (this._runsAgainElsewhere(item, { accountFault: { account: seen.account } })) continue;
+
         // A run already read to its end is not looked at again, or every stuck
         // thread costs a folder listing and a stamp every tick while it stays stuck.
         if (seen.quietAt != null && seen.quietAt === (seen.endedAt ?? 0)) continue;
@@ -6380,6 +6402,12 @@ export class Supervisor {
     if (typeof account !== 'string' || account.startsWith('cloud:')) return false;
     const engine = this._engineFor(item);
     return this._accountKey(engine, this._profilesFor(engine)[0] ?? 'default') !== account;
+  }
+
+  // The work has moved off the account that refused this run, so the row runs
+  // again there with nothing said on it.
+  _runsAgainElsewhere(item: WorkItem, { accountFault }: Pick<RunState, 'accountFault'>) {
+    return !!accountFault && this._accountMovedOn(item, accountFault.account);
   }
 
   _healthyProfiles() {
@@ -7327,7 +7355,7 @@ export class Supervisor {
   _waitsForCloud(item: WorkItem | null | undefined, engine: string) {
     return this._cloudFirstFor(item) && !!item?.id && this._cloudUsable(engine, { full: true }) && this._cloudSignedInAtAll(engine)
       && this._cloudEligible(item) && !this._mustRunHere(item, engine) && !this._cloudSlotFor(engine)
-      && (this._sentToCloud(item.id) || this._cloudInUseState(engine) !== 'limited');
+      && (this._sentToCloud(item.id) || !['limited', 'refused'].includes(this._cloudInUseState(engine)));
   }
 
   // The state of the one cloud account a run would take (`_cloudLoginRunnable`),
@@ -7374,8 +7402,8 @@ export class Supervisor {
       const inUse = cloudLoginInUse(which, this._cloudAccountAsk(which, now));
       if (!inUse) return false;
       const state = cloudLoginState(inUse, { now });
-      // Resting at its limit, or a Codex sign-in being renewed: back soon.
-      return mayRunOn(state) || state === 'limited' || state === 'renew';
+      // Resting at its limit or refused, or a Codex sign-in being renewed: back soon.
+      return mayRunOn(state) || state === 'limited' || state === 'refused' || state === 'renew';
     });
   }
 
@@ -7843,6 +7871,7 @@ export class Supervisor {
     if (noRoom) return { why: 'cloud-no-room', detail: noRoom.error };
     if (this._cloudVersionGaps().some((g) => g.engine === engineOf(engine) && g.blocks)) return { why: 'version', detail: engineOf(engine) };
     if (this._cloudInUseState(engine) === 'limited') return { why: 'cloud-account-limited' };
+    if (this._cloudInUseState(engine) === 'refused') return { why: 'cloud-account-refused' };
     return { why: 'other' };
   }
 
@@ -8622,6 +8651,9 @@ export class Supervisor {
       const said = session.resultIsError ? troubleCause(session.result) : 'unknown';
       if (said === 'at-limit') {
         session.accountFault = { cause: 'at-limit', account: `cloud:${engineOf(session.engine)}` };
+        this._cloudConfigAt = 0;
+      } else if (accountRefused(said)) {
+        session.accountFault = { cause: said, account: session.cloudAccount ?? `cloud:${engineOf(session.engine)}` };
         this._cloudConfigAt = 0;
       }
       return;
@@ -12679,6 +12711,7 @@ export class Supervisor {
       // Mac's slots (`_loadFor`), shown on the thread, remembered for a
       // restart (`_liveSessions`).
       cloud: where === 'cloud',
+      ...(where === 'cloud' ? { cloudAccount: this._accountKey(engine, this._profilesFor(engine)[0] ?? 'default') } : {}),
       carriesHandBack: adopted ? !!adopted.rec.carriesHandBack : where !== 'cloud' && this._noteCarryingHandBack(item.id),
       whyLocal:where === 'cloud' || plan.command ? null : whyLocal ?? this._whyLocal({ item, product, cwd, engine, remoteOnly }),
     } as WorkerSession;
@@ -13111,6 +13144,10 @@ export class Supervisor {
       this._forgetCloudStartThatLeftNothing(item, session);
       this.noteExitForBackoff(session, { onLine });
       this._noteStoppedByAccount(item, session);
+      // Before the row is judged, so it runs on the other account instead of coming to the inbox.
+      if (session.accountFault) {
+        try { this._moveOffALimitedAccount(); } catch (e) { console.warn('zero: could not move off the account that refused a run:', (e as Error).message); }
+      }
       if (session.cloud) this._sayCloudNews(cwd, item);
       const carryingAnswer = continuation && answerAtSpawn;
       if (carryingAnswer && !session.spawnAnswerSettled) this.settleDeliveryAndSay(item, answerAtSpawn, session, signal, { command: !!plan.command });
@@ -13160,7 +13197,7 @@ export class Supervisor {
           // ended with an error result. On Agentbox alone, 18 of the 74 rows this
           // touched still carried no word about it, one of them after 236 dead
           // runs on the same task. She read an inbox that looked idle.
-          if (saidNothingSheCanUse(session)) this.sayTheRunDied(item, session);
+          if (saidNothingSheCanUse(session) && !this._runsAgainElsewhere(item, session)) this.sayTheRunDied(item, session);
         }
       }
       this.onChange?.();

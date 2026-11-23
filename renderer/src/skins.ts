@@ -99,8 +99,8 @@ export function normalizeSavedLook(store: {
     if (theme !== l.theme) store.setItem(THEME_KEY, l.theme);
     if (skin !== l.skin) store.setItem(SKIN_KEY, String(l.skin));
   };
-  // A new install follows the computer's own light or dark until somebody picks a look.
-  if (theme === null && skin === null) return put('match');
+  // A new install opens light for everybody, dark Mac or not, until a look is picked (the setup's look page).
+  if (theme === null && skin === null) return put('light');
   if (skin && LIGHT_PICTURES.includes(skin)) return put('light');
   if (skin && skin !== 'none') return put('ember-grid');
   if (theme === 'light') return put('light');
@@ -283,9 +283,8 @@ export function walkSkin(skin: SkinChoice): SkinChoice {
  */
 export const WALK_PICTURE: SkinChoice = 'gouache-valley';
 
-// Writes the computer's own light or dark into an empty store, once, so it
-// stays that after the computer changes and the picker opens with the worn
-// look already ticked. Both keys, so theme and skin agree.
+// Writes the light look into an empty store, once, so the picker opens with the
+// worn look already ticked. Both keys, so theme and skin agree.
 //
 // A store holding any choice is left alone, which also makes `?firstrun=1`
 // safe on a Mac that is already set up. Returns what it wrote so the caller
@@ -295,8 +294,8 @@ export function seedFirstRunLook(store: {
   setItem(k: string, v: string): void;
 }, themeKey: string, _machine: 'light' | 'dark' = 'dark'): { theme: 'light' | 'dark' | 'match'; skin: SkinChoice } | null {
   if (store.getItem(themeKey) !== null || store.getItem(SKIN_KEY) !== null) return null;
-  // Match, so the window follows the Mac until somebody picks a look.
-  const look = lookMeans('match');
+  // Light, so setup opens in the light mountains for everybody until somebody picks a look.
+  const look = lookMeans('light');
   store.setItem(themeKey, look.theme);
   store.setItem(SKIN_KEY, String(look.skin));
   return look;

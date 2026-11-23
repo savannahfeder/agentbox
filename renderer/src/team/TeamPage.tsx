@@ -15,6 +15,7 @@ import { handoverAsk, handoverOf } from './handover';
 import { inviteWords } from './invite-words';
 import { AskForMultiplayer, NOT_LET_IN } from './ask-for-multiplayer';
 import { StartPro } from './StartPro';
+import { StartTeam } from './StartTeam';
 import { PRO_FOR_INVITES, askOwnerForPro } from './multiplayer-words';
 
 
@@ -55,7 +56,6 @@ function SignIn({ error }: { error: string | null }) {
 }
 
 function TeamSetup({ team, onDone, inviteFocus = false }: { team: TeamState; onDone?: () => void; inviteFocus?: boolean }) {
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   // WHO YOU INVITED, SAID BACK (2026-10-01): an invite used to empty the field
   // and show nothing else, so there was no way to tell it had worked.
@@ -79,12 +79,8 @@ function TeamSetup({ team, onDone, inviteFocus = false }: { team: TeamState; onD
       <div className="tm-field-row"><AskForMultiplayer email={me?.email} className="tm-btn" /></div>
       <p>Waiting for an invite from a teammate instead? Ask them to invite {me?.email}. It shows up here within a few seconds.</p>
     </> : !team.team ? <>
-      <h2>Start your team</h2>
-      <p>Name it, then invite people by email. Anyone you invite is asked to join when they sign in with that email.</p>
-      <form className="tm-field-row" onSubmit={(e) => { e.preventDefault(); void run(() => api.teamCreate(name)); }}>
-        <input className="tm-input" placeholder="Team name" value={name} onChange={(e) => setName(e.target.value)} />
-        <button className="tm-btn" disabled={busy || !name.trim()}>Start team</button>
-      </form>
+      {/* Pro makes and names the team, so nothing here asks for a name (tests/invite-people-with-no-team-never-asks-for-a-team-name). */}
+      <StartTeam me={me} multiplayer={team.multiplayer} left title={PRO_FOR_INVITES} />
       <p>Waiting for an invite instead? Ask a teammate to invite {me?.email}. It shows up here within a few seconds.</p>
     </> : <TeamSettings team={team} me={me} inviteFocus={inviteFocus} invited={invited} setInvited={setInvited} email={email} setEmail={setEmail} busy={busy} run={run} onDone={onDone} />}
     {error && <p className="tm-error">{error}</p>}

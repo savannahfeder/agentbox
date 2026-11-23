@@ -6,7 +6,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { Product, ThreadStateWord, View } from '../types';
 import { commandKeys } from '../palette-keys';
 import { keptPick, nameRank, namesIt, pointerMoved, titleFirst } from '../palette-pick';
-import { emptyLine, escapeClosesThePalette, lookRows, matchesQuery, pageRows, rankMatches } from '../palette-rows';
+import { emptyLine, escapeClosesThePalette, lookRows, matchesQuery, pageRows, rankMatches, walkRows } from '../palette-rows';
 import { ICONS, iconFor } from '../palette-glyphs';
 import { markedWords } from '../found-inside';
 import { ago } from '../format';
@@ -166,7 +166,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     // opens the corner's filter menu with the keyboard in it.
     { id: 'filter', label: 'Filter…', hint: 'project, priority or agent', run: onOpenFilter },
     ...(filtering ? [{ id: 'clear-filter', label: 'Clear filter', run: onClearFilter }] : []),
-    ...(onEndTutorial ? [{ id: 'end-tutorial', label: 'End the tutorial', keywords: 'skip stop hide tips', run: onEndTutorial }] : []),
+    ...(onEndTutorial ? [{ id: 'end-tutorial', label: 'Skip walkthrough', keywords: 'end the tutorial skip stop hide tips', run: onEndTutorial }] : []),
     // Per project, only "rank first" is offered. The whole order is set on the
     // Projects page, which the next row opens.
     ...(onOpenProjects ? [{
@@ -374,14 +374,12 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       keywords: 'import agents claude code codex conversations threads sessions subagents existing mine bring across add my recent older chat find search by name title past old',
       run: onImportAgents,
     },
-    // The tutorial practises and keeps nothing; the onboarding row below sets
-    // up and leaves a project. The walk's last card says "type tutorial", so
-    // this label must contain that word
-    // (tests/the-tutorial-and-the-onboarding-are-two-things.test.mts). The
-    // keywords are split so each word finds only one of the two rows.
+    // The walkthrough practises and keeps nothing; the onboarding row below sets
+    // up and leaves a project. The keywords are split so each word finds only
+    // one of the two rows.
     {
       id: 'tutorial',
-      label: 'Take the tutorial',
+      label: 'Start the walkthrough',
       hint: 'nothing is kept',
       keywords: 'tutorial practice practise walkthrough walk tour again show me around teach learn training how does this work sandbox lesson',
       run: onTutorial,
@@ -416,7 +414,9 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
     },
 
   ], [itemCommands, batch, projects, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, skyThemes, onSkyTheme, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onDemo, cloud, onCloudMode]);
-  return open ? <PaletteBox commands={commands} findThreads={findThreads} findChats={findChats} findInside={findInside} onSearchFor={onSearchFor} onClose={onClose} phone={phone} typed={typed} /> : null;
+  // The walkthrough's ⌘K is a short list, with the rest a word away.
+  const drawn = useMemo(() => (onEndTutorial ? walkRows(commands) : commands), [onEndTutorial, commands]);
+  return open ? <PaletteBox commands={drawn} findThreads={findThreads} findChats={findChats} findInside={findInside} onSearchFor={onSearchFor} onClose={onClose} phone={phone} typed={typed} /> : null;
 }
 
 /** How many threads the box lists under the commands before "See all". */
