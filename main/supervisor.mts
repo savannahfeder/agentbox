@@ -1795,7 +1795,8 @@ export class Supervisor {
     // right now, and a push that survived a restart would jump a task she
     // asked for hours ago over everything filed since. The entry stays while
     // the pushed task runs, so a second push cannot pause the first, and goes
-    // the moment that run ends (`_settleRunNow`).
+    // the moment that run ends (`_settleRunNow`). `started` is set where the
+    // run goes live (`_noteRunCarrying`).
     this._runNow = new Map();
     // Rows the toast has already spoken about. In memory only: a restart is a
     // sweep she has not been told about yet, so it gets to speak once.
@@ -4476,6 +4477,11 @@ export class Supervisor {
   _noteRunCarrying(item: WorkItem, session: WorkerSession, { continuation = false }: { continuation?: boolean } = {}) {
     if (continuation && item.answer) session.carrying = this._answerKey(item);
     this.sessions.set(item.id, session);
+    // Marked here, not at a tick: a start held for a folder or leftovers lands
+    // between ticks, and a run that also ends before the next one was never
+    // seen, so its push stood and started the thread again on every tick.
+    const push = this._runNow.get(item.id);
+    if (push) push.started = true;
     if (session.carrying) this._saveState();
   }
 
