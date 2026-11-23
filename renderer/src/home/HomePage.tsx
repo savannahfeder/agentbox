@@ -4,15 +4,15 @@ import { updatedWords } from '../threads/page-rules';
 import { PriorityMark } from '../threads/Pages';
 import { priorityLabelOf, type PriorityId } from '../priority';
 import { MateFace } from '../teammates/MateFace';
-import { AgentFace } from '../components/AgentFace';
+import { HarnessMark } from '../components/EngineLogos';
 import { initialsOf } from '../team/rooms/room-rules';
 import { MoreMenu, type MoreItem } from '../team/MessageMore';
 import { PinMark } from '../threads/ThreadMenu';
 import './home.css';
 import { enterIsTheButtons } from '../focused-button';
 
-/** `from` is the teammate who asked, when one did; priority is null at Medium, as on the Inbox's board; an invitation has no time. `agent` is an agent's thread. */
-export type NeedsRow = { key: string; letter: string; face?: string; photo?: string; agent?: boolean; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean };
+/** `from` is the teammate who asked, when one did; priority is null at Medium, as on the Inbox's board; an invitation has no time. `agent` is an agent's thread, and `engine` the harness it runs on. */
+export type NeedsRow = { key: string; letter: string; face?: string; photo?: string; agent?: boolean; engine?: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean };
 export type TeamRow = { key: string; name: string; letter: string; ai: boolean; face?: string; photo?: string; line: string; state: TeamRowState; week: number[]; total: number; pinned?: boolean; hidden?: boolean };
 export type MateAct = 'pin' | 'unpin' | 'hide' | 'show';
 
@@ -30,7 +30,7 @@ function mateMenu(m: TeamRow, act: (key: string, a: MateAct) => void): MoreItem[
     { label: 'Hide from Home', icon: EYE_OFF, onClick: () => act(m.key, 'hide') },
   ];
 }
-export type ProgressRow = { key: string; letter: string; title: string; line: string; at: number };
+export type ProgressRow = { key: string; letter: string; engine?: string; title: string; line: string; at: number };
 
 const ICONS: Record<DoorKey, JSX.Element> = {
   inbox: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9" /></svg>,
@@ -141,7 +141,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
             {needs.length === 0 && <p className="hm-empty">Nothing needs you.</p>}
             {needs.map((r, i) => (
               <button type="button" key={r.key} className={`hm-row${i === pick ? ' on' : ''}${r.unread ? ' unread' : ''}`} onClick={() => onOpen(r.key)} onMouseEnter={() => setPick(i)}>
-                {r.face ? <MateFace seed={r.face} className="hm-face" /> : r.agent ? <span className="hm-face hm-agent"><AgentFace /></span> : <span className="hm-face">{r.photo ? <img className="hm-photo" src={r.photo} alt="" referrerPolicy="no-referrer" /> : r.letter}</span>}
+                {r.face ? <MateFace seed={r.face} className="hm-face" /> : r.agent ? <span className="hm-face hm-agent"><HarnessMark engine={r.engine ?? ''} /></span> : <span className="hm-face">{r.photo ? <img className="hm-photo" src={r.photo} alt="" referrerPolicy="no-referrer" /> : r.letter}</span>}
                 <span className="hm-text"><b>{r.title}</b>
                   <span className="hm-tags">
                     {r.priority && <span className={`hm-prio${r.priority === 'urgent' ? ' urgent' : ''}`} title={priorityLabelOf(r.priority)} aria-label={priorityLabelOf(r.priority)}><PriorityMark id={r.priority} /></span>}
@@ -182,7 +182,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
               {progress.length === 0 && <p className="hm-empty">No agent is working right now.</p>}
               {progress.map((r) => (
                 <button type="button" key={r.key} className="hm-row" onClick={() => onOpen(r.key)}>
-                  <span className="hm-face hm-agent live"><AgentFace /></span>
+                  <span className="hm-face hm-agent live"><HarnessMark engine={r.engine ?? ''} /></span>
                   <span className="hm-text"><b>{r.title}</b><small>{r.line}</small></span>
                   <time>{updatedWords(r.at, now)}</time>
                 </button>
