@@ -127,10 +127,13 @@
    count beside the mark, in the mark's own faint colour. Raised 0.75px
    (2026-10-02): on the baseline it read too low, at 1.5px too high, so it
    sits halfway between. */
-/* PINNED (w-20323283e6): the same faint ink and box as the others. Its weight is in its
-   head, so with its tip level with the lock's foot it still read as high; it
-   hangs about two thirds of a pixel past it. */
-.th-pin { display: inline-block; margin-left: 9px; color: var(--text-faint); vertical-align: -3px; }
+/* PINNED (w-20323283e6): a filled head in the second ink, a step stronger than
+   the lock beside it, because a pin you cannot find did nothing. */
+.th-pin { display: inline-flex; margin-left: 9px; color: var(--text-dim); vertical-align: -3px; }
+.th-pin path:first-child { fill: currentColor; }
+.th-cell-title.with-pin { display: flex; align-items: center; }
+.th-cell-title.with-pin > * { flex: none; }
+.th-cell-title.with-pin > .th-title-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* A run in the cloud: the running mark is a cloud, pulsing with the dot.
    14px wide with 6px after it, so its title starts where a dot's does. */
 .th-st-cloud { display: inline; flex: none; margin-right: 6px; color: var(--accent); vertical-align: -1px; animation: th-breathe 1.6s ease-in-out infinite; }

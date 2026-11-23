@@ -3722,6 +3722,11 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(null), goes ? TOAST_GOES_MS : 2500);
   }, []);
   showToastRef.current = showToast;
+  // Every menu's Pin thread says what it did: from inside a thread the list it moves on is out of sight.
+  const pinFromMenu = (id: string, pin: boolean) => {
+    pinThread(id, pin, true);
+    showToast(pin ? 'Pinned to the top of your list' : 'Unpinned');
+  };
   // A second copy on an invented team, for a call where this inbox should stay
   // off the shared screen (main/demo.mts). The toast says which window is which.
   const openDemoCopy = useCallback(async () => {
@@ -7242,7 +7247,7 @@ export default function App() {
         // Next tick, as Add people below: the menu is on the thread's page, which may only just be opening.
         setTimeout(() => window.dispatchEvent(new Event('zero:choose-people')), 60);
         return;
-      case 'pin': pinThread(item.id, d.pin, true); showToast(d.pin ? 'Pinned to the top of your list' : 'Unpinned'); return;
+      case 'pin': pinFromMenu(item.id, d.pin); return;
       case 'place': placeThread(item, d.keep); return;
       case 'code': setOpenDoc({ product: item.product, src: changePathFor(item.id) }); return;
       case 'end-repeat': { const rule = ruleOf(item); if (rule) void endRule(rule); return; }
@@ -7471,7 +7476,7 @@ export default function App() {
       const ended = from && i.ask && i.status === 'done' && team ? taskWords(i, team.products.get(i.product), team.me, (id) => firstName(team.byId.get(id) ?? null), true)?.word ?? null : null;
       const asks = from && i.ask && i.assignee === team?.me && !ended ? (i.ask.kind === 'help' ? ' asks for help' : ' asks for a review') : '';
       const photo = sent && !sent.agent ? team?.byId.get(sent.from)?.avatarUrl : null;
-      return { key: `${i.product}/${i.id}`, ...(mate ? { face: faceSeed(mate) } : {}), ...(!from && !mate ? { agent: true } : {}), ...(photo ? { photo } : {}), letter: sent ? initialsOf(team?.byId.get(sent.from)?.name || from || '?') : from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i, engineFacts)), title: rowTitle(i), from: ended ?? (from ? `${from}${asks}` : null), priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null) };
+      return { key: `${i.product}/${i.id}`, ...(mate ? { face: faceSeed(mate) } : {}), ...(!from && !mate ? { agent: true } : {}), ...(photo ? { photo } : {}), letter: sent ? initialsOf(team?.byId.get(sent.from)?.name || from || '?') : from ? from.slice(0, 1).toUpperCase() : engineLetter(rowEngine(i, engineFacts)), title: rowTitle(i), from: ended ?? (from ? `${from}${asks}` : null), priority: rowPriorityId(shownPriority(i)), project, at: sentAtOf(i), unread: isUnread(i, seenAt, unreadSince, team?.me ?? null), ...(i.pinned && i.status !== 'done' ? { pinned: true } : {}) };
     },
   }) : [];
   const homeTeam = !homeShown || !teamMode ? null : teamCard(members.filter((m) => m.kind === 'person' || (m.kind === 'mate' && m.key.startsWith('mate:'))).map((m): TeamRow => {
@@ -8257,7 +8262,7 @@ export default function App() {
                   onReplyClose={() => setModal(null)}
                   onStop={() => stopAgent(focused)}
                   onRunNow={() => runNow(focused)}
-                  onPin={focused.agent ? undefined : (pin) => pinThread(focused.id, pin, true)}
+                  onPin={focused.agent ? undefined : (pin) => pinFromMenu(focused.id, pin)}
                   place={focused.agent ? null : threadPlace(focused, snap.supervisor.running.find((r) => r.itemId === focused.id) ?? null, snap.cloud ?? null, runningEngine)}
                   onPlace={(keep) => placeThread(focused, keep, false)}
                   pageAsk={threadAsk?.key === keyOf(focused) ? threadAsk : null}
