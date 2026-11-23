@@ -7,7 +7,7 @@
 // second line saying what came back, led by who said it when that was a person
 // or an AI teammate. It also draws one 24px face per row, its top on the top of
 // the title's capitals, and centres status, project, priority and time on the
-// two lines. The orange unread square is gone; the heavier title stays.
+// two lines. The orange unread dot stays in the gutter, level with the title.
 // Measured on the built page at the founder's zoom (2.4 pixels a point) by
 // finding each face's and each letter's first row of ink: every face started on
 // its title's first row, and every cell's middle sat within half a device pixel
@@ -120,8 +120,10 @@ describe('on the desktop', () => {
     expect(rule('.th-table .row:not(.th-head) .th-cell-state.has-card:hover')).toMatch(/z-index: 30;/);
   });
 
-  it('an unread thread has no orange square, only its heavier title', () => {
-    expect(rule('.th-table .row.unread::before')).toMatch(/display: none;/);
+  // Measured: the x-height of 14.5px Geist is centred 28px into the row, and so is the 6px dot at 25px.
+  it("an unread thread's dot stays in the gutter, level with the title's lowercase, not half way down two lines", () => {
+    expect(rule('.th-table .row.unread::before')).toMatch(/top: 25px;/);
+    expect(rule('.th-table .row.unread::before')).not.toMatch(/display: none/);
     expect(pages).toMatch(/:root \.th-table \.row\.unread \.subject \{ font-weight: 530; \}/);
   });
 });

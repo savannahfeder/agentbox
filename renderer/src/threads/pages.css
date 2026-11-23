@@ -716,6 +716,6 @@ body:has(.tm-tab[data-clicked]:hover) .hint-plate { display: none !important; }
   .th-table .row:not(.th-head) .th-grid.has-line > .th-cell-when { top: 0.5px; }
   /* The transform makes the cell its own layer; this keeps its card over the rows below. */
   .th-table .row:not(.th-head) .th-cell-state.has-card:hover { z-index: 30; }
-  /* Unread is the heavier title alone: the orange square read as clutter. */
-  .th-table .row.unread::before { display: none; }
+  /* The unread dot stays in the gutter, level with the title's lowercase rather than half way down a two-line row. */
+  .th-table .row.unread::before { top: 25px; }
 }

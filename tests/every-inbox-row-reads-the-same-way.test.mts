@@ -109,8 +109,8 @@ describe('where the face sits', () => {
     expect(css).not.toMatch(/(?<!:not\()\.th-head[^{]*\{[^}]*padding-left/);
   });
 
-  // The desktop draws no unread square since w-6714ad1360 (tests/an-inbox-row-has-two-lines-and-its-face-sits-on-the-title).
-  it('puts no unread mark on the face', () => {
+  it('leaves the unread dot in the margin', () => {
+    expect(css).not.toMatch(/\.row\.unread[^{]*::before\s*\{[^}]*display: none/);
     expect(css).not.toMatch(/\.th-slot::after/);
   });
 });

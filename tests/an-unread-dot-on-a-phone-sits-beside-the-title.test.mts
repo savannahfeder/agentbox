@@ -37,9 +37,9 @@ describe('the unread dot', () => {
     expect(phone).toMatch(/\.row\.selected:not\(\.unread\)::before, :root:root:root \.row\.selected::after \{ display: none; \}/);
     expect(phone).not.toMatch(/:root:root:root \.row\.selected::before/);
   });
-  // The phone's dot is drawn by the base rule; the desktop window hides it since w-6714ad1360.
-  it('and is drawn from the base rule, which the desktop window hides', () => {
+  // A desktop row has two lines since w-6714ad1360, so its dot is level with the title, not half way down.
+  it('and on the desktop stays in the gutter, level with the title', () => {
     expect(rule(pages, '.th-table .row.unread::before')).toMatch(/left: 13px; top: 50%;[^}]*background: var\(--accent\)/);
-    expect(pages).toMatch(/@media \(min-width: 701px\) and \(min-height: 521px\) \{[^@]*\n {2}\.th-table \.row\.unread::before \{ display: none; \}/);
+    expect(pages).toMatch(/@media \(min-width: 701px\) and \(min-height: 521px\) \{[^@]*\n {2}\.th-table \.row\.unread::before \{ top: 25px; \}/);
   });
 });
