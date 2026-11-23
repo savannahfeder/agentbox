@@ -262,6 +262,7 @@ import { usePointerHold, useHeldOrder } from './threads/steady-rows';
 import { inviteRows, leadRows, type InviteRow, type LeadRow } from './threads/needs-you-rows';
 import { InviteCards, InviteRows } from './threads/InviteRows';
 import { mentionRows } from './team/rooms/room-rules';
+import { notMarkedDone, useChatsMarkedDone } from './team/rooms/chats-marked-done';
 import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheLastToast, opensTheToast, saysWhereItWent, toastOpens, toastParts, type LastToast, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
 import { TickedBar } from './components/TickedBar';
@@ -2548,7 +2549,8 @@ export default function App() {
   }, [teamMode, view, search, onBoard, shownAs, progressTab, snoozed, done, now, stackFolded, repeats.length, directSlugs]);
   // THE ROWS ABOVE THE THREADS (./threads/needs-you-rows). The Mac's rooms hold
   // them whether or not the Groups page has been opened.
-  const groupRows = useMemo(() => (snap?.alpha?.rooms && snap?.team?.rooms?.on ? mentionRows(snap.team.rooms.mentions, snap.team.rooms) : []), [snap?.alpha?.rooms, snap?.team?.rooms]);
+  const chatsDone = useChatsMarkedDone();
+  const groupRows = useMemo(() => (snap?.alpha?.rooms && snap?.team?.rooms?.on ? mentionRows(notMarkedDone(snap.team.rooms.mentions, chatsDone.done), snap.team.rooms) : []), [snap?.alpha?.rooms, snap?.team?.rooms, chatsDone.done]);
   const allLeads = useMemo(() => leadRows(
     inviteRows(snap?.team?.invites),
     groupRows,
@@ -2611,6 +2613,7 @@ export default function App() {
   // On a lead row by J and K, or the only thing left to be on.
   const keyLeadPicked = cardSel?.startsWith('lead/') ? allLeads.find((l) => `lead/${l.key}` === cardSel) ?? null : null;
   const keyLead = keyLeadPicked ?? (view === 'inbox' && search === null && !current && !keyCard ? heldLeads.rows[0] ?? null : null);
+  const chatRow = keyLead?.mention ?? null;
   // The row above the threads is first in the walk, so the mark starts there.
   const firstLead = view === 'inbox' && search === null && !focused ? heldLeads.rows[0] ?? null : null;
   // Anything else that moves the keyboard takes it off their row. The people
@@ -3645,7 +3648,7 @@ export default function App() {
   // over whichever one you opened. The Chats page and its sidebar row are gone;
   // their chats open under the cards.
   const roomsUi = useRooms({
-    rooms: snap?.team?.rooms, on: !!snap?.alpha?.rooms, meId: snap?.team?.me?.id ?? null,
+    rooms: snap?.team?.rooms, on: !!snap?.alpha?.rooms, meId: snap?.team?.me?.id ?? null, chatsDone,
     myName: snap?.team?.rooms?.me?.display_name ?? '', fullName: snap?.team?.me?.name ?? '', hasTeam: !!snap?.team?.team, now: Date.now(), toast: showToast,
     team: snap?.team?.people, directs,
     onOpenDirect: (id) => { const item = items.find((i) => i.id === id); if (item) { setChatsDirect(id); setTeamOpen(false); setSettingsOpen(false); setFocused(item); markSeen(item); } },
@@ -3682,6 +3685,14 @@ export default function App() {
   const answerLead = (l: LeadRow) => {
     if (l.invite) void joinInvite(l.invite);
     else if (l.mention) roomsUi.openMention(l.mention, 'inbox');
+  };
+  // The keyboard goes on to the row under it, as after E on a thread; with no
+  // row of this kind under it, the first thread is next.
+  const chatRowDone = (row: NonNullable<LeadRow['mention']>) => {
+    const at = heldLeads.rows.findIndex((l) => l.mention?.roomId === row.roomId);
+    const next = at >= 0 ? heldLeads.rows[at + 1] ?? null : null;
+    if (next) setCardSel(`lead/${next.key}`);
+    roomsUi.markChatDone(row);
   };
   const leadRowsDrawn = (rows: LeadRow[]) => rows.map((l) => (l.invite
     ? <InviteRows key={l.key} rows={[l.invite]} onJoin={(r) => void joinInvite(r)} onOpen={openInvite} selected={keyLeadPicked?.key ?? null} />
@@ -6137,6 +6148,7 @@ export default function App() {
           if (view === 'snoozed') unsnooze(multiSel.size ? selectable.filter((i) => multiSel.has(i.id)) : pointed ? [pointed] : []);
           else if (multiSel.size) batchDone(multiSel);
           else if (pointed && view === 'inbox') markDone(pointed);
+          else if (chatRow && view === 'inbox') chatRowDone(chatRow);
           break;
         case 'r': case 'R': if (!multiSel.size && pointed && replyKeyWorksIn(view)) { e.preventDefault(); const whose = replyingTo({ people: conversationNames(pointed) }); if (whose) showToast(whose); setFocused(pointed); markSeen(pointed); setModal('reply'); } break;
         // 1 AND 2 ANSWER A CODEX CONVERSATION'S ROW WITHOUT OPENING IT, and I
@@ -8442,6 +8454,9 @@ export default function App() {
         findInside={insideForPalette}
         onSearchFor={searchFor}
         itemCommands={(() => {
+          // A chat covers the list, so nothing here may act on a row behind it.
+          // E is a letter for the chat's box there, so its Mark done has no key.
+          if (roomShown) return roomsUi.markDoneHere ? [{ id: 'done', label: `Mark ${DONE.verb.toLowerCase()}`, run: () => { setModal(null); roomsUi.markDoneHere?.(); } }] : [];
           // A cmd-A (or shift-J/K) selection turns the palette into batch
           // mode: every command it offers acts on the whole selection, and
           // single-item commands (Reply, Approve) drop out rather than
@@ -8500,6 +8515,7 @@ export default function App() {
             }));
           }
           const target = focused ?? (onPhone() ? null : pointed);
+          if (!target && chatRow && !onPhone()) return [{ id: 'done', label: `Mark ${DONE.verb.toLowerCase()}`, keyHint: 'E', run: () => { setModal(null); chatRowDone(chatRow); } }];
           if (!target) return [];
           const options = itemOptions(target);
           const recommended = options.find((o) => o.recommended) ?? options[0];
