@@ -24,6 +24,8 @@ import type { LineVersion, VersionLine } from './version-line.mts';
 import type { SavedVersion } from './file-version.mts';
 import type { Store, StoreProduct } from './store.mts';
 import type { FilesKeeper, KeptVersion } from './files-cloud.mts';
+import { looseFilesIn } from './files-loose.mts';
+import { ICON_KINDS } from './project-identity.mts';
 import type { createTeamService } from './team/index.mts';
 
 type FilesTeam = ReturnType<typeof createTeamService>;
@@ -147,6 +149,9 @@ const toCloudFamily = (family: string): string => family.split('\0').map(encodeU
 const fromCloudFamily = (family: unknown): string => String(family).split('/').map(decodeURIComponent).join('\0');
 const CROSS_EVERY_MS = 10_000;
 const UNDO_KEEP_MS = 10 * 60_000;
+const DAY_MS = 24 * 60 * 60_000;
+// A thread its agent may still work on: its folder stays on this computer.
+const OPEN_STATUSES = new Set(['open', 'claimed', 'blocked']);
 // What New makes, and what it starts with: a table needs its columns to be typed into.
 const MADE: Record<MadeKind, { ext: string; seed: string; untitled: string }> = {
   document: { ext: '.md', seed: '', untitled: 'Untitled document' },
@@ -847,7 +852,16 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
   // Files moves only what sits in a project's own documents or among the
   // version line's kept copies, never anything inside a code folder.
   interface Roots { allow: string[]; deny: string[] }
-  const realOr = (p: string): string => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
+  // Through the nearest folder that exists: a root not made yet, such as the
+  // kept versions' before a first pass, still names the files later made in it.
+  const realOr = (p: string): string => {
+    const rest: string[] = [];
+    for (let at = path.resolve(p); ; at = path.dirname(at)) {
+      try { return path.join(fs.realpathSync(at), ...rest); } catch { /* not there yet */ }
+      if (path.dirname(at) === at) return path.resolve(p);
+      rest.unshift(path.basename(at));
+    }
+  };
   function rootsNow(): Roots {
     const products = store.listProducts();
     return {
@@ -856,8 +870,8 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
     };
   }
   const within = (dir: string, file: string): boolean => { const rel = path.relative(dir, file); return !!rel && !rel.startsWith('..') && !path.isAbsolute(rel); };
-  function movableIn(roots: Roots, file: string): boolean {
-    const real = realOr(file);
+  const movableIn = (roots: Roots, file: string): boolean => movableReal(roots, realOr(file));
+  function movableReal(roots: Roots, real: string): boolean {
     if (real.split(path.sep).includes('.git') || roots.deny.some((d) => within(d, real))) return false;
     if (isProjectsOwnFile(path.basename(real)) && roots.allow.includes(path.dirname(real))) return false;
     return roots.allow.some((a) => within(a, real));
@@ -947,19 +961,83 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
         const paths = await pathsOf(whole, v, products);
         const st = paths[0] ? await fs.promises.stat(paths[0]).catch(() => null) : null;
         if (!st || !v.hash) continue;
-        out.push({ hash: v.hash, size: st.size, paths, kind: whole.kind, at: v.at || st.mtimeMs, name: v.name, movable: paths.every((p) => movableIn(roots, p)) });
+        const threads = paths.map(threadFolderOf).filter((k): k is string => !!k);
+        out.push({
+          hash: v.hash, size: st.size, paths, kind: whole.kind, at: v.at || st.mtimeMs, name: v.name, movable: paths.every((p) => movableIn(roots, p)),
+          ...(threads.length ? { staysNow: () => threads.some((k) => workingNow().has(k)) } : {}),
+        });
+      }
+    }
+    return [...out, ...await looseVersions(out, roots)];
+  }
+
+  // The threads an agent may still work on, read again at most every half minute while a pass runs for hours.
+  let working: { at: number; keys: Set<string> } = { at: 0, keys: new Set() };
+  function workingNow(): Set<string> {
+    if (Date.now() - working.at > 30_000) {
+      working = { at: Date.now(), keys: new Set(store.listAllWorkItems().filter((i) => OPEN_STATUSES.has(i.status ?? '')).map((i) => `${i.product}/${i.id}`)) };
+    }
+    return working.keys;
+  }
+  /** `<project>/<thread>` for a path inside a thread's own designs folder. */
+  function threadFolderOf(file: string): string | null {
+    const at = path.resolve(file);
+    for (const p of store.listProducts()) {
+      if (!p.dir) continue;
+      const parts = path.relative(path.resolve(p.dir), at).split(path.sep);
+      if (parts[0] === 'designs' && parts.length > 2) return `${p.slug}/${parts[1]}`;
+    }
+    return null;
+  }
+
+  // Most of what agents make is never named one by one, and threads old enough
+  // drop off the list the app reads, so their folders are looked through too.
+  // Only what is old enough to leave is weighed: hashing the rest is wasted.
+  async function looseVersions(named: readonly KeptVersion[], roots: Roots): Promise<KeptVersion[]> {
+    const { offAfterDays } = keeper!.status();
+    if (offAfterDays <= 0) return [];
+    const before = Date.now() - offAfterDays * DAY_MS;
+    // Plain paths, not real ones: a twin missed here is still one version once the keeper joins them by their bytes.
+    const claimed = new Set(named.flatMap((v) => v.paths.map((p) => path.resolve(p))));
+    const products = store.listProducts().filter((p) => p.dir);
+    // The project's own mark, which the app draws without asking for it back (main/project-identity.mts).
+    for (const p of products) for (const ext of ICON_KINDS) claimed.add(path.resolve(p.dir, `icon${ext}`));
+    const places = [
+      ...products.map((p) => ({ dir: p.dir, slug: p.slug as string | null, skip: p.repoPath ? [p.repoPath] : [] })),
+      { dir: path.join(logDir(), '.file-versions', 'version-bytes'), slug: null, skip: [] },
+    ];
+    const out: KeptVersion[] = [];
+    for (const place of places) {
+      // The walk follows no link, so a file's real place is its folder's real place and the rest of its path.
+      const realDir = realOr(place.dir);
+      for (const f of await looseFilesIn(place.dir, { skip: place.skip })) {
+        const key = place.slug && f.thread ? `${place.slug}/${f.thread}` : null;
+        if (f.at >= before || (key && workingNow().has(key)) || claimed.has(path.resolve(f.path))) continue;
+        const bytes = await lineNow().hashOf(f.path);
+        if (!bytes) continue;
+        out.push({
+          hash: bytes.hash, size: bytes.size, paths: [f.path], kind: f.kind, at: f.at, name: path.basename(f.path),
+          movable: movableReal(roots, path.join(realDir, path.relative(place.dir, f.path))), loose: true,
+          ...(key ? { staysNow: () => workingNow().has(key) } : {}),
+        });
       }
     }
     return out;
   }
   const CONSIDER_EVERY_MS = 10 * 60_000;
   let consideredAt = 0;
-  function consider(force = false): void {
-    if (!keeper || (!force && Date.now() - consideredAt < CONSIDER_EVERY_MS)) return;
+  let considering: Promise<void> | null = null;
+  let shared = false;
+  function consider(force = false): Promise<void> {
+    if (!keeper || considering || (!force && Date.now() - consideredAt < CONSIDER_EVERY_MS)) return considering ?? Promise.resolve();
     consideredAt = Date.now();
+    // Before the first pass, so a kept copy is never made again while the pass takes it off.
+    const sharing = shared ? Promise.resolve() : lineNow().shareKeptCopies().then(() => { shared = true; }, (err: Error) => { console.warn(`files: kept copies were not shared: ${err.message}`); });
     // Without a plan for files a pass needs no versions: it only brings back what an ended plan kept.
-    void keeper.wantsVersions().then(async (want) => keeper.pass(want ? await keptVersions() : []))
-      .catch((err: Error) => { console.warn(`files: the cloud pass could not start: ${err.message}`); });
+    considering = sharing.then(() => keeper.wantsVersions()).then(async (want) => keeper.pass(want ? await keptVersions() : []))
+      .catch((err: Error) => { console.warn(`files: the cloud pass could not start: ${err.message}`); })
+      .finally(() => { considering = null; });
+    return considering;
   }
 
   // Shared and group threads are only listed with a team, and a group's only with its rooms.
@@ -1419,14 +1497,19 @@ export function appFilesPlace({ store, team = null, accountRoot, storeRoot, noti
       return { ok: true, back };
     },
 
-    /** A thread's files kept in the cloud, brought back as its agent starts. False when one could not come in time. */
+    /** A thread's files kept in the cloud, and its own folder's, brought back as its agent starts. False when one could not come in time. */
     async bringBackFor({ product, id, deadlineMs = 5 * 60_000 }: { product: string; id: string; deadlineMs?: number }): Promise<boolean> {
       if (!keeper || !keeper.status().offBytes) return true;
       const waits: Promise<boolean>[] = [];
+      const products = readable();
+      const sharedIn = new Map<string | null, boolean>();
       for (const whole of allFiles().filter((f) => f.chain.some((v) => v.copies.some((c) => c.thread.ref.product === product && c.thread.ref.id === id)))) {
-        const { chain } = await lineChain(whole);
+        if (!sharedIn.has(whole.project)) sharedIn.set(whole.project, audienceOf(whole.project) !== 'private');
+        const { chain } = await lineChain(whole, sharedIn.get(whole.project), products);
         for (const v of chain) if (v.hash && !v.opened && keeper.off(v.hash)) waits.push(keeper.bringBack(v.hash));
       }
+      const own = store.listProducts().find((p) => p.slug === product)?.dir;
+      if (own) for (const hash of keeper.offUnder(path.join(own, 'designs', id))) waits.push(keeper.bringBack(hash));
       if (!waits.length) return true;
       let timer: NodeJS.Timeout | undefined;
       const late = new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(false), deadlineMs); timer.unref?.(); });

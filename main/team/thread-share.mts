@@ -23,7 +23,7 @@ import path from 'node:path';
 import { artifactRoots, resolveArtifact } from '../artifact-path.mts';
 import { bytesOf, hideSecrets } from '../../shared/phone-snapshot.mts';
 import { isShared, runnerOf } from '../../shared/team-rules.mts';
-import { cleanMark, editedWords, familyName, fileNewsFor, filesInLines, isBookkeepingMark, marksOf, threadFiles } from '../../shared/artifact-marks.mts';
+import { cleanMark, editedWords, familyName, fileNewsFor, filesInLines, isBookkeepingMark, marksOf, TEAMMATE_MARK, threadFiles } from '../../shared/artifact-marks.mts';
 import { saveNextVersion } from '../file-version.mts';
 import { MAX_MESSAGE_FILE_BYTES } from './sync.mts';
 import { MAX_SHARED_SENT_BYTES as MAX_SENT_BYTES, PART_BYTES } from '../../shared/carried-files.mts';
@@ -528,7 +528,7 @@ export function createThreadShare({
 
   const asLine = (row: ThreadFileMark): (SharedLine & { uid: string; patch: { artifact: Mark } }) | null => {
     const artifact = cleanMark(row.mark);
-    return artifact ? { id: row.threadId, ts: row.at, source: 'system', by: row.by, uid: `mark-${row.id}`, patch: { artifact } } : null;
+    return artifact ? { id: row.threadId, ts: row.at, source: 'system', by: row.by, uid: `${TEAMMATE_MARK}${row.id}`, patch: { artifact } } : null;
   };
 
   /** Everything marked on one teammate's thread: what its owner published, what the cloud holds, what is waiting to go. */

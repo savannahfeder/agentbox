@@ -10335,9 +10335,17 @@ export class Supervisor {
       }
       if (this.sessions.has(current.id)) return;
       if (this._answerDelivered(current)) return;
-      this._handledAnswers.add(this._answerKey(current));
+      // The run closed its thread before it heard these words, and a closed
+      // thread refuses the claim the next run makes. One she closed stays closed.
+      let next = current;
+      if (current.status === 'done') {
+        if (current.wrote?.status?.source === 'founder') return;
+        this.store.answerItem(current.product, current.id, { status: 'open' });
+        next = { ...current, status: 'open' };
+      }
+      this._handledAnswers.add(this._answerKey(next));
       this._saveState();
-      this.spawnWorker(current, { continuation: true });
+      this.spawnWorker(next, { continuation: true });
     } catch {}
   }
 
@@ -10399,7 +10407,7 @@ export class Supervisor {
   // it did. It is here for the two resume paths only: a session belongs to the
   // harness that wrote it, and a thread id handed to the wrong CLI dies on
   // arrival with "No conversation found with session ID".
-  spawnPlan(item: WorkItem, product: Product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE, shipFailure = null, switched = false, movedHere = false, cloudNote = null }: { continuation?: boolean; resumeSessionId?: string | null; engine?: string; shipFailure?: string | null; switched?: boolean; movedHere?: boolean; cloudNote?: string | null } = {}): SpawnPlan {
+  spawnPlan(item: WorkItem, product: Product, { continuation = false, resumeSessionId = null, engine = DEFAULT_ENGINE, shipFailure = null, switched = false, movedHere = false, cloudNote = null, cloud = false }: { continuation?: boolean; resumeSessionId?: string | null; engine?: string; shipFailure?: string | null; switched?: boolean; movedHere?: boolean; cloudNote?: string | null; cloud?: boolean } = {}): SpawnPlan {
     // A ROW'S OWN CHAT. Her reply on a row goes back to the session that wrote
     // what she is replying to. Four guards, and each one falls back to the old
     // behaviour rather than to anything worse:
@@ -10512,8 +10520,9 @@ export class Supervisor {
     if (earlyConflict) prompt = `${prompt}\n\n${earlyConflict}`;
     // WHAT HAPPENS TO WHAT IT LEAVES RUNNING, when that switch is on
     // (main/leftovers.mts): the rule, and the programs of this task still
-    // shutting down, which it must not reuse.
-    const leftoverNote = this.leftoverBriefNote(item);
+    // shutting down, which it must not reuse. Not in the cloud, whose machine
+    // goes with the run (main/cloud/run.mts `LIVE_NOTE`).
+    const leftoverNote = cloud ? null : this.leftoverBriefNote(item);
     if (leftoverNote) prompt = `${prompt}\n\n${leftoverNote}`;
     if (cloudNote) prompt = `${prompt}\n\n${cloudNote}`;
     // A request the cloud handed back (`_toldItMoved`).
@@ -12534,7 +12543,7 @@ export class Supervisor {
     }
 
     const cloudNote = where === 'local' ? this._cloudNoteForHere(item, product, cwd, engine) : null;
-    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine, shipFailure, switched, movedHere: this._toldItMoved(item, where), cloudNote });
+    const plan = this.spawnPlan(item, product, { continuation, resumeSessionId, engine, shipFailure, switched, movedHere: this._toldItMoved(item, where), cloudNote, cloud: where === 'cloud' });
     const { args } = plan;
     // Why it runs locally, where a branch below says so rather than `_whyLocal`.
     let whyLocal: WhyLocal | null = null;
@@ -13864,7 +13873,7 @@ export class Supervisor {
     const fresh = product ? this.store.readItem?.(item.product, item.id) ?? item : null;
     if (!fresh) return;
     const engine = engineOf(session?.engine);
-    const plan = this.spawnPlan({ ...fresh, answer: REPLY_MARK, status: 'open', wrote: { ...(fresh.wrote ?? {}), answer: { ts: Date.now(), source: 'founder' } } }, product!, { continuation: true, engine });
+    const plan = this.spawnPlan({ ...fresh, answer: REPLY_MARK, status: 'open', wrote: { ...(fresh.wrote ?? {}), answer: { ts: Date.now(), source: 'founder' } } }, product!, { continuation: true, engine, cloud: true });
     const frame = plan.command ? null : replyFrame(plan.prompt);
     if (!frame) return;
     const profile = plan.resumeProfile ?? session.profile;
@@ -13967,7 +13976,7 @@ export class Supervisor {
   }
 
   _writeClaudeNewThreadKit({ slug, stub, product, root, defaultEngine, rec, plain }: NewKitCtx) {
-    const plan = this.spawnPlan(stub, product!, { continuation: false, engine: 'claude' });
+    const plan = this.spawnPlan(stub, product!, { continuation: false, engine: 'claude', cloud: true });
     if (plan.command || plan.resumeId) return;
     const frame = replyFrame(this.replyBrief({ ...stub, answer: REPLY_MARK }, { product }));
     if (!frame) return;
@@ -13993,7 +14002,7 @@ export class Supervisor {
   // names marked) with the turn's own settings, and its brief. Her title and
   // body go only into the first turn, so a start that carried them is none.
   _writeCodexNewThreadKit({ slug, stub, product, root, defaultEngine, rec, plain }: NewKitCtx) {
-    const plan = this.spawnPlan(stub, product!, { continuation: false, engine: 'codex' });
+    const plan = this.spawnPlan(stub, product!, { continuation: false, engine: 'codex', cloud: true });
     if (plan.command || plan.resumeId || plan.reviewTarget) return;
     const frame = replyFrame(this.replyBrief({ ...stub, answer: REPLY_MARK }, { product }));
     if (!frame) return;
@@ -14796,7 +14805,8 @@ export class Supervisor {
     // AGENTBOX_KEEP=1 is still honoured but no longer asked for: the task's
     // rule decides what stays, not the agent's guess about what is needed.
     if (cleaner.enabled) {
-      parts.push('Anything you leave running after your turn (a dev server, a preview, a background job) keeps running while this task is open and is stopped when the person closes it, or sooner if this computer runs critically short of memory. '
+      parts.push('Anything you leave running after your turn (a dev server, a preview) keeps running while this task is open and is stopped when the person closes it, or sooner if this computer runs critically short of memory. '
+        + 'Start what the person will use so it outlives your turn, `nohup <command> > <log file> 2>&1 &`, not as a background job of your own (run_in_background): your answer waits until those end, and they end with your session. '
         + 'Stop anything you started that the person will not need before you finish.');
     }
     const stopping = cleaner.stoppingNote(item.id);

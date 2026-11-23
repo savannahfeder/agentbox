@@ -1088,7 +1088,7 @@ export function planWakes({ teammates = [], chat = { messages: [], seen: new Set
           continue;
         }
       }
-      // `yours`: the primary passing on what your own words asked of it.
+      // `yours`: a teammate passing on what your own words asked of it.
       const hold = !fromYou && !m.yours && (selfPass || t.handoffsNeedYes !== false);
       const home = fromYou ? null : homeOf(t, m);
       if (home && !closedByYou(home)) {
