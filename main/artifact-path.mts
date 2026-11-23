@@ -41,6 +41,8 @@ import { carryOf, partFile, shelvedFor, threadFileComing } from './team/carried-
 import type { Dirent } from 'node:fs';
 import type { CarryState } from '../shared/carried-files.mts';
 import type { ThreadLine } from '../shared/artifact-marks.mts';
+import { shownName } from '../shared/artifact-marks.mts';
+import { attachmentName } from './save-attachments.mts';
 
 export interface ArtifactProduct {
     slug?: string;
@@ -318,6 +320,25 @@ export function notFoundMessage(raw: string, own: ArtifactProduct | null | undef
         return `${raw} could not be opened. ${product ? `“${product}”` : 'That project'} is not set up in ${NAME}.`;
     return `${raw} is not in ${name}. Nothing was opened.`;
 }
+// A message's file is kept under a stamped name (save-attachments.mts), and the
+// words around it name it by its own: the newest copy of that name is the one meant.
+async function attachedNamed(dir: string, raw: string, fs: ArtifactFs, now: number, fresh: boolean): Promise<string | null> {
+    if (raw.includes('/'))
+        return null;
+    const own = attachmentName(raw);
+    const folder = path.join(dir, 'attachments');
+    const list = (): Promise<string[]> => fs.promises.readdir(folder).catch(() => []);
+    let best: { full: string; m: number } | null = null;
+    for (const name of await freshly(`attached:${folder}`, fs, now, list, fresh)) {
+        if (name === own || shownName(`attachments/${name}`) !== own)
+            continue;
+        const full = path.join(folder, name);
+        const m = await fs.promises.stat(full).then((s) => s.mtimeMs, () => -1);
+        if (m >= 0 && (!best || m > best.m))
+            best = { full, m };
+    }
+    return best?.full ?? null;
+}
 const THREAD_ID = /^w-[0-9a-f]{6,}$/i;
 // A script's output is in no record of what an agent wrote, and a run works in
 // its own checkout, which the hunt skips for being hidden. So a name means a file
@@ -590,6 +611,9 @@ export async function resolveArtifact({ src, product, products = [], accountRoot
         if (fs.existsSync(full))
             return withCarry({ ok: true, path: full });
     }
+    const attached = own?.dir ? await attachedNamed(own.dir, raw, fs, now, fresh) : null;
+    if (attached)
+        return withCarry({ ok: true, path: attached });
     // A folder given back has nothing to walk: most threads asked about are finished.
     if (mine && mineIsThere && raw.split('/')[0] !== 'runs') {
         const found = await huntByName(path.basename(raw), [mine], fs, now, fresh, raw);
