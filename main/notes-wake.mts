@@ -87,6 +87,27 @@ export async function noteToItsAgent({ store, supervisor, product, id, mark, nam
   return handOn({ store, supervisor, product, id, text: words.join('\n\n'), sent, handOffMs });
 }
 
+/** The notes a Send named that its agent has still not been handed. */
+export function notesLeftUnsent({ store, product, id, mark, people = [] }: {
+  store: NoteReadStore;
+  product: string;
+  id: string;
+  mark: Mark | null | undefined;
+  people?: readonly NotePerson[];
+}): string[] {
+  const ids = mark?.do === 'toagent' ? mark.on ?? [] : [];
+  if (!ids.length || store.listProducts().find((p) => p.slug === product)?.team?.direct) return [];
+  const item = store.readItem(product, id);
+  if (!item || heldByAPerson(item)) return [];
+  return (item.artifacts?.notes ?? [])
+    .filter((n) => ids.includes(n.id) && !n.resolved && (!n.sent || unsentReplies(n, people).length > 0))
+    .map((n) => n.id);
+}
+
+export const notReached = (left: readonly string[]): string => (left.length === 1
+  ? 'The note is saved, but it did not reach the agent.'
+  : 'The notes are saved, but they did not reach the agent.');
+
 // A reply typed in the thread takes every comment of yours still waiting for
 // Send with it, so the agent hears them in the same turn. Null when none wait.
 export function replyWithWaitingNotes({ store, product, id, answer, me = null, nameOf = () => 'the person writing to you', people = [] }: {

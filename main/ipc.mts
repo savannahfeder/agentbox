@@ -1,6 +1,6 @@
 import { openSourceFile } from './open-source-file.mts';
 import {submitReply} from './live-replies.mts';
-import { noteToItsAgent, replyWithWaitingNotes, waitingNotes } from './notes-wake.mts';
+import { noteToItsAgent, notesLeftUnsent, notReached, replyWithWaitingNotes, waitingNotes } from './notes-wake.mts';
 import { leftByAMove } from '../shared/move-thread.mts';
 import { moveThread } from './move-thread.mts';
 import { whereTheWorkStands, type WorkStands } from './git-change.mts';
@@ -1336,8 +1336,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       store.fileMark(product, id, mark);
       push();
       void team?.syncNow?.()?.catch?.(() => {});
-      try { await noteToItsAgent({ store, supervisor, product, id, mark: mark as Mark, nameOf: noteBy, people: teamPeople() }); }
+      let handed = false;
+      try { handed = await noteToItsAgent({ store, supervisor, product, id, mark: mark as Mark, nameOf: noteBy, people: teamPeople() }); }
       catch (err) { return { ok: false, error: `The note is saved, but it did not reach the agent: ${(err as Error)?.message ?? err}` }; }
+      const left = handed ? [] : notesLeftUnsent({ store, product, id, mark: mark as Mark, people: teamPeople() });
+      if (left.length) return { ok: false, error: notReached(left) };
       return { ok: true };
     } catch (err) {
       return { ok: false, error: String((err as Error)?.message ?? err) };
@@ -2810,8 +2813,11 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     const { wrote, ...out } = await filesPlaceNow().mark(String(key ?? ''), mark);
     if (out.ok) { push(); void team?.syncNow?.()?.catch?.(() => {}); }
     if (out.ok && wrote) {
-      try { await noteToItsAgent({ store, supervisor, ...wrote, mark: mark as Mark, nameOf: noteBy, people: teamPeople() }); }
+      let handed = false;
+      try { handed = await noteToItsAgent({ store, supervisor, ...wrote, mark: mark as Mark, nameOf: noteBy, people: teamPeople() }); }
       catch (err) { return { ok: false, error: `The note is saved, but it did not reach the agent: ${(err as Error)?.message ?? err}` }; }
+      const left = handed ? [] : notesLeftUnsent({ store, ...wrote, mark: mark as Mark, people: teamPeople() });
+      if (left.length) return { ok: false, error: notReached(left) };
     }
     return out;
   });
