@@ -574,7 +574,9 @@ export function createTeamService({
     });
     const lines = store.readHistory(product.slug, row.id, { max: Number.MAX_SAFE_INTEGER }).filter(Boolean);
     // The newest review or help a teammate handed back, which the giver's note often points at, though they wrote since.
-    const back = [...lines].reverse().find((l) => typeof l.patch?.answer === 'string' && (l.patch.from as { teammate?: unknown } | undefined)?.teammate);
+    // `app` is the app's own notice on the thread (main/teammate-reach.mts), nobody's review.
+    const fromWho = (l: TeamHistoryLine) => (l.patch?.from as { teammate?: unknown } | undefined)?.teammate;
+    const back = [...lines].reverse().find((l) => typeof l.patch?.answer === 'string' && fromWho(l) && fromWho(l) !== 'app');
     const backWho = (back?.patch?.from as { teammate?: string; name?: string } | undefined);
     const backName = backWho ? state.people.find((p) => p.id === backWho.teammate)?.name?.split(/\s+/)[0] || backWho.name?.split(/\s+/)[0] || 'A teammate' : '';
     const words = titled([
