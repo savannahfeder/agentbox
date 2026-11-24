@@ -8,7 +8,7 @@ import Svg, { Path, Rect } from 'react-native-svg';
 import { KIND_PLURAL, kindsIn, sizeWords } from '../../../renderer/src/files/files-shown';
 import { updatedWords } from '../../../renderer/src/threads/page-rules';
 import type { FileKind } from '../../../renderer/src/types';
-import { filesOnPhone, phoneFiles, type PhoneFile } from '../lib/files-place';
+import { filesOnPhone, phoneFiles, threadOfChange, type PhoneFile } from '../lib/files-place';
 import { linkToShare, openingOf, pictureLink, pictureSource } from '../lib/files';
 import { router } from '../lib/router';
 import { useCloud } from '../state/cloud';
@@ -102,6 +102,8 @@ export function FilesPlace({ tabs }: { tabs: ReactNode }) {
   const shown = filesOnPhone(files, { query, kind: k, project: place });
 
   const open = (f: PhoneFile) => {
+    const change = threadOfChange(f);
+    if (change) { openThread(change.product, change.id); return; }
     const o = openingOf(c.view.places, c.links, f.product, f.path);
     if (o.kind === 'refused') { c.say(o.error); return; }
     if (o.kind === 'elsewhere') { void WebBrowser.openBrowserAsync(o.link); return; }
