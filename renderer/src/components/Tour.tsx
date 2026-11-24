@@ -447,7 +447,7 @@ export function Tour({ tour, practice = false, practiceId = null, practiceOpen =
       {step !== 'palette' && !(step === 'urgent' && !urgentCell()) && step !== 'busy' && step !== 'gettingReady' && step !== 'inPalette' && step !== 'startHere' && <div key={`glow-${step}`} className="tour-glow" style={{ left: box.x, top: box.y, width: box.w, height: box.h }} aria-hidden="true" />}
       <div key={`card-${step}`} ref={cardRef} className="tour-card" role="status"
         style={cardAt ? { left: cardAt.left, top: cardAt.top } : { left: -9999, top: -9999 }}>
-        <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : step === 'send' && practice ? PRACTICE_SEND : step === 'working' && practiceId ? PRACTICE_WORKING : step === 'open' && practiceId ? PRACTICE_OPEN : SAY[step].words}</span>
+        <span className="tour-say">{step === 'busy' && tried ? BUSY_TOLD : step === 'inPalette' ? <InPalette /> : step === 'send' && (practice || practiceId) ? PRACTICE_SEND : step === 'working' && practiceId ? PRACTICE_WORKING : step === 'open' && practiceId ? PRACTICE_OPEN : SAY[step].words}</span>
         {step === 'busy' && !tried && <button type="button" className="tour-act" onClick={tryNotifications}>Turn on notifications</button>}
         {step === 'busy' && tried && MAC && <button type="button" className="tour-act" onClick={openNotifySettings}>Didn’t see it? Open settings</button>}
       </div>
