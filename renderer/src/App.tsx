@@ -78,7 +78,8 @@ import { ImportAgents } from './components/ImportAgents';
 import { importedLine } from './agent-import-card';
 import { whenLabel } from './components/When';
 import { RepeatFocus } from './components/RepeatFocus';
-import { Palette } from './components/Palette';
+import { Palette, type DescribedAnswer } from './components/Palette';
+import { aboutThread } from '../../shared/find-by-description.mts';
 import { CloudOffAsk } from './components/CloudOffAsk';
 import { Standing, STANDING } from './components/Standing';
 import { Settings } from './components/Settings';
@@ -151,6 +152,7 @@ import { TeammatesContext } from './teammates/row-lead';
 import { ChatsContext, ChatsFrame, LAST_CHAT_KEY, type ChatsValue } from './teammates/ChatsColumn';
 import { queuedTeammateRun, threadsItOpened } from './teammates/chat-lines';
 import { teammateIdOf } from '../../shared/teammates.mts';
+import { MatesOnContext, placeWithoutGoneMate, theDaysThreads } from './teammates/mate-place';
 import { faceSeed } from '../../shared/teammate-face.mts';
 import { asksWho } from '../../shared/auto-route.mts';
 import { RoomBoard } from './team/rooms/RoomBoard';
@@ -205,7 +207,7 @@ import { NO_FILTER, filterBox, harnessOf, isFiltering, type BoxFilter as BoxFilt
 import { URGENT_PRIORITY, itemPriority, shownPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mts';
 import { rankProducts } from './project-priority';
 import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
-import { waitingCounts } from './threads-made';
+import { waitingCounts, stateWord } from './threads-made';
 import { closeAsk, closeAskOwnsKey, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mts';
 import { wasBeforeClose } from '../../shared/reopen-as-it-was.mts';
@@ -3404,6 +3406,33 @@ export default function App() {
     })),
     ];
   }, [repeats, items, agentList, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard, stateOfMine, focused?.id]);
+  // A thread described in a sentence, found by a small AI (shared/find-by-description.mts).
+  const askAiToFind = useMemo(() => api.findByDescription(), []);
+  const findByDescription = useCallback(async (description: string): Promise<DescribedAnswer> => {
+    if (!askAiToFind) return { ok: false, error: 'This copy of the app cannot search with AI yet.' };
+    const projectOf = (slug: string) => snap?.products.find((p) => p.slug === slug)?.name ?? slug;
+    const candidates = items.map((i) => ({
+      key: `${i.product}/${i.id}`, product: i.product, title: threadSearchDetails(i, searchContext).title,
+      about: aboutThread(i), where: stateWord(stateOfMine(i) ?? (i.status === 'done' ? 'done' : null)) || 'Open',
+      at: i.updatedAt ?? i.createdAt, project: projectOf(i.product),
+    }));
+    const answer = await askAiToFind({ description, candidates });
+    if (!answer.ok) return answer;
+    const byKey = new Map(items.map((i) => [`${i.product}/${i.id}`, i]));
+    const now = Date.now();
+    return {
+      ok: true,
+      rows: answer.picks.flatMap((p) => {
+        const item = byKey.get(p.key);
+        return item ? [{
+          id: `thread-${item.product}-${item.id}`,
+          label: threadSearchDetails(item, searchContext).title,
+          ...threadResult(item, { state: stateOfMine(item), summary: p.why, project: projectOf(item.product), now }),
+          run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(item); markSeen(item); },
+        }] : [];
+      }),
+    };
+  }, [askAiToFind, items, searchContext, snap?.products, stateOfMine, search, closeSearch, markSeen]);
   // J AND K FROM AN OPEN THREAD OR AN OPEN TEAMMATE CARD (w-fb16bcaeba): open
   // the next stop, whoever's it is. Yours opens as your thread, theirs as
   // their card, exactly as a click on its row would.
@@ -3998,6 +4027,9 @@ export default function App() {
   const filesForPalette = useFilesList(modal === 'palette');
   // Today lists approvals as decisions.
   const filesForToday = useFilesList(teamMode && todayOn);
+  const mateIdsRead = snap ? (teammatesUi.live ? teammatesUi.list.map((t) => t.id) : []) : null;
+  const placeAfterMates = placeWithoutGoneMate(chatsPlace, mateIdsRead);
+  useEffect(() => { if (placeAfterMates !== chatsPlace) setChatsPlace(placeAfterMates); }, [placeAfterMates, chatsPlace]);
   // With teammates on, Groups is Chats: your AI teammates, people and groups
   // in one list, and the sidebar's row opens the chat you had open last.
   const openChatsPlace = (key: string) => {
@@ -4010,7 +4042,7 @@ export default function App() {
     setChatsPlace(key);
   };
   const chatsValue: ChatsValue | null = teammatesUi.live || teamMode ? {
-    teammates: teammatesUi.list, groups: roomsUi.live ? roomsUi.groups : [], now,
+    teammates: teammatesUi.list, matesOn: teammatesUi.live, groups: roomsUi.live ? roomsUi.groups : [], now,
     onTeammate: (id) => (homeLayout === 'chats' ? openChatsPlace(`mate:${id}`) : teammatesUi.go(id)), onNew: teammatesUi.onNew,
     onGroup: (key) => {
       const one = homeLayout === 'chats' ? directs.find((d) => `direct:${d.item.id}` === key && d.people.length === 1) : null;
@@ -7471,7 +7503,7 @@ export default function App() {
   const needsYouCount = { inbox: (mineShown ? shownCount(inbox) : 0) + theirCount('inbox') + leadCount + sharedFileNews.length + followingNews.length };
   const todayShown = teamMode && todayOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
   const teamDayFor = (range: TodayRange, window?: { from: number; to: number }) => teamToday({
-    range, ...(window ? { window } : {}), now, me: team?.me ?? null, items, products: snap?.products ?? [], cards: weekCards,
+    range, ...(window ? { window } : {}), now, me: team?.me ?? null, items: theDaysThreads(items, teammatesUi.live), products: snap?.products ?? [], cards: weekCards,
     decisions: Object.values(snap?.team?.rooms?.decisions ?? {}).flat(),
     needs: mineInNeeds, mentions: roomsUi.live ? roomsUi.mentions : [], needsCount: needsYouCount.inbox,
     approvals: (filesForToday?.files ?? []).flatMap((f) => (f.approved ?? []).map((a) => ({ key: f.key, name: f.name, by: a.by ?? team?.me ?? null, at: a.at, threads: f.sentIn.flatMap((s) => (s.product && s.id ? [`${s.product}/${s.id}`] : [])) }))),
@@ -7488,7 +7520,7 @@ export default function App() {
   // The Team page opens on the standup: a post from each teammate per standup day.
   const standupPage = (onPerson?: (key: string) => void) => snap && team?.state.signedIn && !team.state.team ? <StartTeam me={team.state.me} multiplayer={team.state.multiplayer} onStarted={() => void refresh()} /> : snap ? <StandupPage now={now} onPerson={onPerson}
     team={members.flatMap((m) => (m.kind === 'person' || m.key.startsWith('mate:') ? [{ key: m.key, name: m.name, kind: m.kind === 'person' ? 'person' as const : 'mate' as const }] : []))}
-    faces={new Map(members.map((m) => [m.key, m]))} dayFor={(w) => teamDayFor('today', w)} onOpen={openTodayLine} /> : null;
+    faces={new Map(members.map((m) => [m.key, m]))} dayFor={(w) => teamDayFor('today', w)} onOpen={openTodayLine} matesOn={teammatesUi.live} /> : null;
   const todayEl = todayShown ? todayPage() : null;
   const homeShown = homeOn && homeOpen && !!snap && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
@@ -7778,6 +7810,7 @@ export default function App() {
       },
     } : null}>
     <TeammatesContext.Provider value={teammatesById}>
+    <MatesOnContext.Provider value={teammatesUi.live}>
     <ChatsContext.Provider value={chatsValue}>
     <FreeAgentContext.Provider value={freeWaitIds}>
     <TryAgainContext.Provider value={tryAgain}>
@@ -8799,6 +8832,7 @@ export default function App() {
         findThreads={findThreads}
         findChats={findChats}
         findInside={insideForPalette}
+        findByDescription={askAiToFind ? findByDescription : undefined}
         onSearchFor={searchFor}
         itemCommands={(() => {
           // A chat covers the list, so nothing here may act on a row behind it.
@@ -9521,6 +9555,7 @@ export default function App() {
     </TryAgainContext.Provider>
     </FreeAgentContext.Provider>
     </ChatsContext.Provider>
+    </MatesOnContext.Provider>
     </TeammatesContext.Provider>
     </DecideContext.Provider>
     </FollowContext.Provider>

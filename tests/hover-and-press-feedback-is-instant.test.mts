@@ -80,7 +80,12 @@ function eased(body: string): string[] {
 const ownsTransition = (body: string) =>
   [...body.matchAll(/(?:^|;)\s*transition(?:-[a-z]+)?\s*:\s*([^;]+)/g)].some((d) => !/^\s*(none|0m?s)\b/.test(d[1]));
 
-const lastCompound = (sel: string) => sel.replace(POINTER, '').split(/\s*[ >+~]\s*/).pop()!.replace(new RegExp(POINTER.source, 'g'), '');
+// A bare tag such as `svg` names nothing on its own, so it is keyed with the compound before it.
+const lastCompound = (sel: string) => {
+  const parts = sel.replace(new RegExp(POINTER.source, 'g'), '').split(/\s*[ >+~]\s*/);
+  const last = parts.pop()!;
+  return /^[a-z][a-z0-9-]*$/i.test(last) && parts.length ? `${parts.pop()} ${last}` : last;
+};
 
 function slowFeedback(all: Rule[]) {
   const found: string[] = [];
@@ -139,6 +144,12 @@ describe('slowFeedback', () => {
     expect(run('.bar { transition: width .3s; } .side { transition: opacity .14s; } .collapsed .side { opacity: 0; }')).toEqual([]);
     expect(run('.caret { transition: transform .12s; } .open .caret { transform: rotate(90deg); } .row:hover .caret { color: red; }')).toEqual([]);
     expect(run('/* transition: color .2s */ .a { color: red; }')).toEqual([]);
+    expect(run('.sec > svg { transition: opacity .14s; } .tag:hover svg { opacity: 1; }')).toEqual([]);
+  });
+
+  it('still finds a bare tag that fades in under its own parent\'s pointer', () => {
+    expect(run('.card svg { opacity: 0; transition: opacity .12s; } .card:hover svg { opacity: 1; }'))
+      .toEqual(['x.css: .card svg eases the opacity that .card:hover svg changes']);
   });
 
   it('lets the named exceptions keep their timing', () => {

@@ -14,6 +14,8 @@ import { FOLD_KEY, foldedSet, matesInOrder, rowName, toggleFold } from './chat-l
 
 export interface ChatsValue {
   teammates: Teammate[];
+  /** AI teammates are on (Settings, General); off, the list has no section for them. */
+  matesOn: boolean;
   groups: GroupChoice[];
   now: number;
   onTeammate: (id: string) => void;
@@ -73,7 +75,7 @@ export function ChatsColumn({ current }: { current: string | null }) {
     {c.onTeam && <button type="button" className={`cx-row cx-team${current === 'team' ? ' on' : ''}`} aria-current={current === 'team' ? 'page' : undefined} onClick={c.onTeam}>
       <span className="cx-mark" aria-hidden="true">{I.standupNav()}</span><span className="cx-n">Standup</span>
     </button>}
-    {section('teammates', 'AI teammates', c.teammates.length, <>
+    {c.matesOn && section('teammates', 'AI teammates', c.teammates.length, <>
       {mates.map((t) => {
         const on = current === `teammate:${t.id}`;
         return <button type="button" key={t.id} className={`cx-row${on ? ' on' : ''}`} aria-current={on ? 'page' : undefined} onClick={() => openMate(t.id)}>

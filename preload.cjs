@@ -103,6 +103,7 @@ contextBridge.exposeInMainWorld('zero', {
   teamThreadWork: (payload) => ipcRenderer.invoke('zero:team-thread-work', payload),
   findInThreads: (payload) => ipcRenderer.invoke('zero:find-in-threads', payload),
   warmFindInThreads: () => ipcRenderer.invoke('zero:warm-find-in-threads'),
+  findByDescription: (payload) => ipcRenderer.invoke('zero:find-by-description', payload),
   teamComment: (payload) => ipcRenderer.invoke('zero:team-comment', payload),
   teamContinueBrief: (payload) => ipcRenderer.invoke('zero:team-continue-brief', payload),
   teamContinued: (payload) => ipcRenderer.invoke('zero:team-continued', payload),
