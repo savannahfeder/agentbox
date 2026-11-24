@@ -65,7 +65,7 @@ const groups = [
   { key: 'direct:p-maya', name: 'Maya Chen', faces: [{ name: 'Maya Chen', url: null }], last: 'Keys before 6?', at: 0, unread: true, pinned: false },
 ];
 const teammate = (over) => ({ id: MKT, name: 'Marketing lead', letter: 'M', role: null, status: 'active', paused: false, waiting: [], now: null, running: null, works: null, ...over });
-const chats = (over = {}) => ({ teammates: [teammate({ waiting: [{ id: 'w', product: 'p', title: 't' }] })], groups, now: 0, onTeammate() {}, onNew() {}, onGroup() {}, ...over });
+const chats = (over = {}) => ({ matesOn: true, teammates: [teammate({ waiting: [{ id: 'w', product: 'p', title: 't' }] })], groups, now: 0, onTeammate() {}, onNew() {}, onGroup() {}, ...over });
 const column = (value, current = 'room:r-1') => renderToStaticMarkup(createElement(ChatsContext.Provider, { value }, createElement(GroupsColumn, { rows: groups, current, now: 0, onOpen() {} })));
 
 describe('the Groups page with teammates on', () => {

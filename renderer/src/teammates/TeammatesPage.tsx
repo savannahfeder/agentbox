@@ -12,7 +12,7 @@ import { ModelPicker } from '../components/Model';
 import { ruleLabel } from '../../../shared/repeats.mts';
 import type { ModelChoice } from '../models';
 import { rememberedProject } from '../compose-project';
-import { answerOf, answersMessage, chatEntries, chatWith, openedLines, sentWord, clockOf, dayOf, firstSentence, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, openQuestionsIn, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, whyWaiting, type ChatEntry } from './chat-lines';
+import { answerOf, answersMessage, chatEntries, chatWith, openedLines, sentWord, clockOf, dayOf, firstSentence, goalLine, heldFor, heldTitle, logOf, longMessage, nameOf, openQuestionsIn, SAVED_VERBS, startWord, titleAside, liveLine, pendingAsk, rowName, whyWaiting, type ChatEntry } from './chat-lines';
 import { ChatsColumn } from './ChatsColumn';
 import { nowLine, TeammateMark } from './TeammatesRail';
 import { FacePick } from './MateFace';
@@ -80,7 +80,7 @@ export function TeammatesTitle({ view, open }: { view: TeammatesView | null; ope
     <div className="gc-head-col"><span className="workspace-title gc-col-title">Chats</span></div>
     {open === 'new' || !t
       ? <h1 className="workspace-title gc-head-group tq-title"><i className="tq tq-hd tq-hash" aria-hidden="true">+</i><span>New teammate</span></h1>
-      : <h1 className="workspace-title gc-head-group tq-title"><TeammateMark t={t} size="hd" /><span>{book ? book.title : t.name}</span>{!book && <span className="tq-role">{titleAside(shown.kind, t.role, t)}</span>}</h1>}
+      : <h1 className="workspace-title gc-head-group tq-title"><TeammateMark t={t} size="hd" /><span>{book ? book.title : rowName(t)}</span>{!book && <span className="tq-role">{titleAside(shown.kind, t.role, t)}</span>}</h1>}
   </div>;
 }
 
