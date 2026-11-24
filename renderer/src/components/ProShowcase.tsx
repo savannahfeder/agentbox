@@ -2,7 +2,7 @@
 // place of the app, one card for each line on the left (PRO_PITCH in
 // ../setup-split.ts), in the same order. Styles are in ./setup-split.css.
 import { useEffect, useRef } from 'react';
-import { drawSky, skyTheme } from '../home/sky';
+import { drawSky, releaseCanvas, skyTheme } from '../home/sky';
 import { useDarkWindow } from '../home/home-settings';
 
 const CloudIcon = () => <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" aria-hidden="true"><path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .4-5.6A4 4 0 0 0 4.4 6.2 3.2 3.2 0 0 0 4.5 12.5z" /></svg>;
@@ -21,7 +21,9 @@ export function ProShowcase({ agents, team }: { agents: string[]; team: string |
   const dark = useDarkWindow();
   useEffect(() => {
     const k = skyTheme(dark ? 'ember' : 'mountains');
-    if (sky.current && k) drawSky(sky.current, k.art, { from: 0, span: 260 });
+    const canvas = sky.current;
+    if (canvas && k) drawSky(canvas, k.art, { from: 0, span: 260 });
+    return () => releaseCanvas(canvas);
   }, [dark]);
   return (
     <div className="pro-show">

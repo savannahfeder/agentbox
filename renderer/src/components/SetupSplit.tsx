@@ -14,7 +14,7 @@ import type { SessionThread } from '../agent-import-card';
 import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
-import { MATCH_SKY, SKY_THEMES, drawSky } from '../home/sky';
+import { MATCH_SKY, SKY_THEMES, drawSky, releaseCanvas } from '../home/sky';
 import { PRO_PITCH, bringInBehind, proFreeDays, proOffer, cloudShowcase, heldPress, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
 import { ENGINE_CHOSEN, writeLastEngine } from '../engines';
 import { startProTrial } from '../pro-trial';
@@ -64,7 +64,11 @@ function Strip({ look }: { look: string }) {
 function SkyArt({ id }: { id: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const sky = SKY_THEMES.find((s) => s.id === id);
-  useEffect(() => { if (ref.current && sky) drawSky(ref.current, sky.art, { from: 0, span: 6 }); }, [sky]);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (canvas && sky) drawSky(canvas, sky.art, { from: 0, span: 6 });
+    return () => releaseCanvas(canvas);
+  }, [sky]);
   return <span className="ss-sky" style={sky?.frame ? { background: sky.frame } : undefined}><canvas ref={ref} /></span>;
 }
 const LOOK_NAME = (id: string) => (id === MATCH_SKY ? 'Match my system' : id === 'light' ? 'Light' : id === 'dark' ? 'Dark' : SKY_THEMES.find((s) => s.id === id)?.name ?? id);

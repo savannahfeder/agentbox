@@ -3,7 +3,7 @@
 // in ../teammate-offer.ts.
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import { drawSky, skyTheme } from '../home/sky';
+import { drawSky, releaseCanvas, skyTheme } from '../home/sky';
 import { useHomeSettings } from '../home/home-settings';
 import { aRole, chooseFold, foldChosen, markSeen, offerCard, seenBefore, startsFolded } from '../teammate-offer';
 import type { WorkItem } from '../types';
@@ -28,7 +28,7 @@ function Sky() {
     let width = canvas.clientWidth;
     const watch = new ResizeObserver(() => { if (canvas.clientWidth !== width) { width = canvas.clientWidth; paint(); } });
     watch.observe(canvas);
-    return () => watch.disconnect();
+    return () => { watch.disconnect(); releaseCanvas(canvas); };
   }, [worn]);
   return <div className="to-sky" aria-hidden="true"><canvas ref={ref} /></div>;
 }
