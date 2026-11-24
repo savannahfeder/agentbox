@@ -38,7 +38,6 @@ import { CommandHistory } from './memory-gate-history.mts';
 import type { Verdict } from './memory-gate-history.mts';
 import { etimeSeconds } from './leftovers.mts';
 import { readMacPressure } from './mac-pressure.mts';
-import { gatePressure } from './memory-allowance.mts';
 import { askedByANestedAgent, giveBackAsk, mayAskAgain } from './memory-give-back.mts';
 import type { Holding } from './memory-give-back.mts';
 
@@ -159,6 +158,9 @@ export interface GrantLine {
   peakMb: unknown;
   shared?: boolean;
   pressure?: Pressure | null;
+  /** What the command was expected to take and the room it started in, so the two can be set beside what it took. */
+  needMb?: unknown;
+  roomMb?: unknown;
   command: unknown;
 }
 
@@ -173,8 +175,10 @@ export interface MemoryGateServerOptions {
   ownerOf?: ((session: string) => { item?: unknown; product?: string | null } | null | undefined) | null;
   urgentFor?: ((product: string | null, item: string | null) => unknown) | null;
   readPressure?: () => Promise<PressureReading>;
-  /** Whether the app and its agents are over their allowance (main/memory-allowance.mts). */
-  overAllowance?: () => boolean;
+  /** How many MB Agentbox has left on this computer and when that was read, or null (main/memory-allowance.mts). */
+  room?: () => { mb: number; at: number } | null;
+  /** This computer's memory, which the light and heavy lines are shares of. Left out, they are the ones measured at 16 GB. */
+  ramMb?: number;
   /** The thread to ask for memory back, while there is one (main/memory-give-back.mts). */
   heaviest?: () => Holding | null;
   /** Whether a pid is a running program now. */
@@ -209,7 +213,7 @@ export class MemoryGateServer {
   declare ownerOf: MemoryGateServerOptions['ownerOf'];
   declare urgentFor: MemoryGateServerOptions['urgentFor'];
   declare readPressure: () => Promise<PressureReading>;
-  declare overAllowance: () => boolean;
+  declare room: () => { mb: number; at: number } | null;
   declare heaviest: () => Holding | null;
   declare running: (pid: number) => boolean;
   declare agentPids: (item: string) => number[];
@@ -261,7 +265,8 @@ export class MemoryGateServer {
     // a worker's own request can make its command urgent.
     urgentFor = null,
     readPressure = readMacPressure,
-    overAllowance = () => false,
+    room = () => null,
+    ramMb,
     heaviest = () => null,
     running = isRunning,
     agentPids = () => [],
@@ -290,17 +295,17 @@ export class MemoryGateServer {
     this.historyFile = historyFile;
     this.grantLogFile = grantLogFile;
     this.grantLogMaxBytes = grantLogMaxBytes;
-    this.history = history ?? loadHistory(historyFile);
+    this.history = history ?? loadHistory(historyFile, ramMb);
     this.clock = clock;
     this.idleReleaseMs = idleReleaseMs;
     this.maxGrantMs = maxGrantMs;
-    this.gate = new MemoryGate({ ...gate, history: this.history, clock });
+    this.gate = new MemoryGate({ heavyMb: this.history.heavyMb, ...gate, history: this.history, clock });
     this.sharedGrantMs = Number.isFinite(sharedGrantMs) ? sharedGrantMs as number : this.gate.maxWaitMs;
     this.scoreFor = scoreFor;
     this.ownerOf = ownerOf;
     this.urgentFor = urgentFor;
     this.readPressure = readPressure;
-    this.overAllowance = overAllowance;
+    this.room = room;
     this.heaviest = heaviest;
     this.running = running;
     this.agentPids = agentPids;
@@ -610,6 +615,8 @@ export class MemoryGateServer {
       peakMb: grant?.ambiguous ? null : was.peakMb,
       shared: !!grant?.ambiguous,
       pressure: was.pressureAt,
+      needMb: was.needMb,
+      roomMb: was.roomMb,
       command: was.command,
     });
     // A SHARED READING IS NOT NO READING (w-5601e99977). Every Codex thread of
@@ -647,15 +654,17 @@ export class MemoryGateServer {
   }
 
   /** A question that throws is not a reason to hold. */
-  _over(): boolean {
-    try { return this.overAllowance() === true; } catch { return false; }
+  _room(): { mb: number; at: number } | null {
+    try { return this.room() ?? null; } catch { return null; }
   }
 
   async _read() {
     try {
       this.reading = await this.readPressure();
       this.readAt = this.clock();
-      this.gate.setPressure(gatePressure(pressureFrom(this.reading, GATE_LINES), this._over()));
+      this.gate.setPressure(pressureFrom(this.reading, GATE_LINES));
+      const room = this._room();
+      this.gate.setRoom(room?.mb ?? null, room?.at);
       // Processes are only looked at while something is granted: nothing
       // else needs them, and each look costs a `ps`.
       if (this.grants.size) this._sample(await this.sampleProcesses());
@@ -790,7 +799,7 @@ export class MemoryGateServer {
    * Every shell command on the Mac waits on this path, so a write that fails
    * is logged and swallowed rather than returned to the agent.
    */
-  _writeGrant({ refused, askedBack = false, cls, waitMs, ranMs, peakMb, shared = false, pressure = null, command }: GrantLine) {
+  _writeGrant({ refused, askedBack = false, cls, waitMs, ranMs, peakMb, shared = false, pressure = null, needMb, roomMb, command }: GrantLine) {
     if (!this.grantLogFile) return;
     try {
       if (this.grantBytes === undefined) {
@@ -812,6 +821,8 @@ export class MemoryGateServer {
         // the slot count; under `tight` nothing heavy starts whatever it is.
         pressure: pressure ?? null,
         ...(shared ? { shared: true } : {}),
+        ...(Number.isFinite(needMb) ? { need: needMb } : {}),
+        ...(Number.isFinite(roomMb) ? { room: roomMb } : {}),
         ...(refused ? { refused: true } : {}),
         ...(askedBack ? { askedBack: true } : {}),
         cmd: String(command ?? '').slice(0, 300),
@@ -834,7 +845,7 @@ export class MemoryGateServer {
   }
 }
 
-function loadHistory(file: string | null) {
-  if (!file) return new CommandHistory();
-  try { return CommandHistory.fromJSON(JSON.parse(fs.readFileSync(file, 'utf8'))); } catch { return new CommandHistory(); }
+function loadHistory(file: string | null, ramMb?: number) {
+  if (!file) return new CommandHistory({ ramMb });
+  try { return CommandHistory.fromJSON(JSON.parse(fs.readFileSync(file, 'utf8')), { ramMb }); } catch { return new CommandHistory({ ramMb }); }
 }

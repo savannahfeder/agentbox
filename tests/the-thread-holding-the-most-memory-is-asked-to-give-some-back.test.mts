@@ -553,7 +553,7 @@ describe('the command gate', () => {
     const history = new CommandHistory();
     history.record('npm test', { peakMb: 900, durationMs: 60_000 });
     const server = new MemoryGateServer({
-      socketPath: path.join(dir, 'g.sock'), history, overAllowance: () => true,
+      socketPath: path.join(dir, 'g.sock'), history, room: () => ({ mb: -2244, at: 1 }),
       readPressure: async () => ({ level: 1, freePct: 60, swapInMbps: 0 }), sampleProcesses: async () => [], pollMs: 30, idlePollMs: 30, takeoverMs: 50, lockPort: 0,
     });
     servers.push(server);

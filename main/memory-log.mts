@@ -27,7 +27,7 @@ import type { ProcessRecord } from './leftovers.mts';
 import { readMacPressure } from './memory-gate-server.mts';
 import { pressureFrom } from './memory-gate.mts';
 import type { PressureReading } from './memory-gate.mts';
-import { heaviestOver, overAllowance, standing, SETTLE_MS, STALE_MS } from './memory-allowance.mts';
+import { heaviestOver, overAllowance, roomMb, standing, SETTLE_MS, STALE_MS } from './memory-allowance.mts';
 import type { StampedStanding } from './memory-allowance.mts';
 import type { Holding } from './memory-give-back.mts';
 
@@ -212,6 +212,13 @@ export class MemoryLog {
   /** Whether the app and its agents are over their allowance, on the listings of the last minutes. */
   overAllowance(now: number = this.now()): boolean {
     return overAllowance(this._standings, now);
+  }
+
+  /** How many MB the newest listing left Agentbox, and when it was taken; null once that is too old to act on. */
+  room(now: number = this.now()): { mb: number; at: number } | null {
+    const newest = this._standings.at(-1);
+    const mb = newest && now - newest.at <= STALE_MS ? roomMb(newest) : null;
+    return mb === null ? null : { mb, at: newest!.at };
   }
 
   /**

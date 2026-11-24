@@ -8663,6 +8663,12 @@ export class Supervisor {
     try { return this._memoryLog?.overAllowance() === true; } catch { return false; }
   }
 
+  /** How much room the newest listing left Agentbox, for the command gate (main/memory-allowance.mts). */
+  _memoryRoom(): { mb: number; at: number } | null {
+    if (!this._memoryGateOn()) return null;
+    try { return this._memoryLog?.room() ?? null; } catch { return null; }
+  }
+
   /** The thread the command gate asks for memory back, while Agentbox is over (main/memory-give-back.mts). */
   _heaviestOver(): Holding | null {
     if (!this._memoryGateOn()) return null;
@@ -14855,7 +14861,8 @@ export class Supervisor {
       scoreFor: (product, itemId) => this.memoryGateScore(product, itemId),
       ownerOf: (sessionId) => this.memoryGateOwner(sessionId),
       urgentFor: (product, itemId) => this.memoryGateUrgent(product, itemId),
-      overAllowance: () => this._overAllowance(),
+      room: () => this._memoryRoom(),
+      ramMb: os.totalmem() / 1048576,
       heaviest: () => this._heaviestOver(),
       agentPids: (item) => this._workerPids(item),
       log: (line) => console.log(`zero: ${line}`),

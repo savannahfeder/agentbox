@@ -20,8 +20,11 @@
 // one at a time, because its size is not known to be big. A light command
 // never waits for room, and the computer's own word that it is short still
 // holds everything that is not light, as before.
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { MemoryGate, refusal } from '../main/memory-gate.mts';
+import { MemoryGateServer } from '../main/memory-gate-server.mts';
 import { CommandHistory } from '../main/memory-gate-history.mts';
 import type { GateAnswer } from '../main/memory-gate.mts';
 
@@ -259,5 +262,87 @@ describe('what it says and writes down', () => {
     const unknown = makeGate();
     unknown.ask('a', 'npm test');
     expect(unknown.gate.running.get('a')).toMatchObject({ needMb: 900, roomMb: null });
+  });
+});
+
+describe('the gate the app runs', () => {
+  const dirs: string[] = [];
+  afterEach(() => { for (const d of dirs.splice(0)) fs.rmSync(d, { recursive: true, force: true }); });
+  const AGENT = { pid: 100, ppid: 1, mb: 300, args: '/Users/x/.local/bin/claude -p', startedAt: 1 };
+
+  function harness(opts = {}) {
+    const dir = fs.mkdtempSync(path.join('/tmp', 'gate-room-'));
+    dirs.push(dir);
+    const history = new CommandHistory();
+    for (let i = 0; i < 3; i++) {
+      history.record('npm test', { peakMb: 900, durationMs: 60_000 });
+      history.record('git status', { peakMb: 10, durationMs: 100 });
+    }
+    let now = 1_000;
+    const server = new MemoryGateServer({
+      socketPath: path.join(dir, 'g.sock'), history, grantLogFile: path.join(dir, 'grants.jsonl'),
+      readPressure: async () => ({ level: 1, freePct: 50 }), sampleProcesses: async () => [AGENT],
+      pollMs: 60_000, clock: () => now, gate: { slots: 2 }, ...opts,
+    });
+    const ask = (id: string, command: string) => new Promise<string>((resolve) => {
+      const res = { end: (body?: string) => resolve(body ?? ''), on: () => {} };
+      void server._pre({ ppid: AGENT.pid, score: 5, item: 'w-1', hook: { tool_use_id: id, tool_input: { command } } }, {} as never, res as never);
+    });
+    const post = (id: string) => { now += 30_000; server._post({ hook: { tool_use_id: id, duration_ms: 30_000 } }); };
+    const lines = () => fs.readFileSync(path.join(dir, 'grants.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
+    return { dir, server, ask, post, lines };
+  }
+
+  it('is told the room on every reading, and each grant line says what was expected and the room it started in', async () => {
+    const g = harness({ room: () => ({ mb: 1_000, at: 500 }) });
+    await g.server._poll();
+    expect(g.server.gate.room).toBe(1_000);
+    await g.ask('a', 'npm test');
+    await g.ask('b', 'git status');
+    g.post('a'); g.post('b');
+    const [test, status] = g.lines();
+    expect(test).toMatchObject({ cls: 'heavy', need: 900, room: 1_000 });
+    expect(status).toMatchObject({ cls: 'light', need: 0, room: 100 });
+  });
+
+  it('with no listing to go by the line says no room, and the command starts on its slot', async () => {
+    const g = harness();
+    await g.server._poll();
+    expect(g.server.gate.room).toBe(null);
+    await g.ask('a', 'npm test');
+    g.post('a');
+    const [line] = g.lines();
+    expect(line.need).toBe(900);
+    expect('room' in line).toBe(false);
+  });
+
+  it('holds what does not fit, by the room the app reads', async () => {
+    let room = { mb: 1_000, at: 500 };
+    const g = harness({ room: () => room });
+    await g.server._poll();
+    await g.ask('a', 'npm test');
+    let second = false;
+    void g.ask('b', 'npm test').then(() => { second = true; });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(second).toBe(false);
+    room = { mb: 2_000, at: 600 };
+    await g.server._poll();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(second).toBe(true);
+  });
+
+  it('judges light and heavy by the memory the app says this computer has', () => {
+    const dir = fs.mkdtempSync(path.join('/tmp', 'gate-ram-'));
+    dirs.push(dir);
+    const file = path.join(dir, 'history.json');
+    const make = (ramMb?: number) => new MemoryGateServer({ socketPath: path.join(dir, 'g.sock'), historyFile: file, ...(ramMb ? { ramMb } : {}) });
+    expect([make(64 * 1024).history.heavyMb, make(64 * 1024).gate.heavyMb]).toEqual([1600, 1600]);
+    expect([make(8 * 1024).history.lightMb, make(8 * 1024).gate.heavyMb]).toEqual([75, 200]);
+    // Told nothing, it keeps the lines measured at 16 GB, and so does a record already on disk.
+    expect([make().history.lightMb, make().gate.heavyMb]).toEqual([150, 400]);
+    fs.writeFileSync(file, JSON.stringify({ v: 1, keys: [['npm test', ['l', 'l']]], programs: [] }));
+    const read = make(32 * 1024);
+    expect(read.history.heavyMb).toBe(800);
+    expect(read.history.classify('npm test')).toBe('light');
   });
 });
