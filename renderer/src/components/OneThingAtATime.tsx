@@ -21,8 +21,10 @@ import { Face, firstName } from '../team/people';
 /** What this page reads in place rather than as a tile: a page an agent made, a note, or a table. */
 export const readsInPlace = (path: string) => /\.(html?|md|markdown|csv|tsv)$/i.test(path);
 
-export function QueueSummary({ title, context, earlier, steps = false, open, onToggle }: {
+export function QueueSummary({ title, context, earlier, steps = false, open, onToggle, fold }: {
   title?: string;
+  /** The fold's own words, for a page whose fold holds something other than earlier messages. */
+  fold?: { shut: string; open: string };
   context: string | null | undefined;
   /** Messages behind the fold. */
   earlier: number;
@@ -43,7 +45,7 @@ export function QueueSummary({ title, context, earlier, steps = false, open, onT
     const box = summary.current?.closest('.focus-scroll');
     if (box) box.scrollTop = box.scrollHeight;
   }, [open]);
-  const toggle = earlier > 0
+  const toggle = fold ? (open ? fold.open : fold.shut) : earlier > 0
     ? (open ? 'Hide earlier messages' : `Show ${earlier} earlier ${earlier === 1 ? 'message' : 'messages'}`)
     : steps ? (open ? 'Hide what the agent did' : 'Show what the agent did') : null;
   // Cut is only known once laid out, at this width.

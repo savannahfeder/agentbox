@@ -136,7 +136,8 @@ html:root[data-skin="ember-grid"][data-sky-dark] {
 /* A long name gives way before the pin does. */
 .hm-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .hm-name b { min-width: 0; }
-.hm-pin { display: flex; flex: none; color: var(--text-faint); transform: translateY(.5px); }
+.hm-pin { display: flex; flex: none; color: var(--text-dim); transform: translateY(.5px); }
+.hm-pin path:first-child { fill: currentColor; }
 
 /* The row's one action fades in where its week was, as a conversation's ⋯ does over its time. */
 .hm-mate-wrap { position: relative; }

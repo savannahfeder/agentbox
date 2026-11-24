@@ -46,13 +46,10 @@ const CLOSE = 80;
 // bar, and reading it without holding the mouse still is what the press is for.
 const LINGER_MS = 220;
 
-// In the sidebar it is a row like Feedback and Settings: this gauge, the agent's
-// name, and the percent where Inbox shows its count (w-dcaa2c122e, picked from five).
-const GaugeIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true"><path d="M4.5 16.5a7.5 7.5 0 1 1 15 0"/><path d="m12 16.5 3.6-4.2"/></svg>;
-
-// IN THE SIDEBAR IT NAMES THE AGENT YOU USED LAST (w-dcaa2c122e): "Claude Code
-// 47%". Using more than one, pointing at it lists each, that one first. An
-// agent counts while it has a reading from this week; older figures have reset.
+// IN THE SIDEBAR IT IS THE BAR ON YOUR OWN ROW, for the agent you used last.
+// Pointing at it names that agent; using more than one, it lists each, that
+// one first. An agent counts while it has a reading from this week; older
+// figures have reset.
 const WEEK = 7 * 24 * 60 * 60 * 1000;
 export function agentsInUse(all: Usage[], recent: string | null, sent: Usage | null, now: number): { word: string; usage: Usage }[] {
   // A reading whose every window has started over since it was taken is not a
@@ -212,10 +209,9 @@ function UsageOne({ usage, now, engineWord = null, onOpen, sidebar = false, fold
         onFocus={sidebar ? undefined : enter}
         onBlur={sidebar ? undefined : leave}
       >
-        {sidebar && <><GaugeIcon /><span className="usage-row-label">{engineWord ?? 'Usage'}</span>{used != null && <span className="usage-row-num">{used}%</span>}</>}
-        {!sidebar && <span className="usage-meter" aria-hidden="true">
+        <span className="usage-meter" aria-hidden="true">
           <i style={{ width: `${used ?? 0}%` }} />
-        </span>}
+        </span>
       </button>
       {open && (
         <div className={`usage-panel ${pinned ? 'is-pinned' : ''}`} id={panelId} role="group" aria-label={engineWord ?? 'Your limits'}>

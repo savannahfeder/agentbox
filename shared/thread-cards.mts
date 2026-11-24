@@ -122,7 +122,8 @@ export function firstSentence(text: string | null | undefined, max = 240): strin
     .replace(/^##\s*Options[\s\S]*$/m, '')
     // A blockquote's mark is the one at the start of its line. Elsewhere `>`
     // is a redirect or an arrow and belongs to whoever typed it.
-    .replace(/^\s*>\s?/gm, '');
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/(?<![!`])\[([^\]\n]+)\]\([^)\s]+\)/g, '$1');
   for (const [re, to] of EMPHASIS) plain = plain.replace(re, to);
   plain = plain.replace(/\s+/g, ' ').trim();
   const m = plain.match(SENTENCE);

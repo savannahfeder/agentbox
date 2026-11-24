@@ -14,6 +14,9 @@ import type { EngineSetupState } from './plan-setup';
 export type { AgentVoice };
 
 /** A comment on a thread's shared link, waiting for its owner (shared/work-items.mts `linkComments`). */
+/** A session started outside Agentbox, brought in as a thread (main/ipc.mts zero:bring-in-session). */
+export type BringInResult = { ok: true; product: string; id: string } | { ok: false; reason: string };
+
 export interface LinkCommentWaiting { name: string; file: string; text: string; ts: number; place?: NotePlace }
 
 export interface WorkItem {
@@ -320,6 +323,8 @@ export interface PlacedFile {
   name: string;
   /** The name a person gave it in Files; `name` stays its name on disk. */
   title?: string;
+  /** Its later versions' own names, when they differ from `name`. */
+  versionNames?: string[];
   /** The icon a person picked for its tile. */
   icon?: string;
   kind: FileKind | null;
@@ -492,7 +497,7 @@ export interface FoundWhere {
   updatedAt: number;
 }
 export interface FoundLine extends FoundWhere { uid: string; by: string | null; source: 'founder' | 'agent' | 'system'; at: number; comment: boolean; text: string }
-export interface FoundFile extends FoundWhere { how: 'name' | 'contents'; src: string; name: string; by: string | null; at: number; text: string }
+export interface FoundFile extends FoundWhere { how: 'name' | 'contents'; src: string; name: string; by: string | null; agent?: string; at: number; text: string }
 export interface FoundComment extends FoundWhere { src: string; name: string; by: string | null; at: number; resolved: boolean; noteId: string; fileId: string; text: string }
 /** What the finder in main answers (main/everything-found.mts). */
 export interface FoundInThreads {
@@ -1156,6 +1161,16 @@ export interface AgentSession {
   repliedAt?: number;
   /** The session's own stamp on its own status. */
   statusAt?: number;
+  /** When its newest answer began, which tells her later words from earlier ones. */
+  saidAt?: number;
+  /** Claude Code when absent. A Codex session has no process here (`pid` is 0). */
+  engine?: 'claude' | 'codex';
+  /** The tool's own question it is stopped on, with its choices. */
+  question?: { question: string; options: string[] }[];
+  /** Where it runs, in words: "Codex app", "Codex in a terminal". */
+  app?: string | null;
+  /** A command it is waiting on permission to run, with its own reason. */
+  approval?: { command: string; reason: string } | null;
   // the app's own workers, folded out of everything she sees: they are already in
   // her inbox as work items, and a second row about the same agent is a
   // rejected duplicate picture.
@@ -1817,9 +1832,10 @@ declare global {
       // A count. The name is checked against the approved list in the main
       // process, which attaches everything else; nothing from this side rides along.
       track?(name: string, count?: number): Promise<boolean>;
-      agentReply(p: { pid: number; text: string }): Promise<{ ok: boolean; delivered?: boolean; working?: boolean; name?: string; reason?: string }>;
-      agentReveal(p: { pid: number }): Promise<{ ok: boolean; name?: string; reason?: string }>;
-      agentConversation(p: { pid: number; sessionId: string | null; cwd: string }): Promise<AgentConversation>;
+      agentReply(p: { pid: number; text: string; engine?: string }): Promise<{ ok: boolean; delivered?: boolean; working?: boolean; name?: string; reason?: string }>;
+      agentReveal(p: { pid: number; engine?: string; sessionId?: string | null }): Promise<{ ok: boolean; name?: string; reason?: string }>;
+      bringInSession?(p: { pid: number; engine?: string; sessionId?: string | null }): Promise<BringInResult>;
+      agentConversation(p: { pid: number; sessionId: string | null; cwd: string; engine?: string }): Promise<AgentConversation>;
       dashboard(slug: string): Promise<ProductDashboard | null>;
       terminal<A extends TerminalAction>(p: TerminalAsk<A>): Promise<TerminalAnswer<A>>;
       // Null from the phone's own site, which has no coding agents to update.
@@ -1990,8 +2006,6 @@ declare global {
         ready: { id: string; title: string; says: string; since?: number; open?: string | null }[];
         working: number;
       }): Promise<void>;
-      // The corner tag's "Turn off…": open Settings on this page.
-      onOpenSettings?(fn: (p: { pane?: string }) => void): () => void;
       // screenDetail is which set of theme pictures this screen wants, 'soft' or
       // 'sharp' (main/screen-detail.mts). It rides here rather than being
       // pushed because the answer is needed on the first paint.

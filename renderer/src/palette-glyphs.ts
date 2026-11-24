@@ -118,6 +118,7 @@ const BY_ID: Record<string, IconName> = {
   keyhints: 'keyboard',
   'flip-view': 'board',
   'import-agents': 'download',
+  'bring-in': 'download',
   tutorial: 'help',
   'first-run': 'refresh',
   demo: 'spark',
@@ -160,6 +161,7 @@ const BY_ID: Record<string, IconName> = {
 
 // Longest prefix first, so `teammate-pause-` is read before `teammate-`.
 const BY_PREFIX: [string, IconName][] = [
+  ['outside-', 'inbox'],
   ['teammate-pause-', 'pause'],
   ['teammate-', 'person'],
   ['chat-person-', 'person'],

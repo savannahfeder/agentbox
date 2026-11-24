@@ -200,16 +200,7 @@
 }
 .settings-embedded .set-pane { flex: 1; min-height: 0; background: transparent; border-radius: var(--radius); }
 .workspace-utilities button[aria-current="page"] { background: var(--wash); color: var(--text); }
-/* THE READING IS A ROW LIKE FEEDBACK AND SETTINGS (w-dcaa2c122e), picked from
-   five drawn in the app: the gauge in their icon column, the agent's name on
-   their labels' edge, the percent where Inbox shows its count, at their size.
-   It sits 2 under Settings, as they sit to each other, and narrow it keeps
-   its gauge as they keep theirs. */
-.workspace-navigation .workspace-usage { padding: 0 0 12px; margin-top: -10px; }
-.workspace-navigation .workspace-usage .usage-pill { display: flex; align-items: center; gap: 11px; width: 100%; height: 36px; min-height: 36px; padding: 0 10px; border: 0; border-radius: var(--radius); font-size: 13px; text-align: left; color: var(--text-faint); }
-.workspace-navigation .workspace-usage .usage-pill:hover { background: var(--wash); color: var(--text); }
-.workspace-navigation .usage-row-num { margin-left: auto; font-variant-numeric: tabular-nums; }
-.workspace-navigation .usage-pill.is-close .usage-row-num { color: var(--text); }
+/* The reading is a bar on the foot's last row (sidebar.css). */
 /* Its limits open above it as wide as the sidebar, the way your account menu opens from your row. */
 /* Its own width, not the rail's: on the narrow rail that was 44px, and "This session" and "28% used" ran into each other. */
 .workspace-navigation .workspace-usage .usage-panel { top: auto; bottom: calc(100% + 8px); left: 0; right: auto; width: 268px; border-radius: 0; }

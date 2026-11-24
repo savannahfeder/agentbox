@@ -12,7 +12,7 @@ import './home.css';
 import { enterIsTheButtons } from '../focused-button';
 
 /** `from` is the teammate who asked, when one did; priority is null at Medium, as on the Inbox's board; an invitation has no time. `agent` is an agent's thread, and `engine` the harness it runs on. */
-export type NeedsRow = { key: string; letter: string; face?: string; photo?: string; agent?: boolean; engine?: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean };
+export type NeedsRow = { key: string; letter: string; face?: string; photo?: string; agent?: boolean; engine?: string; title: string; from: string | null; priority: PriorityId | null; project: string; at: number | null; unread: boolean; pinned?: boolean };
 export type TeamRow = { key: string; name: string; letter: string; ai: boolean; face?: string; photo?: string; line: string; state: TeamRowState; week: number[]; total: number; pinned?: boolean; hidden?: boolean };
 export type MateAct = 'pin' | 'unpin' | 'hide' | 'show';
 
@@ -142,7 +142,7 @@ export function HomePage({ hello, now, needs, needsCount, inboxCount = needsCoun
             {needs.map((r, i) => (
               <button type="button" key={r.key} className={`hm-row${i === pick ? ' on' : ''}${r.unread ? ' unread' : ''}`} onClick={() => onOpen(r.key)} onMouseEnter={() => setPick(i)}>
                 {r.face ? <MateFace seed={r.face} className="hm-face" /> : r.agent ? <span className="hm-face hm-agent"><HarnessMark engine={r.engine ?? ''} /></span> : <span className="hm-face">{r.photo ? <img className="hm-photo" src={r.photo} alt="" referrerPolicy="no-referrer" /> : r.letter}</span>}
-                <span className="hm-text"><b>{r.title}</b>
+                <span className="hm-text"><span className="hm-name"><b>{r.title}</b>{r.pinned && <span className="hm-pin" aria-label="Pinned"><PinMark size={13} /></span>}</span>
                   <span className="hm-tags">
                     {r.priority && <span className={`hm-prio${r.priority === 'urgent' ? ' urgent' : ''}`} title={priorityLabelOf(r.priority)} aria-label={priorityLabelOf(r.priority)}><PriorityMark id={r.priority} /></span>}
                     {r.from && <span className="hm-tag">{r.from}</span>}

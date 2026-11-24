@@ -90,7 +90,8 @@ describe('the shortcuts are off the screen and the verbs are not', () => {
     const row = focus.slice(focus.indexOf('<div className="focus-actions">'), focus.indexOf('focus-dock'));
     expect(row).toContain('Back to inbox');
     expect(row).toContain('Let it run now');
-    expect(row).toContain('Take me to it');
+    // Take me to it, until it took you to the very tab and was named as the bar under a session is (2026-11-24).
+    expect(row).toContain('Respond in terminal');
     // Send back to agent was named on 2026-11-21: "I don't really get this function".
     // It left the row and stays in ⌘K (tests/a-handed-back-thread-reads-like-any-other-thread).
     expect(row).not.toContain('Send back to agent<');
