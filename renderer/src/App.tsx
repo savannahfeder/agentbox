@@ -7604,11 +7604,11 @@ export default function App() {
       follow: (n, card) => { changeFollows((was) => markTold(was, n)); openTeammateCard(card); },
     });
   };
-  const skyOnInbox = wearsInboxSky(sky) && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
+  const inboxPageUp = (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown && !evPick;
-  // PROTOTYPE (w-ef3bfd38f2): the light mountains have no Inbox header, so only the empty page wears them.
-  const sceneOnEmpty = !!sky?.art.mountains && !skyOnInbox && !homeShown && view === 'inbox' && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
-    && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown && !evPick;
+  const skyOnInbox = wearsInboxSky(sky) && !homeShown && inboxPageUp;
+  // The light mountains have no strip over the list, so only the empty page wears them.
+  const mountainsOnEmpty = !!sky?.art.mountains && !skyOnInbox && !homeShown && inboxPageUp;
   // Team and Files wear the same sky over their header.
   const skyOnPlace = wearsInboxSky(sky) && !onPhone() && (chatsPlaceShown || filesShown);
   // A place is the whole page under the tabs; on the one-list home there are no cards.
@@ -8450,7 +8450,7 @@ export default function App() {
                     // "Nothing needs you" is about you alone; with a teammate
                     // on the page the quiet line says it instead.
                     : view === 'inbox' && !withOthers
-                      ? <><InboxClear slot={setClearSlot} first={firstTask(tour)} sky={skyOnInbox && sky ? sky.art : null} />{sceneOnEmpty && sky && <EmptyScene art={sky.home ?? sky.art} />}</>
+                      ? <><InboxClear slot={setClearSlot} first={firstTask(tour)} sky={skyOnInbox && sky ? sky.art : null} />{mountainsOnEmpty && sky && <EmptyScene art={sky.home ?? sky.art} />}</>
                       : <EmptyTab view={view} starting={justSent} waiting={needsYouCount.inbox} />
                 ) : <List
                   lead={view === 'inbox' && search === null && (leadCount || sharedFileNews.length || followingNews.length)
