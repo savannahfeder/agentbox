@@ -112,6 +112,15 @@ export function paneCanSave(resolved: string | null, roots: readonly string[]): 
   return roots.some((root) => resolved === root || resolved.startsWith(`${root.replace(/\/+$/, '')}/`));
 }
 
+/**
+ * Whether the pane draws its own Comment bar over selected words. The notes
+ * sidebar has one, and a table's cell menu says Comment, so only a document
+ * or a script without the sidebar needs it.
+ */
+export function paneOffersComment(kind: PaneKind, besideNotes: boolean, takesNotes: boolean): boolean {
+  return takesNotes && !besideNotes && (kind === 'markdown' || kind === 'text');
+}
+
 /** How often an open file is read again while the app changes: a cloud run's
  *  files land on this Mac after its answer does. */
 export const FOLLOW_FILE_MS = 3000;

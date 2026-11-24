@@ -2812,10 +2812,10 @@ export default function App() {
     return () => window.removeEventListener('storage', heard);
   }, []);
   const toggleNotes = () => setNotesOpen((was) => { rememberNotesSidebar(localStorage, !was); return !was; });
-  const [cellComment, setCellComment] = useState<{ text: string; cell: TableCell } | null>(null);
-  // Notes are only drawn full screen, so a Comment from a table beside the thread goes full screen first.
-  const commentOnTable = (text: string, cell: TableCell) => {
-    setCellComment({ text, cell });
+  const [fileComment, setFileComment] = useState<{ text: string; cell?: TableCell } | null>(null);
+  // Notes are only drawn full screen, so a Comment from a file beside the thread goes full screen first.
+  const commentOnFile = (text: string, cell?: TableCell) => {
+    setFileComment(cell ? { text, cell } : { text });
     rememberNotesSidebar(localStorage, true); setNotesOpen(true);
     if (artifactMode !== 'focus') { setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode('focus'); }
   };
@@ -8568,8 +8568,8 @@ export default function App() {
                 onClose={closeArtifact}
                 onNotice={showToast}
                 aside={notesShown && focused ? <NotesSidebar key={`${focused.id}\n${openDoc.src}`} item={focused} src={openDoc.src}
-                  asked={cellComment} onAsked={() => setCellComment(null)} /> : undefined}
-                onComment={cellsTakeNotes ? commentOnTable : undefined}
+                  asked={fileComment} onAsked={() => setFileComment(null)} /> : undefined}
+                onComment={cellsTakeNotes ? commentOnFile : undefined}
                 firstMark={<>
                   {focused && focused.product === openDoc.product && canShareFile(openDoc.src) && <ShareLink icon product={openDoc.product} thread={focused.id} src={openDoc.src} signedIn={!!snap?.team?.signedIn} />}
                   {notesHere && focused && <NotesToggle open={notesOpen} waiting={(focused.artifacts?.notes ?? []).filter((n) => !n.resolved && stillWaiting(n)).length} onToggle={toggleNotes} />}
