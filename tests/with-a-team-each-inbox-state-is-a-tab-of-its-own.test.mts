@@ -75,7 +75,8 @@ describe('in the app', () => {
   });
 
   it('wears the dark sky on every tab, the board too, but not on a teammate\'s place', () => {
-    const rule = app.match(/const skyOnInbox = [\s\S]*?;\n/)[0];
+    expect(app).toMatch(/const skyOnInbox = wearsInboxSky\(sky\) && !homeShown && inboxPageUp;/);
+    const rule = app.match(/const inboxPageUp = [\s\S]*?;\n/)[0];
     expect(rule).toContain("['inbox', 'progress', 'snoozed', 'done']");
     expect(rule).not.toContain('!evOn');
     expect(rule).not.toContain('!onBoard');
