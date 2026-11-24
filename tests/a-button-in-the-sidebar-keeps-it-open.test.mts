@@ -112,3 +112,30 @@ describe('its look', () => {
     expect(css).toMatch(/@media \(max-width: 700px\), \(max-height: 520px\) \{\s*:root:root \.gt-rail-nav\.workspace-navigation :is\(\.ws-new, \.ws-keep, \.ws-sec, \.ws-recent\) \{ display: none; \}/);
   });
 });
+
+// The owner, using the built button: "There's no indication that I'm actually in
+// the open state", and "it's really hard to get there because my thing keeps
+// closing every time I move my mouse a little close". Measured in the app: the
+// button's right edge was the sidebar's own edge, and one point past it the
+// sidebar closed at once, taking the button with it.
+describe('reaching it, and seeing that it is on', () => {
+  const css = strip(read('renderer/src/sidebar.css'));
+  const nav = read('renderer/src/components/WorkspaceNavigation.tsx');
+  const P = ':root:root .gt-rail-nav.workspace-navigation';
+  it('stays lit while the sidebar is kept open', () => {
+    expect(css).toContain(`${P} .ws-keep[aria-pressed="true"] { background: var(--sidebar-fill); color: var(--text); }`);
+  });
+  it('waits a beat before closing when the pointer leaves, and stays if it comes back', async () => {
+    const { CLOSES_AFTER_MS, OPENS_AFTER_MS } = await import('../renderer/src/sidebar-shrinks.ts');
+    expect(OPENS_AFTER_MS).toBe(140);
+    expect(CLOSES_AFTER_MS).toBeGreaterThanOrEqual(250);
+    expect(CLOSES_AFTER_MS).toBeLessThanOrEqual(400);
+    expect(nav).toContain('leaveAt.current = setTimeout(() => { leaveAt.current = null; onHover(false); }, CLOSES_AFTER_MS);');
+    expect(nav).toContain('if (leaveAt.current) { clearTimeout(leaveAt.current); leaveAt.current = null; }');
+    // Nothing closes it at once any more.
+    for (const line of nav.split('\n').filter((l) => l.includes('onHover(false)'))) expect(line).toContain('setTimeout(');
+  });
+  it('counts the gap between the open sidebar and the page as the sidebar, and only while it is open', () => {
+    expect(css).toContain(`:root:root .gt-rail:not(.workspace-collapsed) .gt-rail-nav.workspace-navigation::after { content: ''; position: absolute; top: 0; bottom: 0; left: 100%; width: 22px; }`);
+  });
+});
