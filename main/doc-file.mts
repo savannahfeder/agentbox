@@ -17,9 +17,10 @@
 import fsDefault from 'node:fs';
 import path from 'node:path';
 import { artifactRoots } from './artifact-path.mts';
+import { asWrittenFile } from '../shared/as-written.mts';
 import type { ArtifactProduct } from './artifact-path.mts';
 
-export type DocFs = Pick<typeof fsDefault, 'existsSync' | 'statSync' | 'readFileSync' | 'writeFileSync'>;
+export type DocFs = Pick<typeof fsDefault, 'existsSync' | 'statSync' | 'readFileSync' | 'writeFileSync'> & Partial<Pick<typeof fsDefault, 'mkdirSync'>>;
 
 export type DocResult = { ok: boolean; error?: string; stale?: boolean; tooBig?: boolean; path?: string; text?: string; mtime?: number };
 
@@ -93,6 +94,7 @@ export function writeDoc({ file, product, text, mtime, fs = fsDefault }: { file:
       return { ok: false, stale: true, error: 'Something else changed this file while you were typing, so nothing was saved.' };
     }
   }
+  keepWhatWasThere({ file, product, fs });
   try {
     fs.writeFileSync(file, text, 'utf8');
     let after = 0;
@@ -102,4 +104,19 @@ export function writeDoc({ file, product, text, mtime, fs = fsDefault }: { file:
     return { ok: false, error: String((err as Error)?.message ?? err).slice(0, 200) };
 
   }
+}
+
+/**
+ * The words on a document before its first save from the pane, kept as the
+ * copy an agent's next version merges against, when write_document kept none:
+ * a file an agent wrote with its own tools, or one a cloud run sent home.
+ */
+function keepWhatWasThere({ file, product, fs }: { file: string; product?: ArtifactProduct | null; fs: DocFs }): void {
+  if (!product?.dir || !/\.(md|markdown)$/i.test(file) || !isInside(product.dir, file)) return;
+  const kept = asWrittenFile(product.dir, path.relative(product.dir, file).split(path.sep).join('/'));
+  try {
+    if (!kept || fs.existsSync(kept)) return;
+    fs.mkdirSync!(path.dirname(kept), { recursive: true });
+    fs.writeFileSync(kept, fs.readFileSync(file, 'utf8'));
+  } catch { /* the save goes ahead; only a later merge loses its base */ }
 }

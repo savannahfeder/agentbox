@@ -128,6 +128,56 @@ for (const [how, apart] of Object.entries(APART)) {
   });
 }
 
+// A file the agent wrote with its own tools, or one a cloud run sent home, was
+// never through write_document, so nothing kept the agent's words and the merge
+// could not tell them from the person's typing. The pane's save keeps them.
+describe('typing in the app over a document the agent wrote with its own tools', () => {
+  let write; let rel;
+  beforeEach(async () => {
+    await setUp();
+    process.env.ZERO_PRODUCT = product.id;
+    process.env.ZERO_ITEM = row.id;
+    const { tools } = (await import('../mcp/tools.mts')).buildTools({ holder: 'test-worker', ownItem: row.id });
+    write = (fields) => tools.find((t) => t.name === 'write_document').run({ product: product.id, ...fields });
+    rel = `designs/${row.id}/${NAME}`;
+    fs.mkdirSync(path.join(dir, path.dirname(rel)), { recursive: true });
+    fs.writeFileSync(path.join(dir, rel), SCRIPT);
+    store.updateWorkItem(dir, row.id, { result: `The script: [${NAME}](${rel}).` }, { source: 'agent' });
+  });
+  afterEach(() => { delete process.env.STORE_ACCOUNT_ID; delete process.env.ZERO_PRODUCT; delete process.env.ZERO_ITEM; });
+  const typeInTheApp = async (words) => {
+    const { writeDoc } = await import('../main/doc-file.mts');
+    expect(writeDoc({ file: path.join(dir, rel), product: { dir, name: product.name }, text: words }).ok).toBe(true);
+  };
+
+  it('keeps the typed edits in the agent\'s next version', async () => {
+    await typeInTheApp(TYPED);
+    const r = said(await write({ versionOf: NAME, content: theAgents(SCRIPT) }));
+    expect(text(r.path)).toBe(theAgents(TYPED));
+    expect(r.merged).toBe(rel);
+  });
+
+  it('keeps every save of the sitting, not only the last', async () => {
+    await typeInTheApp(TYPED.replace('one-hundred/ten', 'one-hundred/te'));
+    await typeInTheApp(TYPED);
+    const r = said(await write({ versionOf: NAME, content: theAgents(SCRIPT) }));
+    expect(text(r.path)).toBe(theAgents(TYPED));
+  });
+
+  it('saves the agent\'s words as written when nobody typed anything', async () => {
+    const r = said(await write({ versionOf: NAME, content: theAgents(SCRIPT) }));
+    expect(text(r.path)).toBe(theAgents(SCRIPT));
+    expect(r.merged).toBeUndefined();
+  });
+
+  it('saves the agent\'s words as written when its copy already repeats the typed edits word for word', async () => {
+    await typeInTheApp(TYPED);
+    const r = said(await write({ versionOf: NAME, content: theAgents(TYPED) }));
+    expect(text(r.path)).toBe(theAgents(TYPED));
+    expect(r.merged).toBeUndefined();
+  });
+});
+
 // A cloud run's store tools are served inside the app on the Mac, one process
 // for every run, so the process's own ZERO_ITEM is whichever run started last.
 describe('the same on a cloud run, its tools served in the app beside another run', () => {
