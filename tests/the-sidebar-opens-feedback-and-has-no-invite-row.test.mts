@@ -44,8 +44,9 @@ const buttonWith = (html, marker) => {
   const start = html.lastIndexOf('<button', at);
   return html.slice(start, html.indexOf('</button>', at) + '</button>'.length);
 };
-// The folded plane's fold line: the stroke from the nose back to the crease.
-const FOLD = 'M11.5 14.5 21.5 3';
+// The folded plane's fold line: the stroke from the nose back to the crease,
+// as redrawn for 16 points (2026-11-24).
+const FOLD = 'M7.5 9.5 13.5 2.5';
 
 describe('the Feedback row', () => {
   const full = { team: onATeam, onAccount: noop, onInvite: noop, onInstructions: noop, onSettings: noop, onFeedback: noop };
