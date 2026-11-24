@@ -20,7 +20,7 @@ import { resolveAnsweredNotes } from './notes-wake.mts';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mts';
 import { shownTitle } from '../shared/thread-title.mts';
 import { editedFilesLine } from '../shared/artifact-marks.mts';
-import { readItemHistory, updateWorkItem } from './store/work-items.mts';
+import { ledgerLinesWritten, readItemHistory, updateWorkItem } from './store/work-items.mts';
 import { reconcileRows, type ReconcilePatch } from './version-reconcile.mts';
 import { taskCommand } from './task-commands.mts';
 import { providerCommand, reviewTarget, nativeCommandNames } from '../shared/provider-commands.mts';
@@ -9846,17 +9846,19 @@ export class Supervisor {
     // Repeating tasks first, so a run created on this tick is already in the
     // list the fresh-work pass below reads, rather than waiting for the next.
     await this.serveRepeats(now);
-    // Teammates next, for the same reason: a run a message or a schedule made
-    // on this tick is picked up by the pass below.
-    await this.serveTeammates(now);
     // And the folders of rows she has finished, put away. On a timer of its own
     // rather than every pass, because it is a walk of the disk and a tick is
     // fifteen seconds: she closes rows while nothing at all is running, which
     // is exactly when no session exit is coming to do this.
     this.parkOnATimer(now);
     // Every collection pages the heap back in on a swapping Mac, so the threads
-    // are read once a pass, and again only when resolving wrote a mark.
-    const listed = this.store.listItems(now);
+    // are read once a pass, and again only when teammates or resolving wrote.
+    let listed = this.store.listItems(now);
+    // Teammates next, for the same reason as repeating tasks: a run a message
+    // or a schedule made on this tick is picked up by the pass below.
+    const written = ledgerLinesWritten();
+    await this.serveTeammates(now, listed);
+    if (ledgerLinesWritten() !== written) listed = this.store.listItems(now);
     const items = this.resolveAnsweredNotes(now, listed) ? this.store.listItems(now) : listed;
     this.bringBackWhatNeverShipped(items);
     // A task its agent marked ready goes out, one at a time, beside the tick.
@@ -10264,14 +10266,14 @@ export class Supervisor {
 
   // Your words to a teammate that is already on a run go into that run, the
   // way a reply typed in its thread does, live if a session is up.
-  async serveTeammates(now = Date.now()) {
+  async serveTeammates(now = Date.now(), given?: WorkItem[]) {
     if (!teammatesOn(this.config)) return;
     const TEAMMATE_REPLY_DEADLINE_MS = this.config.teammateReplyDeadlineMs ?? 30_000;
     const teammates = this.store.teammates;
     if (!teammates) return;
     let items: WorkItem[];
     try {
-      items = this.store.listItems(now);
+      items = given ?? this.store.listItems(now);
     } catch (err) {
       teammates.noteTrouble?.(`Teammates could not read your threads: ${(err as Error).message}`, now);
       return;
