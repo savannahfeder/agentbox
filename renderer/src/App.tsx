@@ -151,7 +151,7 @@ import { TeammatesContext } from './teammates/row-lead';
 import { ChatsContext, ChatsFrame, LAST_CHAT_KEY, type ChatsValue } from './teammates/ChatsColumn';
 import { queuedTeammateRun, threadsItOpened } from './teammates/chat-lines';
 import { teammateIdOf } from '../../shared/teammates.mts';
-import { placeWithoutGoneMate } from './teammates/mate-place';
+import { MatesOnContext, placeWithoutGoneMate } from './teammates/mate-place';
 import { faceSeed } from '../../shared/teammate-face.mts';
 import { asksWho } from '../../shared/auto-route.mts';
 import { RoomBoard } from './team/rooms/RoomBoard';
@@ -7782,6 +7782,7 @@ export default function App() {
       },
     } : null}>
     <TeammatesContext.Provider value={teammatesById}>
+    <MatesOnContext.Provider value={teammatesUi.live}>
     <ChatsContext.Provider value={chatsValue}>
     <FreeAgentContext.Provider value={freeWaitIds}>
     <TryAgainContext.Provider value={tryAgain}>
@@ -9525,6 +9526,7 @@ export default function App() {
     </TryAgainContext.Provider>
     </FreeAgentContext.Provider>
     </ChatsContext.Provider>
+    </MatesOnContext.Provider>
     </TeammatesContext.Provider>
     </DecideContext.Provider>
     </FollowContext.Provider>

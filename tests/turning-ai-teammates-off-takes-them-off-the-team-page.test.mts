@@ -1,13 +1,15 @@
 // A power tester (w-db46e3fcfd) turned AI teammates off in Settings while on a
 // teammate's page and went back: the page was blank, and the Team list still
 // had its AI teammates section with New teammate in it, and the Standup its
-// "AI teammates post too" switch. Off, those go, and a page left on a teammate
-// that is gone opens the Standup instead.
+// "AI teammates post too" switch. In round two a thread still offered to make
+// a teammate. Off, those go, and a page left on a teammate that is gone opens
+// the Standup instead.
 import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ChatsColumn, ChatsContext } from '../renderer/src/teammates/ChatsColumn.tsx';
-import { placeWithoutGoneMate } from '../renderer/src/teammates/mate-place.ts';
+import { MatesOnContext, placeWithoutGoneMate } from '../renderer/src/teammates/mate-place.ts';
+import { TeammateOffer } from '../renderer/src/components/TeammateOffer.tsx';
 import { StandupPage } from '../renderer/src/team/StandupPage.tsx';
 
 const base = { teammates: [], groups: [], now: 1, onTeammate() {}, onNew() {}, onGroup() {}, onTeam() {} };
@@ -48,5 +50,16 @@ describe('the Standup', () => {
   it('offers "AI teammates post too" only while they are on', () => {
     expect(standup(true)).toContain('AI teammates post too');
     expect(standup(false)).not.toContain('AI teammates post too');
+  });
+});
+
+describe('a thread where Auto offered a teammate', () => {
+  const item = { id: 'w-1', product: 'p', productName: 'P', status: 'open', title: 'Weekly check', labels: ['founder'], priority: 5, epoch: 1, claim: null, createdAt: 1, updatedAt: 1,
+    routed: { to: 'agent', why: 'No teammate', at: 1, by: 'auto', offer: { role: 'Support lead', why: 'It repeats.' } } };
+  const offer = (on) => renderToStaticMarkup(createElement(MatesOnContext.Provider, { value: on }, createElement(TeammateOffer, { item })));
+
+  it('shows the offer while teammates are on, and nothing while they are off', () => {
+    expect(offer(true)).toContain('Make a Support lead');
+    expect(offer(false)).toBe('');
   });
 });
