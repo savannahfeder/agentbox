@@ -82,6 +82,10 @@ const taken = (names) => names.map((n) => path.join(TMP, n)).map((p) => ` (liter
 // The same for this Mac's own ports: the tests serve and call their own, and
 // what was listening before they started is other programs'. An agent's
 // headless browser or Codex's proxy would carry anything to the internet.
+// A signal wakes the debugger of any plain Node program the person runs, here,
+// with no key; one opened after the start would not be on the list.
+const NODE_DEBUGGER = 9229;
+
 export function listening(lsof = '/usr/sbin/lsof') {
   const r = spawnSync(lsof, ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fn'], { encoding: 'utf8', timeout: 10_000 });
   // lsof exits 1 when nothing matches, as on a fresh CI runner.
@@ -105,7 +109,7 @@ export function profile({ root, commonDir, home, tmp, node, writable = [], stage
 (allow default)
 (deny network-outbound)
 (allow network-outbound (remote tcp "localhost:*") (remote udp "localhost:*"))
-${ports.length ? `(deny network-outbound${ports.map((p) => ` (remote tcp "localhost:${p}")`).join('')})\n` : ''}(allow network-outbound${subpaths([root, tmp, TMP])} (literal "/private/var/run/mDNSResponder"))
+(deny network-outbound${[...new Set([NODE_DEBUGGER, ...ports])].map((p) => ` (remote tcp "localhost:${p}")`).join('')})\n(allow network-outbound${subpaths([root, tmp, TMP])} (literal "/private/var/run/mDNSResponder"))
 (deny network-outbound${others})
 ${stage === 'download' ? '(allow network-outbound)\n' : ''}(deny file-write*)
 (allow file-write*${subpaths([root, tmp, TMP, '/dev', ...writable, ...(stage === 'download' ? [caches] : [])])})
