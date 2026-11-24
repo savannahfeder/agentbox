@@ -6,9 +6,11 @@
 /* The size at which phone.css draws its bar instead. */
 @media (min-width: 701px) and (min-height: 521px) {
   /* Folded, each icon keeps the column it has open, so the closed sidebar is as wide as that column. */
-  :root:root .app.workspace-layout.gt-rail { --sidebar-w: 220px; --sidebar-fill: color-mix(in srgb, var(--text) 6%, transparent); }
+  :root:root .app.workspace-layout.gt-rail { --sidebar-w: 210px; --sidebar-fill: color-mix(in srgb, var(--text) 6%, transparent); }
   :root:root .app.workspace-layout.gt-rail.workspace-collapsed:not(.workspace-settings) { --sidebar-w: 28px; --workspace-left: 58px; }
 
+  /* A pointer that slips off the open sidebar's edge on its way to a button is still on it. */
+  :root:root .gt-rail:not(.workspace-collapsed) .gt-rail-nav.workspace-navigation::after { content: ''; position: absolute; top: 0; bottom: 0; left: 100%; width: 22px; }
   :root:root .gt-rail-nav.workspace-navigation { left: 14px; width: var(--sidebar-w); font-size: 14px; font-weight: 500; line-height: 20px; color: var(--text-dim); }
 
   :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab, .workspace-find button, .workspace-utilities > button, .ws-recent-row) {
@@ -18,19 +20,20 @@
   :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab.active, .workspace-utilities > button[aria-current="page"]) { background: var(--sidebar-fill); box-shadow: none; color: var(--text); font-weight: 500; }
 
   /* The app's icons are drawn on a 24 grid for 18 and 20 points. Here each is
-     sized so its ink is the same height as the others' and weighs 1.55. Search,
-     Feedback and Sign in are drawn inside a group scaled to .8. */
-  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab, .workspace-find button, .workspace-utilities > button) > svg { width: 18px; height: 18px; margin: -1px; stroke-width: 2.07px; color: var(--text-faint); }
-  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-find button, .workspace-utilities > button) > svg > g { stroke-width: 2.58px; }
+     sized so its ink is the same height as the others' and its line is 1.2,
+     in the ink of its word. Search, Feedback and Sign in are drawn inside a
+     group scaled to .8. */
+  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab, .workspace-find button, .workspace-utilities > button, .sb-update-slot > .sb-update-row) > svg { width: 18px; height: 18px; margin: -1px; stroke-width: 1.6px; color: inherit; }
+  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-find button, .workspace-utilities > button) > svg > g { stroke-width: 2px; }
   :root:root .gt-rail-nav.workspace-navigation .workspace-find button > svg { width: 20px; height: 20px; margin: -2px; }
-  :root:root .gt-rail-nav.workspace-navigation .workspace-find button > svg > g { stroke-width: 2.33px; }
-  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab.active, .workspace-tab:hover, .workspace-utilities > button:hover) > svg { color: var(--text-dim); }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-find button > svg > g { stroke-width: 1.8px; }
 
   :root:root .gt-rail-nav.workspace-navigation .th-team { height: 28px; margin: 8px 0 0; padding: 0 0 0 4px; gap: 6px; font-size: 14px; font-weight: 600; letter-spacing: -.18px; color: var(--text); }
   :root:root .gt-rail-nav.workspace-navigation :is(.ws-new, .ws-keep) { flex: none; width: 28px; height: 28px; padding: 0; justify-content: center; border-radius: var(--radius); color: var(--text-faint); cursor: default; transition: opacity .14s .08s; }
   :root:root .gt-rail-nav.workspace-navigation :is(.ws-new, .ws-keep) > svg { width: 16px; height: 16px; }
   /* The two sit 2 apart; the row's own gap is 6. */
   :root:root .gt-rail-nav.workspace-navigation .ws-keep { margin-left: -4px; }
+  :root:root .gt-rail-nav.workspace-navigation .ws-keep[aria-pressed="true"] { background: var(--sidebar-fill); color: var(--text); }
   :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation :is(.ws-new, .ws-keep) { visibility: hidden; opacity: 0; transition: opacity .06s, visibility 0s .06s; }
 
   /* Search is a field, so its keys are read before they are needed. */
@@ -44,6 +47,9 @@
   :root:root .gt-rail-nav.workspace-navigation .workspace-tabs { gap: 2px; margin-top: 0; }
   :root:root .gt-rail-nav.workspace-navigation .workspace-find + .workspace-tabs { margin-top: 12px; }
   :root:root .gt-rail-nav.workspace-navigation .workspace-tabs + .workspace-tabs { margin-top: 2px; }
+  /* With its heading gone, Workspace would be three icons after a gap. */
+  :root:root .gt-rail-nav.workspace-navigation :is(.gt-rail-groups, .workspace-places) { transition: opacity .14s .08s; }
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation :is(.gt-rail-groups, .workspace-places) { visibility: hidden; opacity: 0; transition: opacity .06s, visibility 0s .06s; }
   :root:root .gt-rail-nav.workspace-navigation .workspace-running { font-size: 11.5px; font-weight: 400; line-height: 16px; letter-spacing: .02em; color: var(--text-dim); }
   /* Closed, the Inbox's number is the dot on its icon. */
   :root:root .gt-rail-nav.workspace-navigation .workspace-tab.has-count::after { top: 4px; left: 18px; width: 5px; height: 5px; }
@@ -70,6 +76,10 @@
 
   :root:root .gt-rail-nav.workspace-navigation .workspace-bottom { position: relative; flex: none; padding-top: 16px; }
   :root:root .gt-rail-nav.workspace-navigation .workspace-utilities { gap: 2px; padding-bottom: 0; }
+  :root:root .gt-rail-nav.workspace-navigation .sb-update-slot { padding-bottom: 0; margin-bottom: 6px; }
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .sb-update-slot { margin-bottom: 0; }
+  /* Closed, the update row is one more icon in the foot's column. Open, it is the card's button (threads/pages.css). */
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .sb-update-slot > .sb-update-row { width: 100%; height: 30px; padding: 0 6px; border-radius: var(--radius); color: inherit; }
   /* Settings is in your account menu while you are signed in. */
   :root:root .gt-rail-nav.workspace-navigation .workspace-utilities > .ws-in-menu { display: none; }
   :root:root .gt-rail-nav.workspace-navigation .th-me { display: block; height: auto; margin: 2px 0 0; padding: 0; border-top: 0; font-size: inherit; }

@@ -136,3 +136,33 @@ describe('what is left of your limit, in the sidebar', () => {
     expect(pill).toMatch(/aria-label=\{sentence\}/);
   });
 });
+
+// The owner, on the built sidebar, 2026-11-24: the icons "look a little heavy",
+// names "really touch" the right edge where Notion leaves room, closed "there's
+// just this big white space" between Inbox and Team, and "the restart/update is
+// misaligned compared to the feedback icon". Measured at 1760x1005: icon lines
+// were 1.55 points and greyer than their words, a name ended 18 points from the
+// page, the closed gap was 40 points against 2 between other icons, and the
+// update arrow sat 10 points right of the icon column.
+describe('the second pass on its finish', () => {
+  const css = strip(read('renderer/src/sidebar.css'));
+  const P = ':root:root .gt-rail-nav.workspace-navigation';
+  it('draws every icon with a 1.2 point line, in the ink of its own word', () => {
+    expect(css).toContain('> svg { width: 18px; height: 18px; margin: -1px; stroke-width: 1.6px; color: inherit; }');
+    expect(css).not.toContain('stroke-width: 2.07px');
+    expect(css).not.toMatch(/> svg \{[^}]*color: var\(--text-faint\)/);
+  });
+  it('ends 22 points short of the page, where Settings’ own list ends', () => {
+    expect(css).toContain('--sidebar-w: 210px;');
+    expect(strip(read('renderer/src/workspace-navigation.css'))).toContain('.app.workspace-layout.workspace-settings { --workspace-width: 202px; }');
+  });
+  it('draws no Workspace icons while closed, so nothing stands after a gap', () => {
+    expect(css).toMatch(/\.workspace-collapsed \.gt-rail-nav\.workspace-navigation :is\(\.gt-rail-groups, \.workspace-places\) \{[^}]*visibility: hidden/);
+  });
+  it('sets the update row in the foot’s own icon column', () => {
+    expect(css).toContain(':root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .sb-update-slot { margin-bottom: 0; }');
+    expect(css).toContain(':root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .sb-update-slot > .sb-update-row { width: 100%; height: 30px; padding: 0 6px;');
+    // Open, it stays the card's own button, inside the sidebar's width.
+    expect(css).not.toMatch(/\.sb-update-slot > \.sb-update-row, \.ws-recent-row\) \{\s*width: 100%/);
+  });
+});

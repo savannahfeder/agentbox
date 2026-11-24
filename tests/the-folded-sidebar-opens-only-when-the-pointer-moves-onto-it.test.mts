@@ -24,11 +24,15 @@ describe('a pointer that moved', () => {
 
 describe('the folded sidebar', () => {
   it('opens on a pointer that moved over it, never on one it appeared under', () => {
-    expect(nav).toMatch(/onMouseMove: \(e: \{ movementX: number; movementY: number \}\) => \{ if \(hoverAt\.current \|\| !pointerMoved\(e\)\) return;/);
+    expect(nav).toMatch(/onMouseMove: \(e: \{ movementX: number; movementY: number \}\) => \{/);
+    expect(nav).toContain('if (hoverAt.current || !pointerMoved(e)) return;');
     expect(nav).not.toMatch(/onMouseEnter: \(\) => \{ hoverAt\.current = setTimeout/);
   });
+  // Since 2026-11-24 it closes a beat after the pointer leaves, so one that slips
+  // off the edge can come back (tests/a-button-in-the-sidebar-keeps-it-open).
   it('still waits a moment, and still closes when the pointer leaves', () => {
-    expect(nav).toMatch(/hoverAt\.current = setTimeout\(\(\) => onHover\(true\), 140\)/);
-    expect(nav).toMatch(/onMouseLeave: \(\) => \{ if \(hoverAt\.current\) clearTimeout\(hoverAt\.current\); hoverAt\.current = null; onHover\(false\); \}/);
+    expect(nav).toContain('hoverAt.current = setTimeout(() => onHover(true), OPENS_AFTER_MS);');
+    expect(nav).toMatch(/onMouseLeave: \(\) => \{\s*if \(hoverAt\.current\) clearTimeout\(hoverAt\.current\);\s*hoverAt\.current = null;/);
+    expect(nav).toContain('leaveAt.current = setTimeout(() => { leaveAt.current = null; onHover(false); }, CLOSES_AFTER_MS);');
   });
 });
