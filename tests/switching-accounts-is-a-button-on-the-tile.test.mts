@@ -78,8 +78,8 @@ describe('the line under the name', () => {
   });
 
   // Where it is available, once a cloud is set up: an-account-tile-says-where-it-is-available.
-  it('says when the sign-in here is not finished', () => {
-    expect(accountTile(account({ here: here({ signedIn: false }) }), acts()).about).toEqual(['Finish signing in to use it']);
+  it('says when a known account is signed out here', () => {
+    expect(accountTile(account({ here: here({ signedIn: false }) }), acts()).about).toEqual(['Signed out']);
   });
 
   it('trouble here replaces the meters and carries the command that signs it back in', () => {

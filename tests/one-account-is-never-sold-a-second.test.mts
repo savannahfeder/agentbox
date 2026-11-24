@@ -152,7 +152,8 @@ describe('the account rows never tell anybody to get a second subscription', () 
     // "Signed in" on either agent's page, which cannot grow a plural whatever
     // the count is.
     expect(said).toMatch(/title=\{agent\.name\}/);
-    expect(said).toMatch(/name="Signed in"/);
+    expect(said).toMatch(/name=\{accountsHeading\(accounts\)\}/);
+    expect(cardSource).toMatch(/\? 'Signed in' : 'Account';/);
     expect(said).not.toMatch(/label="Accounts"/);
     expect(said).not.toMatch(/Claude accounts/);
   });
@@ -195,7 +196,7 @@ describe('the account rows never tell anybody to get a second subscription', () 
   it('offers the same Add account row on either agent', () => {
     expect(cardSource).not.toMatch(/\{agent\.engine === 'codex' && \(/);
     expect(cardSource).toMatch(/className="acct-tile acct-tile-add" onClick=\{onAdd\}>Add account<\/button>/);
-    expect(spoken(accountsPane)).toMatch(/<Place[\s\S]{0,900}onAdd=\{\(\) => void addAccount\(agent\)\}/);
+    expect(spoken(accountsPane)).toMatch(/<Place[\s\S]{0,900}onAdd=\{[^}]*\(\) => void addAccount\(agent\)/);
     // And it still says nothing about what a second one would add, which is the
     // line that did not move.
     expect(cardSource).not.toMatch(/adds capacity/);
@@ -239,7 +240,7 @@ describe('where the account rows live', () => {
   // SINCE THE REDRAW (w-ccadd13c46): each agent's own page, which the menu
   // names by the agent, so the place to look is the word she is looking for.
   it('is the coding agent\'s own page', () => {
-    expect(spoken(accountsPane)).toMatch(/name="Signed in"/);
+    expect(spoken(accountsPane)).toMatch(/name=\{accountsHeading\(accounts\)\}/);
     expect(cardSource).toMatch(/w\.accounts \?\? \[\]\)\.map/);
     const general = settings.slice(settings.indexOf("pane === 'general' && ("), settings.indexOf("pane === 'claude' && enginePage"));
     expect(general).not.toContain('name="Signed in"');
@@ -266,7 +267,7 @@ describe('where the account rows live', () => {
   // and since 2026-10-21 every account is one tile, wherever it is signed in.
   it('reads who is signed in with how much is left, then permissions', () => {
     const said = spoken(accountsPane);
-    const who = said.indexOf('name="Signed in"');
+    const who = said.indexOf('name={accountsHeading(accounts)}');
     const usage = said.indexOf('accounts={tiles}');
     const perms = said.indexOf('label="Permissions"');
     expect(who).toBeGreaterThan(-1);
