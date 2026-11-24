@@ -1,9 +1,9 @@
 {
-  "approved": "2026-11-02",
-  "pictures": "designs/w-dd540cfe80 in the product's documents: 2-after-dark.png and light-1-page.png to light-7-lightmac-after.png",
+  "approved": "2026-11-23",
+  "pictures": "designs/w-dd540cfe80 in the product's documents: 2-after-dark.png and light-1-page.png to light-7-lightmac-after.png; the list's Turn off choices approved on 2026-11-23 from the real tray shown live on the Mac over a dark page and a light one (thread w-42b2671e8f)",
   "parts": {
-    "the tray page styles (renderer/src/corner-tag/corner-tag.css)": "5668ba229082b283",
-    "the tray page (renderer/src/corner-tag/main.tsx)": "86dcb8d1f6328b8e",
+    "the tray page styles (renderer/src/corner-tag/corner-tag.css)": "94ce0d4ce545709d",
+    "the tray page (renderer/src/corner-tag/main.tsx)": "80cd56aba0330571",
     "the nine dots (renderer/src/corner-tag/lattice.tsx)": "31c90685a6551c6b",
     "the corner picker (renderer/src/corner-tag/place.tsx)": "a33be8b6183bdfc3",
     "the Mac's glass (main/native/liquid-glass/liquid-glass.mm)": "353a22d9e6e35208",

@@ -67,6 +67,22 @@ describe('the gate log reading adds up', () => {
     expect(s.peaks.neverMeasured).toBe(1);
   });
 
+  it('counts the heavy commands the gate called light', () => {
+    // What a change to how the gate learns is judged by: 93 of 145 in the week to 23 November 2026.
+    const s = summariseGrants([
+      grant({ cls: 'light', peakMb: 1_600 }),
+      grant({ cls: 'light', peakMb: 400 }),
+      grant({ cls: 'unknown', peakMb: 2_200 }),
+      grant({ cls: 'heavy', peakMb: 900 }),
+      // Under the line, never measured, or measured with another: none of these is known heavy.
+      grant({ cls: 'light', peakMb: 399 }),
+      grant({ cls: 'light', peakMb: null }),
+      grant({ cls: 'light', peakMb: null, shared: true }),
+    ]);
+    expect(s.calledLight).toEqual({ heavy: 2, ofHeavy: 4, overGb: 1, ofOverGb: 2 });
+    expect(summariseGrants([]).calledLight).toEqual({ heavy: 0, ofHeavy: 0, overGb: 0, ofOverGb: 0 });
+  });
+
   it('survives a half-written line and an empty log', () => {
     expect(summariseGrants([]).lines).toBe(0);
     expect(summariseGrants([null, undefined, 'nonsense']).lines).toBe(3);

@@ -148,8 +148,9 @@ function fromHelper(): Promise<string | null> {
       if (at !== -1) done(out.slice(0, at));
     };
     const onGone = () => { letGoOf(asked); done(null); };
+    // Not unref'd: the helper is, so while a reading is out this deadline is
+    // what keeps a script that awaits it running.
     const late = setTimeout(() => { asked.kill(); onGone(); }, ASK_MS);
-    late.unref?.();
     asked.stdout.on('data', onData);
     asked.once('exit', onGone);
     asked.once('error', onGone);

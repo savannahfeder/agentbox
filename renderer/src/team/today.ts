@@ -94,7 +94,7 @@ const first = (name: string) => name.split(/\s+/)[0] || name;
 /** A teammate's name is its job ("Chief of staff"), so only a person is cut to a first name. */
 const quietName = (p: { kind: string; name: string }) => (p.kind === 'mate' ? p.name : first(p.name));
 const oneLine = (s: string) => {
-  const line = withoutFiles(s).split('\n').find((l) => l.trim())?.trim() || 'Sent a file';
+  const line = withoutFiles(s).replace(/\[([^\]\n]+)\]\([^)\s]+\)/g, '$1').split('\n').find((l) => l.trim())?.trim() || 'Sent a file';
   return line.length > 110 ? `${line.slice(0, 108).replace(/\s+\S*$/, '')}…` : line;
 };
 
@@ -297,7 +297,9 @@ export function teamToday({ range, window, now, me, items, products, cards, deci
   // Your own agents' asks are yours, so every row the count names has a line.
   for (const n of needs) {
     const mate = mateOf(n);
-    const from = mate ? `mate:${mate}` : keyOfPerson(n.createdBy && n.createdBy !== me ? n.createdBy : directWith(n.product)) ?? 'me';
+    // A record that holds only tasks has no chat to say who it is with; a task you gave is with whoever has it.
+    const other = n.createdBy && n.createdBy !== me ? n.createdBy : directWith(n.product) ?? (isTaskRow(n) ? n.assignee : null);
+    const from = mate ? `mate:${mate}` : keyOfPerson(other) ?? 'me';
     const who = byKey.get(from);
     if (!who) continue;
     const line: TodayLine = { key: `${n.product}/${n.id}`, title: shownTitle(n), at: isTaskRow(n) ? taskNewsAt(n, me) : n.updatedAt, item: n as WorkItem };

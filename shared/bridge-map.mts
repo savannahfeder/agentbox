@@ -281,7 +281,6 @@ export const PUSH_CHANNELS: Readonly<Record<string, string>> = {
   onThreadLink: 'zero:thread-link',
   onSharedFile: 'zero:shared-file',
   onOpenItem: 'zero:open-item',
-  onOpenSettings: 'zero:open-settings',
   onScreenDetail: 'zero:screen-detail',
   onEscapeBrowser: 'zero:escape-browser',
   onKeyInTheFile: 'zero:key-in-the-file',

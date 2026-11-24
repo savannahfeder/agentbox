@@ -15,9 +15,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+/** main/memory-gate-history.mts's line, kept here so this runs on a node that cannot load the app's files. */
+const HEAVY_MB = 400;
 const LIGHT_LETTERS = new Set(['l', 'c']);
 const isLight = (o) => LIGHT_LETTERS.has(o);
-const measured = (list) => (list ?? []).filter((o) => o !== '?');
+// `H` is a chain that came out heavy: it is counted below, and is no reading of the command itself.
+const measured = (list) => (list ?? []).filter((o) => o !== '?' && o !== 'H');
 
 /** Where the app keeps its own files, on either platform, newest first. */
 export function likelyUserDirs(home = os.homedir()) {
@@ -58,6 +61,8 @@ export function summariseGrants(entries) {
     refusals: { total: 0, underNormal: 0, underTight: 0, commands: [] },
     // Commands answered with what their thread holds (main/memory-give-back.mts).
     askedBack: 0,
+    // Of the commands measured at HEAVY_MB or more (and at 1 GB or more), how many started as light.
+    calledLight: { heavy: 0, ofHeavy: 0, overGb: 0, ofOverGb: 0 },
     slotPressedWaitMs: 0,
     tightWaitMs: 0,
     waitedAtAllUnderNormal: 0,
@@ -96,6 +101,14 @@ export function summariseGrants(entries) {
       else out.refusals.underNormal++;
       if (out.refusals.commands.length < 25) out.refusals.commands.push({ waitMs: wait, pressure: e.pressure ?? null, cmd: e.cmd ?? '' });
     }
+    if (!e.shared && Number.isFinite(e.peakMb) && e.peakMb >= HEAVY_MB) {
+      out.calledLight.ofHeavy++;
+      if (cls === 'light') out.calledLight.heavy++;
+      if (e.peakMb >= 1000) {
+        out.calledLight.ofOverGb++;
+        if (cls === 'light') out.calledLight.overGb++;
+      }
+    }
     if (wantedASlot && !e.refused) {
       if (e.shared) out.peaks.sharedDropped++;
       else if (Number.isFinite(e.peakMb)) slotPeaks.push(e.peakMb);
@@ -122,7 +135,7 @@ export function summariseProvenance(raw) {
   const out = {
     keys: { total: 0, lightToday: 0, lightOnChainEvidenceOnly: 0 },
     programs: { total: 0, lendsLightToday: 0, wouldStopLending: 0, names: [] },
-    letters: { l: 0, c: 0, m: 0, h: 0, '?': 0 },
+    letters: { l: 0, c: 0, H: 0, m: 0, h: 0, '?': 0 },
     carriesProvenance: false,
   };
   const keys = new Map(Array.isArray(raw?.keys) ? raw.keys : []);
@@ -177,6 +190,8 @@ function printGrants(s) {
   console.log(`  median ${s.peaks.heldSlotMedianMb ?? 'n/a'}, p90 ${s.peaks.heldSlotP90Mb ?? 'n/a'}, worst ${s.peaks.heldSlotMaxMb ?? 'n/a'}`);
   console.log(`  readings dropped as shared: ${s.peaks.sharedDropped}; never measured: ${s.peaks.neverMeasured}`);
   console.log(`\nASKED TO GIVE MEMORY BACK: ${s.askedBack}`);
+  console.log(`\nHEAVY COMMANDS CALLED LIGHT: ${s.calledLight.heavy} of the ${s.calledLight.ofHeavy} measured at ${HEAVY_MB} MB or more`);
+  console.log(`  of those at 1 GB or more: ${s.calledLight.overGb} of ${s.calledLight.ofOverGb}. A light command starts at once, whatever the memory.`);
   console.log(`\nREFUSALS: ${s.refusals.total} (${s.refusals.underNormal} under normal, ${s.refusals.underTight} under tight)`);
   for (const r of s.refusals.commands) {
     console.log(`  ${secs(r.waitMs).padStart(8)}  ${String(r.pressure).padEnd(8)} ${r.cmd.slice(0, 80).replace(/\n/g, ' ')}`);
@@ -195,7 +210,7 @@ function printProvenance(s) {
     console.log(`let the app run on it and come back.`);
   }
   console.log(`letters across every record: ${Object.entries(s.letters).map(([k, v]) => `${k}=${v}`).join(' ')}`);
-  console.log(`  l is a run measured on its own; c is one measured only inside a chain.`);
+  console.log(`  l is a run measured on its own; c is one seen only inside a chain that came out light, H inside one that came out heavy.`);
   console.log(`\ncommand keys: ${s.keys.total}`);
   console.log(`  classified light today: ${s.keys.lightToday}`);
   console.log(`  of those, resting ONLY on chain-learned runs: ${s.keys.lightOnChainEvidenceOnly}`);

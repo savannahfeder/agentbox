@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('cornerTag', {
   resize: (by) => ipcRenderer.invoke('corner-tag:resize', { by }),
   // 'tl', 'tr', 'bl' or 'br', picked from the list's Place.
   place: (corner) => ipcRenderer.invoke('corner-tag:place', corner),
-  settings: () => ipcRenderer.invoke('corner-tag:settings'),
+  // For good, until the switch in Settings turns it back on.
+  off: () => ipcRenderer.invoke('corner-tag:off'),
   menu: () => ipcRenderer.invoke('corner-tag:menu'),
 });

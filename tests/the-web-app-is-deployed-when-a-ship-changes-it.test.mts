@@ -138,7 +138,7 @@ describe('after a ship', () => {
   it('runs from the ship, after the push, and ends before the ship queue stops the ship', () => {
     const ship = read('scripts/ship.mjs');
     const pushed = ship.indexOf("say(`shipped ${sha}.`)");
-    const deploy = ship.indexOf('await deployAfterShip({ root, say, until: shipEndsBy })');
+    const deploy = ship.indexOf('await deployAfterShip({ root, say, until: shipEndsBy, trusted: ');
     expect(pushed).toBeGreaterThan(0);
     expect(deploy).toBeGreaterThan(pushed);
     const queue = read('main/ship-queue.mts');

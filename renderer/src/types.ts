@@ -323,6 +323,8 @@ export interface PlacedFile {
   name: string;
   /** The name a person gave it in Files; `name` stays its name on disk. */
   title?: string;
+  /** Its later versions' own names, when they differ from `name`. */
+  versionNames?: string[];
   /** The icon a person picked for its tile. */
   icon?: string;
   kind: FileKind | null;
@@ -495,7 +497,7 @@ export interface FoundWhere {
   updatedAt: number;
 }
 export interface FoundLine extends FoundWhere { uid: string; by: string | null; source: 'founder' | 'agent' | 'system'; at: number; comment: boolean; text: string }
-export interface FoundFile extends FoundWhere { how: 'name' | 'contents'; src: string; name: string; by: string | null; at: number; text: string }
+export interface FoundFile extends FoundWhere { how: 'name' | 'contents'; src: string; name: string; by: string | null; agent?: string; at: number; text: string }
 export interface FoundComment extends FoundWhere { src: string; name: string; by: string | null; at: number; resolved: boolean; noteId: string; fileId: string; text: string }
 /** What the finder in main answers (main/everything-found.mts). */
 export interface FoundInThreads {
@@ -2004,8 +2006,6 @@ declare global {
         ready: { id: string; title: string; says: string; since?: number; open?: string | null }[];
         working: number;
       }): Promise<void>;
-      // The corner tag's "Turn off…": open Settings on this page.
-      onOpenSettings?(fn: (p: { pane?: string }) => void): () => void;
       // screenDetail is which set of theme pictures this screen wants, 'soft' or
       // 'sharp' (main/screen-detail.mts). It rides here rather than being
       // pushed because the answer is needed on the first paint.

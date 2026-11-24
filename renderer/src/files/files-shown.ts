@@ -25,7 +25,7 @@ export function filesShown(files: PlacedFile[], { query = '', kind = null, proje
   for (const f of files) {
     if (page && fold(f.project ?? '') !== page) continue;
     if (kind && f.kind !== kind) continue;
-    const own = partsOf(`${f.name} ${shownName(f)}`);
+    const own = partsOf(`${f.name} ${shownName(f)} ${(f.versionNames ?? []).join(' ')}`);
     const all = [...own, ...partsOf(`${f.project ?? ''} ${folders.find((x) => x.id === f.folder)?.name ?? ''}`)];
     if (!words.every((w) => startsAPart(all, w))) continue;
     (!words.length || words.some((w) => startsAPart(own, w)) ? named : placed).push(f);

@@ -40,6 +40,29 @@ describe('what the window counts', () => {
     expect(lag.take()).toEqual({ longMs: 0, longest: 0, slow: 2, worst: 640 });
   });
 
+  it('counts one click once, though it reaches the page as a press, a release and a click', () => {
+    // The first half hour of readings said 9 to 38 late answers a minute, every event of each press counted.
+    const lag = lagCounter();
+    lag.input(120, 7);
+    lag.input(136, 7);
+    lag.input(128, 7);
+    lag.input(240, 8);
+    expect(lag.take()).toEqual({ longMs: 0, longest: 0, slow: 2, worst: 240 });
+    // In the next minute the same press, still being answered, is that minute's to count.
+    lag.input(120, 8);
+    expect(lag.take()).toEqual({ longMs: 0, longest: 0, slow: 1, worst: 120 });
+  });
+
+  it('keeps the worst of a press\'s events, and still counts an event that names no press', () => {
+    const lag = lagCounter();
+    lag.input(120, 7);
+    lag.input(410, 7);
+    lag.input(150);
+    lag.input(150);
+    expect(lag.take()).toEqual({ longMs: 0, longest: 0, slow: 3, worst: 410 });
+    expect(read('renderer/src/window-lag.ts')).toMatch(/lag\.input\(e\.duration, e\.interactionId\)/);
+  });
+
   it('starts again after it is taken, and says nothing when nothing was held', () => {
     const lag = lagCounter();
     expect(lag.take()).toBe(null);

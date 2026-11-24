@@ -10,6 +10,11 @@
 // afresh as they are for a person who has just sent a message. Seven such
 // names there, 8,879 folder reads each across 39 projects: about 62,000 folder
 // reads a minute for files that are not there.
+//
+// 2026-11-24: main went red here once a bare name was also looked for in each
+// project's attachments folder. A path never reaches that folder, so a bare
+// name after a path lists it once per project (3 reads), then never again: 0 a
+// minute and 11 minutes later, measured.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -103,9 +108,19 @@ describe('a shared thread that points at a file no project has', () => {
   });
 
   it('lists none again for a second thread naming another file that is not there', async () => {
+    asks(maya, 'Where is the plan?', 'It is in `launch-plan.md`.');
+    await maya.service.syncNow();
+    asks(maya, 'And the budget?', 'It is in `budget-2027.csv`.');
+    expect(await folderReads(maya, () => maya.service.syncNow())).toBe(0);
+  });
+
+  it('lists each project\'s attachments once for a bare name after a path, then never again', async () => {
     asks(maya, 'Where is the plan?', 'It is in [the plan](plans/launch-plan.md).');
     await maya.service.syncNow();
     asks(maya, 'And the budget?', 'It is in `budget-2027.csv`.');
+    expect(await folderReads(maya, () => maya.service.syncNow())).toBe(PROJECTS.length);
+    asks(maya, 'And the notes?', 'It is in `notes-2027.csv`.');
+    clock += 61_000;
     expect(await folderReads(maya, () => maya.service.syncNow())).toBe(0);
   });
 });

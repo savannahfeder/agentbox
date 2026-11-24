@@ -43,86 +43,123 @@ export const LIGHT_MB = 150;
 export const HEAVY_MB = 400;
 /** A run this short, never seen big, counts as light. */
 export const QUICK_MS = 2_000;
+/**
+ * A command, or a program lending to an argument nobody has seen, is not
+ * light once this many of its last ten chain runs were chains measured heavy.
+ * Replayed over a week of one 16 GB Mac, three caught 4 more heavy commands
+ * and held 34 more small ones, and five caught the same as four.
+ */
+export const HEAVY_CHAINS = 4;
+/** How many runs of each kind a record keeps: measured alone, and seen in a chain. */
+const KEPT = 10;
 
 /**
  * Split a shell command into the programs it starts, as `program firstArg`
- * keys, without running or fully parsing it. `opaque` is true when part of it
- * is computed at run time ($(...) or backticks outside single quotes), which
- * this cannot see into.
+ * keys, without running or fully parsing it. What `$(...)` runs is read like
+ * the rest, its programs filed before the command it sits in. `opaque` is true
+ * when part of it cannot be seen into: backticks, or a `$(` that never closes.
  */
 export function commandSegments(command: unknown): { keys: string[]; opaque: boolean } {
   const text = String(command ?? '');
-  const segments: string[][] = [];
-  let words: string[] = [];
-  let word = '';
-  let inWord = false;
-  let quote: string | null = null;
+  const keys: string[] = [];
   let opaque = false;
-  const heredocs: string[] = [];
-  const endWord = () => {
-    if (inWord) words.push(word);
-    word = ''; inWord = false;
-  };
-  const endSegment = () => { endWord(); if (words.length) segments.push(words); words = []; };
+  // One `$(` never closed and the rest are left as text: each would read the
+  // rest of the command again, twice the work for every one of them.
+  let unclosed = false;
 
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (quote === "'") {
-      if (c === "'") quote = null; else word += c;
-      continue;
-    }
-    if (c === '\\' && i + 1 < text.length) { word += text[++i]; inWord = true; continue; }
-    if (quote === '"') {
-      if (c === '"') quote = null;
-      else {
-        if (c === '`' || (c === '$' && text[i + 1] === '(')) opaque = true;
-        word += c;
-      }
-      continue;
-    }
-    if (c === "'" || c === '"') { quote = c; inWord = true; continue; }
-    if (c === '`' || (c === '$' && text[i + 1] === '(')) opaque = true;
-    if (c === '<' && text[i + 1] === '<' && text[i + 2] !== '<') {
-      // A here-document: its body is text handed to a program, not commands.
-      endWord();
-      let j = i + 2;
-      if (text[j] === '-') j++;
-      while (text[j] === ' ') j++;
-      let delim = '';
-      while (j < text.length && !/[\s;&|]/.test(text[j])) delim += text[j++];
-      heredocs.push(delim.replace(/^['"]|['"]$/g, ''));
-      i = j - 1;
-      continue;
-    }
-    if (c === '\n') {
+  // Reads from `from` to the end of the text, or, inside a `$(`, to the `)`
+  // that closes it. Answers where it stopped, or -1 inside one never closed.
+  const scan = (from: number, nested = 0): number => {
+    const inside = nested > 0;
+    // Deeper than anyone types; past it the command is one this cannot see into.
+    if (nested > 32) return -1;
+    const segments: string[][] = [];
+    let words: string[] = [];
+    let word = '';
+    let inWord = false;
+    let quote: string | null = null;
+    let depth = 0;
+    const heredocs: string[] = [];
+    const endWord = () => {
+      if (inWord) words.push(word);
+      word = ''; inWord = false;
+    };
+    const endSegment = () => { endWord(); if (words.length) segments.push(words); words = []; };
+    const file = () => {
       endSegment();
-      while (heredocs.length) {
-        const delim = heredocs.shift();
-        let end = text.indexOf('\n', i + 1);
-        while (true) {
-          const line = text.slice(i + 1, end === -1 ? text.length : end);
-          i = end === -1 ? text.length : end;
-          if (line.trim() === delim || end === -1) break;
-          end = text.indexOf('\n', i + 1);
+      for (const seg of segments) {
+        const key = keyOf(seg);
+        if (key) keys.push(key);
+      }
+    };
+
+    for (let i = from; i < text.length; i++) {
+      const c = text[i];
+      if (quote === "'") {
+        if (c === "'") quote = null; else word += c;
+        continue;
+      }
+      if (c === '\\' && i + 1 < text.length) { word += text[++i]; inWord = true; continue; }
+      if (c === '`') opaque = true;
+      if (c === '$' && text[i + 1] === '(' && !unclosed) {
+        // `$((` is arithmetic and starts nothing.
+        const arithmetic = text[i + 2] === '(';
+        const close = arithmetic ? text.indexOf('))', i + 3) : scan(i + 2, nested + 1);
+        if (close === -1) { opaque = true; unclosed = true; } else {
+          const end = arithmetic ? close + 1 : close;
+          word += text.slice(i, end + 1);
+          inWord = true;
+          i = end;
+          continue;
         }
       }
-      continue;
+      if (quote === '"') {
+        if (c === '"') quote = null; else word += c;
+        continue;
+      }
+      if (c === "'" || c === '"') { quote = c; inWord = true; continue; }
+      if (c === '<' && text[i + 1] === '<' && text[i + 2] !== '<') {
+        // A here-document: its body is text handed to a program, not commands.
+        endWord();
+        let j = i + 2;
+        if (text[j] === '-') j++;
+        while (text[j] === ' ') j++;
+        let delim = '';
+        while (j < text.length && !/[\s;&|]/.test(text[j])) delim += text[j++];
+        heredocs.push(delim.replace(/^['"]|['"]$/g, ''));
+        i = j - 1;
+        continue;
+      }
+      if (c === '\n') {
+        endSegment();
+        while (heredocs.length) {
+          const delim = heredocs.shift();
+          let end = text.indexOf('\n', i + 1);
+          while (true) {
+            const line = text.slice(i + 1, end === -1 ? text.length : end);
+            i = end === -1 ? text.length : end;
+            if (line.trim() === delim || end === -1) break;
+            end = text.indexOf('\n', i + 1);
+          }
+        }
+        continue;
+      }
+      if (c === ';' || c === '|' || (c === '&' && !/[<>]$/.test(word) && text[i + 1] !== '>')) {
+        endSegment();
+        if ((c === '|' || c === '&') && text[i + 1] === c) i++;
+        continue;
+      }
+      if (c === ' ' || c === '\t') { endWord(); continue; }
+      if (c === ')' && inside && depth === 0) { file(); return i; }
+      if (c === '(') depth++;
+      else if (c === ')' && depth > 0) depth--;
+      word += c; inWord = true;
     }
-    if (c === ';' || c === '|' || (c === '&' && !/[<>]$/.test(word) && text[i + 1] !== '>')) {
-      endSegment();
-      if ((c === '|' || c === '&') && text[i + 1] === c) i++;
-      continue;
-    }
-    if (c === ' ' || c === '\t') { endWord(); continue; }
-    word += c; inWord = true;
-  }
-  endSegment();
-
-  const keys: string[] = [];
-  for (const seg of segments) {
-    const key = keyOf(seg);
-    if (key) keys.push(key);
-  }
+    if (inside) return -1;
+    file();
+    return text.length;
+  };
+  scan(0);
   return { keys, opaque };
 }
 
@@ -188,11 +225,38 @@ const measured = (list?: string[] | null) => (list ?? []).filter((o) => o !== '?
 const isLight = (o: string) => o === 'l' || o === 'c';
 
 /**
- * The learned record. Each key and each program keeps its last ten
- * observations as letters: l light, c light but learned only inside a chain,
- * m in between, h heavy, ? not measured. A build that predates `c` drops it on
- * load, which costs those runs as evidence and holds a little more than it
- * needs to; it cannot call anything light that is not.
+ * What a chain said of its parts: `c` it came out light, `H` it came out
+ * heavy. Neither says which part did it, so they are kept apart from the runs
+ * measured alone and never push one out: ten light chains used to push out
+ * the one heavy reading a test run had on its own.
+ */
+const isChainMark = (o: string) => o === 'c' || o === 'H';
+const alone = (list?: string[] | null) => (list ?? []).filter((o) => !isChainMark(o));
+const chainMarks = (list?: string[] | null) => (list ?? []).filter(isChainMark);
+const heavyChains = (list?: string[] | null) => chainMarks(list).filter((o) => o === 'H').length;
+
+/**
+ * The last `KEPT` of each kind, in the order they came. Of the runs alone, one
+ * nobody measured goes before one somebody did: it is no evidence, and must
+ * not be what pushes evidence out.
+ */
+function lastOfEachKind(list: string[]): string[] {
+  const out = [...list];
+  for (let over = chainMarks(out).length - KEPT; over > 0; over--) out.splice(out.findIndex(isChainMark), 1);
+  for (let over = alone(out).length - KEPT; over > 0; over--) {
+    const unmeasured = out.indexOf('?');
+    out.splice(unmeasured === -1 ? out.findIndex((o) => !isChainMark(o)) : unmeasured, 1);
+  }
+  return out;
+}
+
+/**
+ * The learned record. Each key and each program keeps its last ten runs
+ * measured alone and its last ten seen in a chain, as letters: l light, m in
+ * between, h heavy, ? not measured; c in a chain that came out light, H in one
+ * that came out heavy. A build that predates `c` or `H` drops it on load,
+ * which costs those runs as evidence; it cannot call anything light that is
+ * not.
  * Both maps are kept in least-recently-seen-first order so the oldest falls off
  * first when either passes `maxKeys`.
  */
@@ -246,18 +310,21 @@ export class CommandHistory {
     }
     if (onlyIfLight && obs !== 'l') return false;
     // A chain's memory belongs to the chain: `git status && npm test` measured
-    // heavy says nothing bad about `git status`. Only a light chain vouches for
-    // each of its parts.
+    // heavy does not say `git status` is heavy. A light chain vouches for each
+    // of its parts (`c`), and a heavy one marks each (`H`): agents pipe nearly
+    // everything, so parts that only ever heard of the light chains read light
+    // for good. Enough marks and a part is no longer light (`HEAVY_CHAINS`).
     if (keys.length > 1 || opaque) {
       this._push(this.keys, chainKey(keys, opaque), obs);
-      if (obs !== 'l') return true;
-      // And only as a chain: the early return above means these records only
-      // ever hear about the chains that came out light, so they drift light.
-      // `c` marks that weaker evidence so it can be counted. It is read as `l`
-      // everywhere, so nothing is classified differently yet.
-      for (const key of keys) {
-        this._push(this.keys, key, 'c');
-        this._push(this.programs, programOf(key), 'c');
+      if (obs === 'l') {
+        for (const key of keys) {
+          this._push(this.keys, key, 'c');
+          this._push(this.programs, programOf(key), 'c');
+        }
+      } else if (obs === 'h') {
+        const marked = [...new Set(keys)].filter((key) => !this._clearedAlone(key));
+        for (const key of marked) this._push(this.keys, key, 'H');
+        for (const program of new Set(marked.map(programOf))) this._push(this.programs, program, 'H');
       }
       return true;
     }
@@ -278,13 +345,13 @@ export class CommandHistory {
       else if (v === 'unknown') verdict = 'unknown';
     };
     // A command's own record outranks the records of its parts: it is the only
-    // reading that covered everything the command starts, and the parts drift
-    // light (see `record`). The key is coarser than the command, so an old
+    // reading that covered everything the command starts, and a chain never
+    // says which part did it (see `record`). The key is coarser than the command, so an old
     // heavy run also holds back cheap variants that share it; that is the
     // price. A middling run only keeps the command out of the light lane, where
     // `lightLane` of them would start together, and `_holdsSlot` hands the slot
     // back once a run measures small.
-    const own = measured(this.keys.get(keys.length > 1 || opaque ? chainKey(keys, opaque) : keys[0]));
+    const own = measured(alone(this.keys.get(keys.length > 1 || opaque ? chainKey(keys, opaque) : keys[0])));
     if (own.includes('h')) return 'heavy';
     if (own.includes('m')) worse('unknown');
     if (opaque) worse('unknown');
@@ -292,23 +359,60 @@ export class CommandHistory {
     return verdict;
   }
 
+  /**
+   * What it was measured as alone comes first. Then the chains it was part
+   * of: marked heavy `HEAVY_CHAINS` times in ten it is not light, and two
+   * light runs of either kind make it light. With too little of its own, its
+   * program lends light on five runs, none measured anything else.
+   */
   _classifyKey(key: string): Verdict {
     const own = this.keys.get(key);
-    const recent = measured(own?.slice(-5));
+    const recent = measured(alone(own)).slice(-5);
     if (recent.includes('h')) return 'heavy';
-    if (recent.length >= 2 && recent.every(isLight)) return 'light';
     if (recent.some((o) => !isLight(o))) return 'unknown';
-    const prog = measured(this.programs.get(programOf(key))?.slice(-10));
-    if (prog.length >= 5 && prog.every(isLight)) return 'light';
-    return 'unknown';
+    if (heavyChains(own) >= HEAVY_CHAINS) return 'unknown';
+    if (recent.length + chainMarks(own).slice(-5).filter(isLight).length >= 2) return 'light';
+    const program = this.programs.get(programOf(key));
+    if (heavyChains(program) >= HEAVY_CHAINS) return 'unknown';
+    const direct = measured(alone(program));
+    if (direct.some((o) => !isLight(o))) return 'unknown';
+    return direct.length + chainMarks(program).filter(isLight).length >= 5 ? 'light' : 'unknown';
+  }
+
+  /**
+   * A part a heavy chain is not held against: never measured alone itself,
+   * and its program measured alone five times or more, light every time.
+   * That is `tail` on the end of a test run. A part with runs of its own is
+   * marked however light they were: `npm run lint` and `npm run build` are
+   * filed under one key.
+   */
+  _clearedAlone(key: string): boolean {
+    if (measured(alone(this.keys.get(key))).length) return false;
+    const direct = measured(alone(this.programs.get(programOf(key))));
+    return direct.length >= 5 && direct.every(isLight);
   }
 
   _push(map: Map<string, string[]>, key: string, obs: string) {
     const list = map.get(key) ?? [];
     map.delete(key);
     list.push(obs);
-    map.set(key, list.slice(-10));
-    while (map.size > this.maxKeys) map.delete(map.keys().next().value!);
+    map.set(key, lastOfEachKind(list));
+    while (map.size > this.maxKeys) this._forget(map);
+  }
+
+  /**
+   * Past the limit the least recently seen goes, and while records of a single
+   * run are more than half of all, the least recently seen of those. Four keys
+   * in five are a search or a chain nobody runs twice, and they pushed
+   * `npm run` out within hours, its heavy readings with it.
+   */
+  _forget(map: Map<string, string[]>) {
+    let once = 0;
+    for (const list of map.values()) if (list.length <= 1) once++;
+    if (once * 2 > map.size) {
+      for (const [key, list] of map) if (list.length <= 1) { map.delete(key); return; }
+    }
+    map.delete(map.keys().next().value!);
   }
 
   toJSON() {
@@ -323,7 +427,7 @@ export class CommandHistory {
       if (!Array.isArray(entries)) return;
       for (const e of entries) {
         if (Array.isArray(e) && typeof e[0] === 'string' && Array.isArray(e[1])) {
-          map.set(e[0], e[1].filter((o) => ['l', 'c', 'm', 'h', '?'].includes(o)).slice(-10));
+          map.set(e[0], lastOfEachKind(e[1].filter((o) => ['l', 'c', 'm', 'h', '?', 'H'].includes(o))));
         }
       }
     };

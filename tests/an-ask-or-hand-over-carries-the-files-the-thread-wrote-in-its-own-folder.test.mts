@@ -12,6 +12,7 @@ import { memorySession } from '../main/team/session.mts';
 import { machineryPath } from '../main/store/home.mts';
 import { changePath } from '../main/code-change.mts';
 import { MAX_MESSAGE_FILE_BYTES } from '../main/team/sync.mts';
+import { typedParts } from '../renderer/src/typed-message.ts';
 
 async function aMac(cloud, personId, repoPath = null) {
   const storeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ask-carries-own-'));
@@ -124,6 +125,41 @@ describe('a doc the agent wrote in the thread\'s own checkout', () => {
     const pic = linked(theTask().body).find((f) => /first-visit\.png$/.test(f));
     expect(theTask().body).toContain(`The picture:\n\n![first-visit.png](${pic})`);
     expect(theTask().body.match(/first-visit\.png\]\(attachments/g)).toHaveLength(1);
+  });
+
+  // A review of 6c8044d92: a path inside a sentence or in backticks became a link mid-line, which the
+  // receiver's view draws as typed brackets, and the foot link was dropped, so no link opened the page.
+  // Measured by drawing the task's words as the receiver's view does (typedParts).
+  describe('named by its path inside the project', () => {
+    const page = (id) => path.join('designs', id, 'checkout-v3.html');
+    const handedWith = async (said) => {
+      const t = aThread((id) => said(page(id)));
+      write(path.join(sam.dir, page(t.id)), '<h1>Checkout</h1>\n');
+      await sam.service.syncNow();
+      await sam.service.handOn({ product: 'api', id: t.id, to: priya.personId });
+      await both();
+      return theTask().body;
+    };
+    const drawnLinks = (body) => typedParts(body).filter((p) => 'embed' in p).map((p) => p.embed).filter((e) => /checkout-v3\.html\]\(attachments\//.test(e));
+
+    it('inside a sentence, keeps the bare name there and a link that opens at the foot', async () => {
+      const body = await handedWith((rel) => `I saved it at ${rel}, ready.`);
+      expect(body).toContain('I saved it at checkout-v3.html, ready.');
+      expect(drawnLinks(body)).toHaveLength(1);
+      expect(carried(theTask(), linked(body)[0])).toBe('<h1>Checkout</h1>\n');
+    });
+
+    it('in backticks, keeps a link that opens at the foot', async () => {
+      const body = await handedWith((rel) => `The page:\n\n\`${rel}\``);
+      expect(drawnLinks(body)).toHaveLength(1);
+      expect(body).not.toMatch(/`\[/);
+    });
+
+    it('alone on its line, is the link there and is not listed again', async () => {
+      const body = await handedWith((rel) => `The page:\n\n${rel}\n\nReady.`);
+      expect(body).toMatch(/The page:\n\n\[checkout-v3\.html\]\(attachments\/[^)\s]+\)\n\nReady\./);
+      expect(drawnLinks(body)).toHaveLength(1);
+    });
   });
 
   it('is said to be left behind when it is over the size a message carries', async () => {

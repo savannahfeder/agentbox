@@ -134,7 +134,7 @@ for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
     say('the app folder follows on its own: git fetch origin && git merge --ff-only refs/remotes/origin/main');
     say(`check the run: gh run list -R savannahfeder/agentbox -L 3`);
     // Shipped whatever happens here; a deploy that did not work says so.
-    try { await deployAfterShip({ root, say, until: shipEndsBy }); } catch (err) { say(`the web app was not updated: ${err?.message ?? err}. Put it up with: npm run phone:deploy`); }
+    try { await deployAfterShip({ root, say, until: shipEndsBy, trusted: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..') }); } catch (err) { say(`the web app was not updated: ${err?.message ?? err}. Put it up with: npm run phone:deploy`); }
     await exit(0);
   }
   if (!racedWithAnotherPush(`${pushed.stdout ?? ''}${pushed.stderr ?? ''}`)) {

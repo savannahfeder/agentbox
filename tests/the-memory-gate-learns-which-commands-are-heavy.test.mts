@@ -49,7 +49,9 @@ describe('what a command is filed under', () => {
   });
 
   it('marks a command it cannot see into', () => {
-    expect(commandSegments('echo $(npm test)').opaque).toBe(true);
+    // `$(...)` is read since 2026-11-23 (tests/a-program-that-keeps-turning-up-in-heavy-commands-is-not-called-light).
+    expect(commandSegments('echo $(npm test)')).toEqual({ keys: ['npm test'], opaque: false });
+    expect(commandSegments('echo $(npm test').opaque).toBe(true);
     expect(commandSegments('echo `make`').opaque).toBe(true);
     expect(commandSegments(`echo '$(not run)'`).opaque).toBe(false);
   });
@@ -107,6 +109,8 @@ describe('deciding light, heavy or unknown', () => {
   it('a command it cannot see into is never light', () => {
     const h = new CommandHistory();
     seen(h, 'echo', 1, 5);
+    expect(h.classify('echo `npm test`')).toBe('unknown');
+    // What `$(...)` runs is judged for what it is, and nothing has seen it.
     expect(h.classify('echo $(npm test)')).toBe('unknown');
   });
 
