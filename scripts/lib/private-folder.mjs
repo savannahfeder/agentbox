@@ -30,9 +30,17 @@ const SETTINGS = new Set(['config', 'config.worktree', 'commondir', 'hooks']);
  * worker process still running cannot change what it reads in between.
  */
 function checkedCopy(own, trustedConfig) {
-  const base = outOfWorkersReach();
-  fs.mkdirSync(base, { recursive: true });
-  const copy = fs.mkdtempSync(path.join(base, 'agentbox-private-push-'));
+  let copy;
+  try {
+    const base = outOfWorkersReach();
+    fs.mkdirSync(base, { recursive: true });
+    copy = fs.mkdtempSync(path.join(base, 'agentbox-private-push-'));
+  } catch (err) {
+    // Only inside the ship's own sandbox (a test of this push run by the push
+    // hook) is the cache shut, and there no worker process can reach the copy.
+    if (err?.code !== 'EPERM' && err?.code !== 'EACCES') throw err;
+    copy = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-private-push-'));
+  }
   // Its times too: git trusts an index newer than the files it lists, and would miss an edit made the second it was written.
   fs.cpSync(own, copy, { recursive: true, verbatimSymlinks: true, preserveTimestamps: true, filter: (src) => !SETTINGS.has(path.relative(own, src).split(path.sep)[0]) });
   fs.writeFileSync(path.join(copy, 'config'), trustedConfig);

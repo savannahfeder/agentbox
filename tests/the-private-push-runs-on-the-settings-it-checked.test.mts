@@ -91,6 +91,23 @@ describe('the private push', () => {
     expect(git(w.remote, 'log', '--format=%s', 'main').split('\n').slice(0, 2)).toEqual(['Third', 'First']);
   });
 
+  // As inside the push hook's sandbox, where these tests run at ship.
+  it.runIf(process.platform !== 'darwin' && process.getuid?.() !== 0)('still pushes when the cache cannot be written', () => {
+    const w = world();
+    put(path.join(w.at, 'unslop/SKILL.md'), 'two\n');
+    const shut = path.join(w.dir, 'shut-cache');
+    fs.mkdirSync(shut, { mode: 0o555 });
+    const was = process.env.XDG_CACHE_HOME;
+    process.env.XDG_CACHE_HOME = shut;
+    try {
+      expect(pushPrivateFolder(w.task, { message: 'Through', env, trusted: w.app })).toMatchObject({ pushed: true, commits: 1 });
+    } finally {
+      if (was === undefined) delete process.env.XDG_CACHE_HOME; else process.env.XDG_CACHE_HOME = was;
+      fs.chmodSync(shut, 0o755);
+    }
+    expect(git(w.remote, 'log', '-1', '--format=%s', 'main')).toBe('Through');
+  });
+
   it('keeps a commit it made when the push is refused, for the next ship to send', () => {
     const w = world();
     put(path.join(w.at, 'unslop/SKILL.md'), 'two\n');
