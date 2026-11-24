@@ -98,7 +98,13 @@ function appendLine(file: string, obj: Stamped): Stamped {
   return writeLine(file, line);
 }
 
+// Lines this process has written to any ledger, so a pass can tell whether
+// its own writes have made the list it read stale.
+let linesWritten = 0;
+export const ledgerLinesWritten = (): number => linesWritten;
+
 function writeLine<T>(file: string, obj: T): T {
+  linesWritten += 1;
   const buf = Buffer.from(JSON.stringify(obj) + '\n', 'utf8');
   if (buf.length > MAX_LINE_BYTES) throw new Error(`work item line too large (${buf.length} bytes, max ${MAX_LINE_BYTES})`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
