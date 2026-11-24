@@ -4206,49 +4206,14 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
 .palette-k .palette-ai-ask .palette-key { margin-left: 2px; height: 18px; min-width: 0; }
 .palette-k .palette-ai-ask:hover:not(:disabled) { color: var(--text); border-color: var(--line-strong); }
 .palette-k .palette-ai-ask:disabled { opacity: .55; cursor: default; }
-.palette-k .palette-ai-ask.asking:disabled { opacity: 1; color: var(--text); }
-/* The wait for an AI answer, in the five looks being chosen between (Palette.tsx AiWait). */
-.palette-k .palette-spinner {
-  display: block; width: 14px; height: 14px; border-radius: 50%; flex: none;
-  border: 2px solid color-mix(in srgb, currentColor 18%, transparent); border-top-color: currentColor;
-  animation: palette-spin .8s linear infinite;
-}
-.palette-k .palette-glyph .palette-spinner { width: 15px; height: 15px; color: var(--text); }
-@keyframes palette-spin { to { transform: rotate(360deg); } }
-.palette-k .palette-wait-shimmer .palette-label {
+/* The wait for an AI answer: a light sweeps across the row's words. */
+.palette-k .palette-shimmer .palette-label {
   background: linear-gradient(90deg, var(--text-faint) 0%, var(--text-faint) 35%, var(--text) 50%, var(--text-faint) 65%, var(--text-faint) 100%);
   background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
   animation: palette-shimmer 1.6s linear infinite;
 }
 @keyframes palette-shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
-.palette-k .palette-skeleton { cursor: default; }
-.palette-k .palette-bone {
-  display: block; height: 10px; width: 46%; border-radius: var(--radius);
-  background: linear-gradient(90deg, var(--line) 0%, color-mix(in srgb, var(--line) 40%, transparent) 50%, var(--line) 100%);
-  background-size: 200% 100%; animation: palette-shimmer 1.4s linear infinite;
-}
-.palette-k .palette-bone.short { width: 72%; height: 8px; margin-top: 7px; opacity: .7; }
-.palette-k .palette-skeleton:nth-of-type(2n) .palette-bone { width: 38%; }
-.palette-k .palette-query { position: relative; }
-.palette-k .palette-progress { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; overflow: hidden; }
-.palette-k .palette-progress::after {
-  content: ''; position: absolute; top: 0; bottom: 0; width: 30%; border-radius: var(--radius); background: var(--accent);
-  animation: palette-progress 1.3s ease-in-out infinite;
-}
-@keyframes palette-progress { from { left: -30%; } to { left: 100%; } }
-@property --palette-glow { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
-.palette-k.palette-glowing { position: relative; }
-.palette-k.palette-glowing::before {
-  content: ''; position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px; pointer-events: none; z-index: 1;
-  background: conic-gradient(from var(--palette-glow), transparent 0deg, var(--accent) 50deg, transparent 110deg, transparent 360deg);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
-  animation: palette-glow 2.2s linear infinite;
-}
-@keyframes palette-glow { to { --palette-glow: 360deg; } }
-@media (prefers-reduced-motion: reduce) {
-  .palette-k .palette-spinner, .palette-k .palette-wait-shimmer .palette-label, .palette-k .palette-bone,
-  .palette-k .palette-progress::after, .palette-k.palette-glowing::before { animation-duration: 3s; }
-}
+@media (prefers-reduced-motion: reduce) { .palette-k .palette-shimmer .palette-label { animation-duration: 3s; } }
 .palette-k .palette-item { justify-content: flex-start; align-items: center; gap: 12px; height: 38px; padding: 0 18px; font-size: 14.5px; color: var(--text-dim); }
 .palette-k .palette-item.selected { color: var(--text); }
 .palette-k .palette-glyph { flex: none; width: 18px; height: 18px; display: grid; place-items: center; color: var(--text-faint); }

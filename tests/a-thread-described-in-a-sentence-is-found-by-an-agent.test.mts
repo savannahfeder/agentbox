@@ -125,6 +125,18 @@ describe('⌘K offers it', () => {
     expect(palette).not.toMatch(/aiSearchLook|palette-ai-modes|AiLook/);
   });
 
+  // The owner, 2026-11-24, on the pulsing star: "when things are searching
+  // with AI, typically you get some sort of processing component". Of five
+  // filmed waits they picked a light sweeping across the row's words.
+  it('waits with a shimmer across the words, and only that', () => {
+    const palette = fs.readFileSync(new URL('../renderer/src/components/Palette.tsx', import.meta.url), 'utf8');
+    const css = fs.readFileSync(new URL('../renderer/src/styles.css', import.meta.url), 'utf8');
+    expect(palette).toMatch(/looking && c\.id === ASK_ROW \? 'palette-shimmer /);
+    expect(css).toMatch(/\.palette-k \.palette-shimmer \.palette-label \{[^}]*background-clip: text[^}]*animation: palette-shimmer/);
+    expect(palette).not.toMatch(/AiWait|aiWaitLook|palette-skeleton|palette-progress|palette-glowing|palette-spinner/);
+    expect(css).not.toMatch(/palette-ai-reading|palette-bone|palette-progress|palette-glow|palette-spinner/);
+  });
+
   // A power tester typed a model command in words, pressed Enter, and an agent
   // started looking through their threads: with no thread found, the ask row
   // was the only "thread" and sat above every command the words only touched.

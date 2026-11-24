@@ -467,17 +467,6 @@ type Asked = { query: string; at: number } & ({ state: 'looking' } | { state: 'f
 const ASK_ROW = 'find-by-description';
 
 /**
- * HOW THE WAIT FOR AN AI ANSWER LOOKS, while one design is chosen.
- * spinner: a turning ring in the button and the row. shimmer: a light sweeps
- * the row's words. skeleton: placeholder rows where the answers land. line: a
- * bar runs under the search bar. glow: a light travels round the box's edge.
- */
-export type AiWait = 'spinner' | 'shimmer' | 'skeleton' | 'line' | 'glow';
-const AI_WAITS: readonly AiWait[] = ['spinner', 'shimmer', 'skeleton', 'line', 'glow'];
-export const aiWaitOf = (stored: string | null | undefined): AiWait => (AI_WAITS.includes(stored as AiWait) ? stored as AiWait : 'spinner');
-const storedAiWait = (): AiWait => { try { return aiWaitOf(localStorage.getItem('zero.aiWaitLook')); } catch { return 'spinner'; } };
-
-/**
  * Whether the idle Ask AI row is in the list. On a computer the bar's button
  * offers it, so the row comes only when the words found no thread and Enter
  * would otherwise do nothing. A phone has no button.
@@ -643,17 +632,13 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findByDescri
       .then((a) => setAsked((was) => (was?.at !== at ? was : a.ok ? { query: q, at, state: 'found', rows: a.rows } : { query: q, at, state: 'failed', error: a.error })));
   };
   const looking = askedNow?.state === 'looking';
-  const aiWait = useMemo(storedAiWait, []);
-  // skeleton: the placeholder rows stand in for the waiting row.
-  const placeholders = looking && aiWait === 'skeleton';
   const aiFound = askedNow?.state === 'found' ? askedNow.rows : NONE_FOUND;
   // Once asked, the answer and the wait for it sit on top, above the words' threads.
   const picks = useMemo(
-    () => (!askedNow || placeholders ? NONE_FOUND : aiFound.length ? aiFound : [agentRow(askedNow, tick, askAgent, { phone, query })]),
+    () => (!askedNow ? NONE_FOUND : aiFound.length ? aiFound : [agentRow(askedNow, tick, askAgent, { phone, query })]),
     // askAgent reads the state it is drawn with.
-    [askedNow, placeholders, aiFound, tick, phone, query], // eslint-disable-line react-hooks/exhaustive-deps
+    [askedNow, aiFound, tick, phone, query], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const spinning = looking && (aiWait === 'spinner' || aiWait === 'glow');
   const offerAgent = !!findByDescription && !askedNow && offersAgent(query, listed.length, phone);
   const threads = useMemo(
     () => [...chats, ...withoutPicked(listed, aiFound)].concat(offerAgent ? [agentRow(null, tick, askAgent, { phone, query })] : []),
@@ -695,9 +680,8 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findByDescri
 
   return (
     <div className={`modal-backdrop palette-backdrop${phone ? ' palette-on-phone' : ''}`} {...closesOnPress(onClose)}>
-      <div className={`modal palette palette-k${phone ? ' palette-phone' : ''}${looking && aiWait === 'glow' ? ' palette-glowing' : ''}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`modal palette palette-k${phone ? ' palette-phone' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="palette-query">
-          {looking && aiWait === 'line' && <span className="palette-progress" aria-hidden="true" />}
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.6" /><path d="M10.4 10.4L14 14" /></svg>
           <input
             ref={inputRef}
@@ -716,11 +700,9 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findByDescri
             }}
           />
           {!phone && findByDescription && (
-            <button type="button" className={`palette-ai-ask${spinning ? ' asking' : ''}`} disabled={!query.trim() || looking} onClick={() => { askAgent(); inputRef.current?.focus(); }}>
-              {spinning
-                ? <span className="palette-spinner" aria-hidden="true" />
-                : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">{ICONS.ai.map((d) => <path key={d} d={d} />)}</svg>}
-              {spinning ? 'Searching…' : 'Ask AI'}{!spinning && <span className="palette-key">{chord('⌘↵')}</span>}
+            <button type="button" className="palette-ai-ask" disabled={!query.trim() || looking} onClick={() => { askAgent(); inputRef.current?.focus(); }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">{ICONS.ai.map((d) => <path key={d} d={d} />)}</svg>
+              Ask AI<span className="palette-key">{chord('⌘↵')}</span>
             </button>
           )}
           {phone
@@ -728,20 +710,11 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findByDescri
             : <button type="button" className="palette-esc" aria-label="Close" onClick={onClose}>esc</button>}
         </div>
         <div className="palette-list" ref={listRef} role="listbox" aria-label="Results">
-          {placeholders && <>
-            <div className="palette-section">Searching with AI</div>
-            {[0, 1, 2].map((n) => (
-              <div key={n} className="palette-item palette-two palette-skeleton" aria-hidden="true">
-                <span className="palette-glyph" />
-                <span className="palette-text"><span className="palette-bone" /><span className="palette-bone short" /></span>
-              </div>
-            ))}
-          </>}
-          {filtered.length === 0 && !placeholders && <div className="palette-empty">{emptyLine(query)}</div>}
+          {filtered.length === 0 && <div className="palette-empty">{emptyLine(query)}</div>}
           {filtered.map((c, i) => (<Fragment key={keys[i]}>
             {labels.has(i) && <div className="palette-section">{labels.get(i)}</div>}
             <div
-              className={`palette-item ${isThread(c) ? 'palette-thread ' : ''}${c.found ? 'palette-found ' : ''}${looking && c.id === ASK_ROW ? `palette-asking palette-wait-${aiWait} ` : ''}${!phone && c.sub ? 'palette-two ' : ''}${i === selected ? 'selected' : ''}`}
+              className={`palette-item ${isThread(c) ? 'palette-thread ' : ''}${c.found ? 'palette-found ' : ''}${looking && c.id === ASK_ROW ? 'palette-shimmer ' : ''}${!phone && c.sub ? 'palette-two ' : ''}${i === selected ? 'selected' : ''}`}
               role="option"
               aria-selected={i === selected}
               onClick={c.run}
@@ -752,7 +725,7 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findByDescri
                 if (moved && i !== selected) pick(i);
               }}
             >
-              <span className="palette-glyph" aria-hidden="true">{looking && c.id === ASK_ROW && aiWait === 'spinner' ? <span className="palette-spinner" /> : <RowIcon row={c} />}</span>
+              <span className="palette-glyph" aria-hidden="true"><RowIcon row={c} /></span>
               {c.found
                 ? <span className="palette-text">
                   <span className="palette-label">
