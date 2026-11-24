@@ -30,7 +30,7 @@ export type FinderLine = Omit<ThreadLine, 'patch'> & {
 };
 
 export interface FoundMessage { uid: string; by: string | null; at: number; source: 'founder' | 'system' | 'agent'; text: string; comment?: boolean }
-export interface FoundFile { src: string; name: string; by: string | null; at: number; kind: ReviewKind | null }
+export interface FoundFile { src: string; name: string; by: string | null; at: number; kind: ReviewKind | null; agent?: string }
 export interface FoundNote { id: string; file: string; text: string; by: string | null; at: number; resolved: boolean; place: NotePlace; pin?: number; src: string; name: string }
 
 export type FinderThread = { key: string; version: unknown; updatedAt?: number } & (
@@ -126,7 +126,7 @@ export function filesAndNotesOf(lines: readonly FinderLine[] | null | undefined)
   });
   const files = families.map((f): FoundFile => {
     const newest = f.versions[f.versions.length - 1];
-    return { src: newest.path, name: newest.name, by: newest.by, at: newest.at, kind: reviewKind(newest.path) };
+    return { src: newest.path, name: newest.name, by: newest.by, at: newest.at, kind: reviewKind(newest.path), ...(newest.agent !== undefined ? { agent: newest.agent } : {}) };
   });
   return { files, notes };
 }
@@ -246,7 +246,7 @@ export function createFinder({ listThreads, loadThread, readText = async () => n
         ...where, uid: m.uid, by: m.by, source: m.source, at: m.at, comment: !!m.comment, text: windowAround(m.text, firstHit(m.f, q), SNIPPET_CHARS),
       })),
       files: foundFiles.slice(0, files).map(({ where, f, l }) => ({
-        ...where, how: l ? 'contents' : 'name', src: f.src, name: f.name, by: f.by, at: f.at, text: l ? windowAround(l.text, firstHit(l.f, q), SNIPPET_CHARS) : '',
+        ...where, how: l ? 'contents' : 'name', src: f.src, name: f.name, by: f.by, ...(f.agent !== undefined ? { agent: f.agent } : {}), at: f.at, text: l ? windowAround(l.text, firstHit(l.f, q), SNIPPET_CHARS) : '',
       })),
       comments: foundNotes.slice(0, comments).map(({ where, n }) => ({
         ...where, src: n.src, name: n.name, by: n.by, at: n.at, resolved: n.resolved, noteId: n.id, fileId: n.file, text: windowAround(n.text, firstHit(n.f, q), SNIPPET_CHARS),

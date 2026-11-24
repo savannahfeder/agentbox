@@ -373,15 +373,15 @@ const savedStamp = (base: string): boolean => {
   return at >= FIRST_SAVED_MS && at <= Date.now() + DAY_MS;
 };
 
-/** A file's name as a person gave it. */
 // A copy carries a mark in its name: a thread's attachments, or a group's file as kept here.
 const SENT_COPY = /(^|\/)(attachments|\.room-files)\//;
 
+/** A file's name as a person gave it. */
 export function shownName(path: string | null | undefined): string {
   const clean = String(path ?? '').split(/[?#]/)[0];
   const base = clean.split('/').pop() ?? '';
-  // A hash in front is a shared thread's copy, even when an agent names it bare.
-  if (!SENT_COPY.test(clean) && !COPY_PREFIX.test(base)) return base;
+  // Bare, it is the copy an agent was handed; in some other folder, a file someone named so.
+  if (clean.includes('/') && !SENT_COPY.test(clean) && !COPY_PREFIX.test(base)) return base;
   const rest = base.replace(COPY_PREFIX, '');
   return savedStamp(rest) ? rest.replace(SAVED_PREFIX, '') : rest;
 }

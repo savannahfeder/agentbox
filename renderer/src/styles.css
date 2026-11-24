@@ -2559,6 +2559,18 @@ body {
    waiting agent, but it is a sentence and not a control: there is nothing to
    click, because a message here would not reach it. */
 .dock-pill-static { cursor: default; }
+/* Takes her to the window the session runs in, so it is pressed, not typed into. */
+.dock-pill-go { cursor: pointer; }
+.dock-pill-go .dock-pill-key { color: var(--text-faint); }
+.dock-pill-go:hover .dock-pill-text, .dock-pill-go:hover .dock-pill-key { color: var(--text-dim); }
+/* Two halves of one bar, each a whole target: where it runs, and here. */
+.dock-split { display: flex; align-items: stretch; width: 100%; }
+.dock-split > .dock-pill { flex: 1 1 0; min-width: 0; }
+.dock-split > .dock-pill + .dock-pill { border-left: 1px solid var(--line); }
+/* Icon, words, key: the order a menu row reads in. */
+.dock-pill-go .dock-pill-icon { display: flex; align-items: center; padding-left: 16px; color: var(--text-faint); }
+.dock-pill-go .dock-pill-icon + .dock-pill-text { padding-left: 10px; }
+.dock-pill-go:hover .dock-pill-icon { color: var(--text-dim); }
 .dock-pill-static .dock-pill-text { padding-right: 16px; }
 /* THE BOX GROWS AS SHE WRITES. The height is written by dock-height.ts on every
    render, because the ceiling is 40% of the PANE and no stylesheet can read
@@ -9459,6 +9471,8 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .picture-view { position: fixed; inset: 0; z-index: 9400; outline: none; overflow: hidden;
   background: var(--read-ground); color: var(--read-paper); animation: pv-in .22s ease-out;
   -webkit-app-region: no-drag; touch-action: none; }
+/* Over the new thread box, which goes to 9480 while any picture is open; under the ⌘F box. */
+.picture-view.pv-over-its-box { z-index: 9490; }
 /* Fingers belong to the view (PictureView.tsx fingerDown); only the strip of pictures scrolls. */
 .pv-strip { touch-action: pan-x; }
 .pv-chrome button, .pv-tools button { touch-action: manipulation; }
@@ -9586,3 +9600,6 @@ span.comment-on-file { cursor: default; }
 .handed-note { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); margin-left: 6px; }
 /* A thread you handed over, in place of the reply box while they have it. */
 .dock-handed { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 18px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--text-dim); font-size: 14px; }
+
+/* Nothing to answer here, as while Codex works on her message in its own window: no empty box. */
+.dock-card:empty { display: none; }

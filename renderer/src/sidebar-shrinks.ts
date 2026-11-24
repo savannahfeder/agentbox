@@ -22,6 +22,13 @@ export function setSidebarShrinks(on: boolean) {
   for (const fn of heard) fn();
 }
 
+/** Flips it, and answers whether the sidebar folds now. */
+export function toggleSidebarShrinks(): boolean {
+  const next = !read();
+  setSidebarShrinks(next);
+  return next;
+}
+
 export function useSidebarShrinks(): boolean {
   return useSyncExternalStore((fn) => { heard.add(fn); return () => heard.delete(fn); }, read);
 }

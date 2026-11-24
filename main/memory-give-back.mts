@@ -19,8 +19,8 @@ const TREE_WORTH_NAMING_MB = 50;
 
 /** One program of a thread's, as a listing has it; `start` is in seconds. */
 export interface HeldProgram { pid: number; ppid: number; mb: number; start: number | null; exe: string; cmd: string; keep: boolean }
-/** One program a thread's command started, with everything under it. */
-export interface HeldTree { pid: number; name: string; mb: number; procs: number; startedAt: number | null }
+/** One program a thread's command started, with everything under it. `kept` is the mark that holds off the app's own sweep. */
+export interface HeldTree { pid: number; name: string; mb: number; procs: number; startedAt: number | null; kept: boolean }
 export interface Holding { item: string; mb: number; programs: HeldProgram[]; at: number }
 
 /** Whether a thread asked `last` time may be asked now. Pure. */
@@ -66,19 +66,21 @@ type Kind = 'own' | 'shell' | 'program';
  * WHAT ONE THREAD'S COMMANDS LEFT RUNNING, biggest first: each program a
  * command started, with everything under it, by the pid that stops the lot.
  *
- * Left out, because stopping them stops the agent or what the person kept:
- * the agent, whatever it runs under, a tool server it started itself
- * (anything under it that is not a shell), what is marked to keep, and all
- * under those. The agent is known two ways. `asker` is the pids above the
- * hook that is asking, which is the agent whatever it is called; its name is
- * the fallback for a listing read with nobody asking. A shell with no program
- * of the thread's above it is the command line itself, so what it runs stands
- * for it. Pure.
+ * Left out, because stopping them stops the agent: the thread's own agent,
+ * whatever it runs under, a tool server it started itself (anything under it
+ * that is not a shell), and all under those. The agent is known two ways.
+ * `asker` is the pids above the hook that is asking and the worker the app
+ * started, which are the agent whatever it is called. With none of those in
+ * the listing, it is whatever looks like an agent and runs under no other.
+ *
+ * Everything else is named, an agent a command started and a program marked
+ * to keep included: a test run is started detached, marked to keep, with its
+ * testers under it, and it is the heaviest thing a thread holds. A shell with
+ * no program of the thread's above it is the command line itself, so what it
+ * runs stands for it. Pure.
  */
 export function commandTrees(programs: readonly HeldProgram[], asker: Iterable<number> = []): HeldTree[] {
   const byPid = new Map(programs.map((p) => [p.pid, p]));
-  const asking = new Set(asker);
-  const isAgent = (p: HeldProgram) => asking.has(p.pid) || looksLikeAnAgent(p);
   // Up from `p` through the thread's own programs, nearest first; a pid met twice ends it.
   const above = (p: HeldProgram): HeldProgram[] => {
     const chain: HeldProgram[] = [];
@@ -86,6 +88,10 @@ export function commandTrees(programs: readonly HeldProgram[], asker: Iterable<n
     for (let up = byPid.get(p.ppid); up && !seen.has(up.pid); up = byPid.get(up.ppid)) { chain.push(up); seen.add(up.pid); }
     return chain;
   };
+  const known = new Set([...asker].filter((pid) => byPid.has(pid)));
+  const agents = known.size ? known
+    : new Set(programs.filter((p) => looksLikeAnAgent(p) && !above(p).some(looksLikeAnAgent)).map((p) => p.pid));
+  const isAgent = (p: HeldProgram) => agents.has(p.pid);
   const hosts = new Set<number>();
   for (const p of programs) if (isAgent(p)) for (const up of above(p)) hosts.add(up.pid);
   const kinds = new Map<number, Kind>();
@@ -97,7 +103,7 @@ export function commandTrees(programs: readonly HeldProgram[], asker: Iterable<n
       const up = parent ? kinds.get(parent.pid) ?? null : null;
       const shell = SHELL.test(base(q.exe));
       let is: Kind;
-      if (q.keep || isAgent(q) || hosts.has(q.pid)) is = 'own';
+      if (isAgent(q) || hosts.has(q.pid)) is = 'own';
       else if (up === 'own') is = shell && isAgent(parent!) ? 'shell' : 'own';
       else is = shell && up !== 'program' ? 'shell' : 'program';
       kinds.set(q.pid, is);
@@ -108,7 +114,7 @@ export function commandTrees(programs: readonly HeldProgram[], asker: Iterable<n
   for (const p of programs) {
     if (kindOf(p) !== 'program') continue;
     const root = [p, ...above(p)].filter((_q, i, chain) => chain.slice(0, i + 1).every((x) => kindOf(x) === 'program')).pop()!;
-    const tree = trees.get(root.pid) ?? { pid: root.pid, name: programName(root), mb: 0, procs: 0, startedAt: root.start === null ? null : root.start * 1000 };
+    const tree = trees.get(root.pid) ?? { pid: root.pid, name: programName(root), mb: 0, procs: 0, startedAt: root.start === null ? null : root.start * 1000, kept: !!root.keep };
     tree.mb += Number(p.mb) || 0;
     tree.procs += 1;
     trees.set(root.pid, tree);
@@ -137,7 +143,7 @@ function ago(startedAt: number, now: number): string {
 export function giveBackAsk(holding: Holding, now: number, { asker = [], running = () => true }: { asker?: Iterable<number>; running?: (pid: number) => boolean } = {}): string | null {
   const named = commandTrees(holding.programs, asker).filter((t) => t.mb >= TREE_WORTH_NAMING_MB && running(t.pid)).slice(0, TREES_NAMED).map((t) => {
     const size = t.procs > 1 ? `${gb(t.mb)} in ${t.procs} programs` : gb(t.mb);
-    return `pid ${t.pid}: ${t.name}, ${size}${t.startedAt === null ? '' : `, started ${ago(t.startedAt, now)}`}`;
+    return `pid ${t.pid}: ${t.name}, ${size}${t.startedAt === null ? '' : `, started ${ago(t.startedAt, now)}`}${t.kept ? ', marked to keep' : ''}`;
   });
   if (!named.length) return null;
   return `Not run yet. This computer is running short of memory, and this thread's own programs hold more of it than any other thread's: ${gb(holding.mb)}. `

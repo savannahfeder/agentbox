@@ -1,0 +1,99 @@
+/* The sidebar's look on a desktop: Linear's structure in Notion's manner.
+   Every rule names the desktop layout (gt-rail), so the phone's bar is
+   untouched. The older rules for these parts still set the window's geometry;
+   the doubled :root is what lets this sheet win over them wherever it loads. */
+
+/* The size at which phone.css draws its bar instead. */
+@media (min-width: 701px) and (min-height: 521px) {
+  /* Folded, each icon keeps the column it has open, so the closed sidebar is as wide as that column. */
+  :root:root .app.workspace-layout.gt-rail { --sidebar-w: 220px; --sidebar-fill: color-mix(in srgb, var(--text) 6%, transparent); }
+  :root:root .app.workspace-layout.gt-rail.workspace-collapsed:not(.workspace-settings) { --sidebar-w: 28px; --workspace-left: 58px; }
+
+  :root:root .gt-rail-nav.workspace-navigation { left: 14px; width: var(--sidebar-w); font-size: 14px; font-weight: 500; line-height: 20px; color: var(--text-dim); }
+
+  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab, .workspace-find button, .workspace-utilities > button, .ws-recent-row) {
+    width: 100%; height: 30px; padding: 0 6px; gap: 8px; border-radius: var(--radius); font-size: inherit; font-weight: inherit; color: inherit; text-align: left; cursor: default;
+  }
+  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab, .workspace-utilities > button, .ws-recent-row, .ws-sec, .ws-new, .ws-keep, .th-me-btn):hover { background: var(--sidebar-fill); color: var(--text); }
+  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab.active, .workspace-utilities > button[aria-current="page"]) { background: var(--sidebar-fill); box-shadow: none; color: var(--text); font-weight: 500; }
+
+  /* The app's icons are drawn on a 24 grid for 18 and 20 points. Here each is
+     sized so its ink is the same height as the others' and weighs 1.55. Search,
+     Feedback and Sign in are drawn inside a group scaled to .8. */
+  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab, .workspace-find button, .workspace-utilities > button) > svg { width: 18px; height: 18px; margin: -1px; stroke-width: 2.07px; color: var(--text-faint); }
+  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-find button, .workspace-utilities > button) > svg > g { stroke-width: 2.58px; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-find button > svg { width: 20px; height: 20px; margin: -2px; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-find button > svg > g { stroke-width: 2.33px; }
+  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab.active, .workspace-tab:hover, .workspace-utilities > button:hover) > svg { color: var(--text-dim); }
+
+  :root:root .gt-rail-nav.workspace-navigation .th-team { height: 28px; margin: 8px 0 0; padding: 0 0 0 4px; gap: 6px; font-size: 14px; font-weight: 600; letter-spacing: -.18px; color: var(--text); }
+  :root:root .gt-rail-nav.workspace-navigation :is(.ws-new, .ws-keep) { flex: none; width: 28px; height: 28px; padding: 0; justify-content: center; border-radius: var(--radius); color: var(--text-faint); cursor: default; transition: opacity .14s .08s; }
+  :root:root .gt-rail-nav.workspace-navigation :is(.ws-new, .ws-keep) > svg { width: 16px; height: 16px; }
+  /* The two sit 2 apart; the row's own gap is 6. */
+  :root:root .gt-rail-nav.workspace-navigation .ws-keep { margin-left: -4px; }
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation :is(.ws-new, .ws-keep) { visibility: hidden; opacity: 0; transition: opacity .06s, visibility 0s .06s; }
+
+  /* Search is a field, so its keys are read before they are needed. */
+  :root:root .gt-rail-nav.workspace-navigation .workspace-find { margin: 12px 0 0; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-find button { font-weight: 400; color: var(--text-faint); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-strong); }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-find button:hover { background: var(--surface); color: var(--text-dim); }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-keys { font-size: 12px; letter-spacing: 0; opacity: 1; }
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .workspace-find button { background: transparent; box-shadow: none; }
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .workspace-keys { opacity: 0; }
+
+  :root:root .gt-rail-nav.workspace-navigation .workspace-tabs { gap: 2px; margin-top: 0; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-find + .workspace-tabs { margin-top: 12px; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-tabs + .workspace-tabs { margin-top: 2px; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-running { font-size: 11.5px; font-weight: 400; line-height: 16px; letter-spacing: .02em; color: var(--text-dim); }
+  /* Closed, the Inbox's number is the dot on its icon. */
+  :root:root .gt-rail-nav.workspace-navigation .workspace-tab.has-count::after { top: 4px; left: 18px; width: 5px; height: 5px; }
+
+  /* A section's name folds its rows. Closed, it keeps its height, so no icon under it moves when the sidebar opens. */
+  :root:root .gt-rail-nav.workspace-navigation .ws-sec { align-self: flex-start; height: 24px; margin-top: 16px; padding: 0 6px; gap: 4px; border-radius: var(--radius); font-size: 12px; font-weight: 500; line-height: 14px; color: var(--text-faint); cursor: default; transition: opacity .14s .08s; }
+  :root:root .gt-rail-nav.workspace-navigation .ws-sec > svg { flex: none; width: 7px; height: 7px; opacity: .75; transition: transform .12s; }
+  :root:root .gt-rail-nav.workspace-navigation .ws-sec[aria-expanded="false"] > svg { transform: rotate(-90deg); }
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .ws-sec { opacity: 0; pointer-events: none; transition: opacity .06s; }
+
+  /* Recent gives way before the foot does in a short window, and is not drawn at all while the sidebar is closed. */
+  :root:root .gt-rail-nav.workspace-navigation .ws-recent { display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0; overflow: hidden; transition: opacity .14s .08s; }
+  :root:root .workspace-collapsed .gt-rail-nav .ws-recent { visibility: hidden; opacity: 0; transition: opacity .06s, visibility 0s .06s; }
+  :root:root .gt-rail-nav.workspace-navigation .ws-recent-list { display: flex; flex-direction: column; gap: 2px; }
+  :root:root .gt-rail-nav.workspace-navigation .ws-recent-row > span:not(.ws-recent-mark) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* An 18 point face in the icons' 16 point column, so every name starts on one line. */
+  :root:root .gt-rail-nav.workspace-navigation .ws-recent-mark { flex: none; display: flex; align-items: center; justify-content: center; width: 16px; height: 16px; }
+  :root:root .gt-rail-nav.workspace-navigation .ws-recent-mark > * { flex: none; margin: -1px; }
+  /* An agent's mark is bare here, like the icons above it: its tile is grey on grey on this ground.
+     The drawing is 11/16 of its box (EngineLogos.tsx IN_TILE), so a 20 point box gives the icons' ink. */
+  :root:root .gt-rail-nav.workspace-navigation .ws-recent-mark > .harness-mark { width: 16px; height: 16px; margin: 0; border: 0; background: none; }
+  :root:root .gt-rail-nav.workspace-navigation .ws-recent-mark > .harness-mark > svg { flex: none; width: 20px; height: 20px; margin: -2px; }
+  :root:root .gt-rail-nav.workspace-navigation .ws-need { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+
+  :root:root .gt-rail-nav.workspace-navigation .workspace-bottom { position: relative; flex: none; padding-top: 16px; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-utilities { gap: 2px; padding-bottom: 0; }
+  /* Settings is in your account menu while you are signed in. */
+  :root:root .gt-rail-nav.workspace-navigation .workspace-utilities > .ws-in-menu { display: none; }
+  :root:root .gt-rail-nav.workspace-navigation .th-me { display: block; height: auto; margin: 2px 0 0; padding: 0; border-top: 0; font-size: inherit; }
+  :root:root .gt-rail-nav.workspace-navigation .th-me .th-me-btn { width: 100%; height: 32px; margin: 0; padding: 0 6px 0 4px; gap: 6px; border-radius: var(--radius); font-size: inherit; font-weight: inherit; color: var(--text); cursor: default; }
+  :root:root .gt-rail-nav.workspace-navigation .th-me .th-me-btn:has(.th-me-invis) { height: 40px; }
+  :root:root .gt-rail-nav.workspace-navigation .th-me .tm-av { width: 20px; height: 20px; line-height: 18px; font-size: 9px; }
+  :root:root .gt-rail-nav.workspace-navigation .th-me .th-me-btn small:not(.th-me-invis) { display: none; }
+  :root:root .gt-rail-nav.workspace-navigation .th-me-signin { width: 100%; height: 30px; padding: 0 6px; border-radius: var(--radius); font-size: inherit; font-weight: inherit; }
+
+  /* What is left of your limit: a bar at the end of the last row, which is yours when you are signed in. */
+  :root:root .gt-rail-nav.workspace-navigation .workspace-usage { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; height: 30px; margin: 0; padding: 0 6px 0 0; display: flex; align-items: center; justify-content: flex-end; pointer-events: none; transition: opacity .14s .08s; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-bottom:has(> .th-me) .workspace-usage { height: 32px; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-bottom:has(> .workspace-usage .usage-pill) .th-me .th-me-btn { padding-right: 48px; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-usage:empty { display: none; }
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .workspace-usage { visibility: hidden; opacity: 0; transition: opacity .06s, visibility 0s .06s; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-usage .usage-box { position: static; width: auto; pointer-events: auto; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-usage .usage-pill { display: flex; align-items: center; width: 32px; height: 20px; min-height: 0; padding: 0; gap: 0; border: 0; background: none; cursor: default; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-usage .usage-pill > .usage-meter { display: block; width: 32px; height: 4px; border-radius: 2px; overflow: hidden; background: color-mix(in srgb, var(--text) 13%, transparent); }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-usage .usage-pill > .usage-meter > i { display: block; height: 100%; border-radius: 2px; background: var(--text-dim); }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-usage .usage-pill.is-close > .usage-meter > i { background: var(--text); }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-usage .usage-panel { top: auto; bottom: calc(100% + 6px); left: 0; right: auto; }
+}
+
+/* In a window that small, what this sidebar adds is not drawn. */
+@media (max-width: 700px), (max-height: 520px) {
+  :root:root .gt-rail-nav.workspace-navigation :is(.ws-new, .ws-keep, .ws-sec, .ws-recent) { display: none; }
+}

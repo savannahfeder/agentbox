@@ -84,6 +84,8 @@
 .th-pop .lab { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint); }
 /* Beside chips that wrap, the label belongs to the first row, not the middle of them all. */
 .th-pop .line:has(> .opts) > .lab { align-self: start; line-height: 26px; }
+/* A label too long for the column takes two lines, as tall together as a chip. */
+.th-pop .line:has(> .opts) > .lab.lab-two { line-height: 13px; }
 .th-pop .opts { display: flex; flex-wrap: wrap; gap: 5px; }
 .th-pop .opts > button { display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--tag-radius); background: none; font: inherit; font-size: 12.5px; color: var(--text-dim); white-space: nowrap; cursor: pointer; }
 .th-pop .opts > button.on { background: rgba(255,255,255,.09); border-color: var(--text-faint); color: var(--text); }
@@ -127,10 +129,14 @@
    count beside the mark, in the mark's own faint colour. Raised 0.75px
    (2026-10-02): on the baseline it read too low, at 1.5px too high, so it
    sits halfway between. */
-/* PINNED (w-20323283e6): the same faint ink and box as the others. Its weight is in its
-   head, so with its tip level with the lock's foot it still read as high; it
-   hangs about two thirds of a pixel past it. */
-.th-pin { display: inline-block; margin-left: 9px; color: var(--text-faint); vertical-align: -3px; }
+/* PINNED (w-20323283e6): a filled head in the second ink, a step stronger than
+   the lock beside it, because a pin nobody could find read as a pin that did
+   nothing. Its tip hangs about two thirds of a pixel past the lock's foot. */
+.th-pin { display: inline-block; margin-left: 9px; color: var(--text-dim); vertical-align: -3px; }
+.th-pin path:first-child { fill: currentColor; }
+.th-cell-title.with-pin { display: flex; align-items: center; }
+.th-cell-title.with-pin > * { flex: none; }
+.th-cell-title.with-pin > .th-title-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* A run in the cloud: the running mark is a cloud, pulsing with the dot.
    14px wide with 6px after it, so its title starts where a dot's does. */
 .th-st-cloud { display: inline; flex: none; margin-right: 6px; color: var(--accent); vertical-align: -1px; animation: th-breathe 1.6s ease-in-out infinite; }

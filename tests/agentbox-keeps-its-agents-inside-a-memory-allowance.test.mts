@@ -26,12 +26,17 @@
 // stretches where the app froze it fired a median of 12 minutes ahead. A
 // squeeze that is all other programs holds nothing here: at 18:18 UTC on the
 // 23rd a backup held 4.0 GB, the agents 338 MB, and nothing of theirs waited.
+//
+// Since 24 November the command gate is told the room, not only whether
+// Agentbox is over (tests/a-command-starts-when-this-computer-has-room-for-it):
+// over read as short of memory, which held every command nothing had measured
+// as well as the heavy ones.
 import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { allowanceMb, gatePressure, overAllowance, standing } from '../main/memory-allowance.mts';
+import { allowanceMb, overAllowance, roomMb, standing } from '../main/memory-allowance.mts';
 import { startDecision } from '../main/start-hold.mts';
 import { MemoryLog } from '../main/memory-log.mts';
 import { MemoryGateServer } from '../main/memory-gate-server.mts';
@@ -113,12 +118,21 @@ describe('when the doors act on it', () => {
     expect(overAllowance([at(true, 180_001), at(false, 120_000), at(false, 60_000), at(false, 0)], NOW)).toBe(false);
   });
 
-  it('heavy commands wait as they do when memory is tight, and no more than that', () => {
-    expect(gatePressure('normal', true)).toBe('tight');
-    expect(gatePressure('normal', false)).toBe('normal');
-    expect(gatePressure('tight', true)).toBe('tight');
-    expect(gatePressure('critical', true)).toBe('critical');
-    expect(gatePressure('critical', false)).toBe('critical');
+  it('the command gate is told the room: what the allowance leaves, under nothing when over', () => {
+    // 14:54 on the 23rd, 291 MB inside; three minutes later, 2.2 GB over.
+    expect(roomMb({ allowanceMb: 4457, agentboxMb: 4166, over: false })).toBe(291);
+    expect(roomMb({ allowanceMb: 4494, agentboxMb: 6738, over: true })).toBe(-2244);
+    expect(roomMb(standing(AGENTS_BIG))).toBe(5213 - 12366);
+    expect(roomMb(null)).toBe(null);
+    expect(roomMb(undefined)).toBe(null);
+  });
+
+  it('a squeeze that is all other programs leaves a megabyte of room, so commands go one at a time', () => {
+    // The backup minute: the app alone is past the floor, and the agents hold too little to give back.
+    expect(standing(BACKUP_BIG)).toMatchObject({ allowanceMb: 2048, agentboxMb: 2687, over: false });
+    expect(roomMb(standing(BACKUP_BIG))).toBe(1);
+    expect(roomMb({ allowanceMb: 2048, agentboxMb: 2047, over: false })).toBe(1);
+    expect(roomMb({ allowanceMb: 2048, agentboxMb: 2046, over: false })).toBe(2);
   });
 });
 
@@ -195,6 +209,26 @@ describe('the minute log', () => {
     expect(log.overAllowance()).toBe(true);
   });
 
+  it('says how much room the newest listing left, and when it was taken, until that is too old', async () => {
+    let browser = 8000;
+    const { log, later } = make(() => sizes(1500, 300, browser, 3000, 1000));
+    expect(log.room()).toBe(null);
+    await log.tick();
+    const first = log.room()!;
+    // 5206 allowed, and the app, the agent and its browser hold 9800.
+    expect(first.mb).toBe(5206 - 9800);
+    browser = 200;
+    later(60_000);
+    await log.tick();
+    // The newest listing alone: one back inside is room again, unlike the doors that wait three minutes.
+    expect(log.room()).toEqual({ mb: 5206 - 2000, at: first.at + 60_000 });
+    expect(log.overAllowance()).toBe(true);
+    later(150_000);
+    expect(log.room()).not.toBe(null);
+    later(1);
+    expect(log.room()).toBe(null);
+  });
+
   it('stops answering over once the agents are back inside for three minutes', async () => {
     let browser = 8000;
     const { dir, log, later } = make(() => sizes(1500, 300, browser, 3000, 1000));
@@ -234,14 +268,14 @@ describe('the command gate', () => {
   });
   const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-  async function makeServer(over: () => boolean) {
+  async function makeServer(room: () => { mb: number; at: number } | null) {
     const dir = fs.mkdtempSync(path.join('/tmp', 'gate-allow-'));
     dirs.push(dir);
     const history = new CommandHistory();
     for (let i = 0; i < 3; i++) history.record('git status', { peakMb: 10, durationMs: 100 });
     history.record('npm test', { peakMb: 900, durationMs: 60_000 });
     const server = new MemoryGateServer({
-      socketPath: path.join(dir, 'g.sock'), history, overAllowance: over,
+      socketPath: path.join(dir, 'g.sock'), history, room,
       readPressure: async () => ({ level: 1, freePct: 60, swapInMbps: 0 }), sampleProcesses: async () => [],
       pollMs: 30, idlePollMs: 30, takeoverMs: 50, lockPort: 0, gate: { slots: 2 },
     });
@@ -265,21 +299,39 @@ describe('the command gate', () => {
   }
 
   it('holds a heavy command while Agentbox is over, with both slots free and memory reading fine', async () => {
-    let over = true;
-    const sock = await makeServer(() => over);
+    let room = { mb: -2244, at: 1 };
+    const sock = await makeServer(() => room);
     await wait(80);
     const heavy = ask(sock, 'h1', 'npm test');
     const light = ask(sock, 'l1', 'git status');
     await light.done;
     await wait(150);
     expect(heavy.answered()).toBe(false);
-    over = false;
+    room = { mb: 291, at: 2 };
     await heavy.done;
     expect(heavy.answered()).toBe(true);
   });
 
-  it('lets a heavy command straight through while Agentbox is inside', async () => {
-    const sock = await makeServer(() => false);
+  it('lets a heavy command straight through while Agentbox is inside, and when no listing says', async () => {
+    const sock = await makeServer(() => ({ mb: 3_000, at: 1 }));
+    await wait(80);
+    await ask(sock, 'h1', 'npm test').done;
+    const unread = await makeServer(() => null);
+    await wait(80);
+    await ask(unread, 'h1', 'npm test').done;
+  });
+
+  it('a command nothing has measured is not held with it', async () => {
+    // Over read as short of memory, and a Python line that read one file waited 20 minutes.
+    const sock = await makeServer(() => ({ mb: -2244, at: 1 }));
+    await wait(80);
+    const heavy = ask(sock, 'h1', 'npm test');
+    await ask(sock, 'p1', 'python3 -I -c "print(1)"').done;
+    expect(heavy.answered()).toBe(false);
+  });
+
+  it('a question about the room that throws holds nothing', async () => {
+    const sock = await makeServer(() => { throw new Error('no listing'); });
     await wait(80);
     await ask(sock, 'h1', 'npm test').done;
   });
@@ -321,8 +373,17 @@ describe('the fleet', () => {
     expect(sup._memoryLetsStart(task('q-0'))).toBe(true);
   });
 
-  it('hands the same answer to the command gate', () => {
+  it('hands the command gate the room and this computer\'s memory', () => {
     const src = fs.readFileSync(new URL('../main/supervisor.mts', import.meta.url), 'utf8');
-    expect(src).toMatch(/overAllowance: \(\) => this\._overAllowance\(\)/);
+    expect(src).toMatch(/room: \(\) => this\._memoryRoom\(\)/);
+    expect(src).toMatch(/ramMb: os\.totalmem\(\) \/ 1048576/);
+    const sup = setup(true);
+    sup._memoryLog = { room: () => ({ mb: -500, at: 7 }) };
+    expect(sup._memoryRoom()).toEqual({ mb: -500, at: 7 });
+    sup._memoryLog = { room: () => { throw new Error('no listing'); } };
+    expect(sup._memoryRoom()).toBe(null);
+    sup._memoryLog = { room: () => ({ mb: -500, at: 7 }) };
+    sup.config.memoryGate = false;
+    expect(sup._memoryRoom()).toBe(null);
   });
 });

@@ -34,9 +34,21 @@ describe('Team this week shows who you pinned and not who you hid', () => {
     expect(card.hidden).toEqual([]);
   });
 
-  it('ranks a pinned teammate who waits on you with the others who wait', () => {
+  // The founder pinned a teammate and "nothing happened": they waited on you
+  // and sat under a busier teammate who also did, so the pin moved no one.
+  it('puts a pinned teammate who waits on you first of those who wait (the reported case)', () => {
     const card = teamCard([row('mate:a', 'waiting', 9), row('person:lena', 'waiting', 1), row('mate:b', 'working')], pinMate(none, 'person:lena'));
-    expect(keys(card.shown)).toEqual(['mate:a', 'person:lena', 'mate:b']);
+    expect(keys(card.shown)).toEqual(['person:lena', 'mate:a', 'mate:b']);
+  });
+
+  it('keeps pinned teammates who wait in the order you pinned them, and the rest who wait busiest first', () => {
+    const waiting = [row('mate:a', 'waiting', 9), row('mate:b', 'waiting', 4), row('person:lena', 'waiting', 1), row('person:theo', 'waiting', 2)];
+    expect(keys(teamCard(waiting, pinMate(pinMate(none, 'person:theo'), 'person:lena')).shown)).toEqual(['person:theo', 'person:lena', 'mate:a', 'mate:b']);
+  });
+
+  it('never puts a pinned teammate who does not wait above one who does', () => {
+    const card = teamCard([row('mate:a', 'waiting', 0), row('person:lena', 'working', 19)], pinMate(none, 'person:lena'));
+    expect(keys(card.shown)).toEqual(['mate:a', 'person:lena']);
   });
 
   it('keeps pinned teammates in the order you pinned them, whoever did more', () => {

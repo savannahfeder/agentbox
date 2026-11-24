@@ -250,14 +250,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'DejaVu Sa
    as the tag's family. */
 .ct-pip { width: calc(7px * var(--ct-cs)); height: calc(7px * var(--ct-cs)); border-radius: 50%; flex: none; background: var(--ct-lat); }
 
-/* Hide it for a while, or go and turn it off. Small and last, so the list
-   reads first. */
+/* Size, move or turn it off. Small and last, so the list reads first. */
 .ct-foot {
   display: flex; align-items: center; gap: 2px; margin: calc(6px * var(--ct-cs)) 0 0;
   padding: calc(7px * var(--ct-cs)) calc(6px * var(--ct-cs)) 0; border-top: 1px solid var(--ct-rule);
   font-size: calc(11.5px * var(--ct-cs)); color: var(--ct-faint); white-space: nowrap;
 }
-.ct-foot > span:first-child { margin-right: 2px; }
 .ct-foot button { all: unset; cursor: pointer; padding: calc(2px * var(--ct-cs)) calc(6px * var(--ct-cs)); border-radius: calc(5px * var(--ct-cs)); color: var(--ct-dim); }
 .ct-foot button:hover { background: var(--ct-press); color: var(--ct-ink); }
 .ct-foot .ct-sep { flex: 1; min-width: calc(16px * var(--ct-cs)); }
@@ -268,7 +266,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'DejaVu Sa
    beside it while she decides. Two halves of one pill, joined by a hairline,
    with the signs drawn rather than typed — a minus and a plus as characters
    never sit on the same baseline and that is what made it ugly. */
-.ct-foot .ct-size { display: flex; align-items: center; gap: calc(5px * var(--ct-cs)); margin-left: calc(4px * var(--ct-cs)); }
+.ct-foot .ct-size { display: flex; align-items: center; gap: calc(5px * var(--ct-cs)); }
 .ct-foot .ct-size-name { color: var(--ct-faint); }
 .ct-foot .ct-steps {
   display: flex; align-items: stretch; overflow: hidden;

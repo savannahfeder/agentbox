@@ -27,6 +27,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { OUTSIDE_MODES, OUTSIDE_TITLE } from '../outside-agents';
 import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel, UpdateState } from '../types';
 import { onCloudPhone, onPhone, phoneSized } from '../phone-screen';
 import { setSidebarShrinks, useSidebarShrinks } from '../sidebar-shrinks';
@@ -1235,11 +1236,7 @@ const CODEX_MODE_OPTIONS: Array<{ value: CodexModeId; label: string }> = CODEX_M
 // Three positions, not a switch, because the middle one is the interesting one
 // and a switch cannot hold it: a machine that has been swept once wants only
 // the sessions that are actually stopped on a question.
-const AGENT_OPTIONS: Array<{ value: AgentMode; label: string }> = [
-  { value: 'all', label: 'All of them' },
-  { value: 'waiting', label: 'Only the stuck ones' },
-  { value: 'off', label: 'None' },
-];
+const AGENT_OPTIONS = OUTSIDE_MODES;
 
 // One short sentence each (2026-10-05): the row is read at a glance, and the
 // picker beside it already names the choice.
@@ -2639,12 +2636,12 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                 They are rows in the Inbox and in no other list since
                 2026-08-17; this is the only place that decides how many of
                 them get there. */}
-            <Group id="outside" label="Agents you started yourself">
+            <Group id="outside" label={OUTSIDE_TITLE}>
               <Row
                 label="Show while they run"
-                desc={`Claude Code started in a terminal, not from here. ${AGENT_SENTENCE[w.outsideAgents]}`}
+                desc={`Claude Code and Codex, started in a terminal or the Codex app. ${AGENT_SENTENCE[w.outsideAgents]}`}
               >
-                <Picker bare label="Agents you started yourself" value={w.outsideAgents} options={AGENT_OPTIONS} onChange={(v) => setWorkspace('outsideAgents', v)} />
+                <Picker bare label={OUTSIDE_TITLE} value={w.outsideAgents} options={AGENT_OPTIONS} onChange={(v) => setWorkspace('outsideAgents', v)} />
               </Row>
               {/* The moment after the row above: a chat that has stopped. */}
               <Row
@@ -3034,9 +3031,9 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
           </ReadRow>
         </Group>
         {/* Bring in new chats is not in the copy, so it is not drawn here. */}
-        <Group id="outside" label="Agents you started yourself">
-          <ReadRow label="Show while they run" reading={outside} desc={`Claude Code started in a terminal, not from here. ${AGENT_SENTENCE[outside.value as AgentMode] ?? ''}`}>
-            <Picker bare label="Agents you started yourself" value={outside.value as string} options={AGENT_OPTIONS} onChange={(v) => onWorkspace('outsideAgents', v)} />
+        <Group id="outside" label={OUTSIDE_TITLE}>
+          <ReadRow label="Show while they run" reading={outside} desc={`Claude Code and Codex, started in a terminal or the Codex app. ${AGENT_SENTENCE[outside.value as AgentMode] ?? ''}`}>
+            <Picker bare label={OUTSIDE_TITLE} value={outside.value as string} options={AGENT_OPTIONS} onChange={(v) => onWorkspace('outsideAgents', v)} />
           </ReadRow>
         </Group>
       </Page>

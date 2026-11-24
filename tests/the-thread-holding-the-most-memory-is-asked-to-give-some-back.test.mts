@@ -22,6 +22,17 @@
 // tree with the pid to stop, and is asked to stop what it no longer needs and
 // run the command again. Once: its later commands queue as they did, and it is
 // asked again only after fifteen minutes and only if it holds more.
+//
+// And what broke next, the hour it shipped: at 12:51 on 23 November Agentbox
+// was over for four minutes, the thread holding the most held 2.0 GB in 27
+// programs, and it was told nothing. It was a test run started detached and
+// marked to keep, with two Codex testers and their browsers under it. Every
+// program of it was left out twice over: as marked to keep, and as what an
+// agent runs under, since its testers read as agents. Of 329 commands the
+// gate was asked for in that first half hour it answered none with an ask.
+// The mark holds off the app's own sweep, not the agent that set it, and a
+// tester is something the worker's command started. So both are named now,
+// the run as one tree by the pid that ends it.
 import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import http from 'node:http';
@@ -61,9 +72,9 @@ const THREAD = [
 describe('what a thread\'s commands left running', () => {
   it('is each program a command started, with everything under it, biggest first', () => {
     expect(commandTrees(THREAD)).toEqual([
-      { pid: 400, name: 'node vite', mb: 2100, procs: 1, startedAt: NOW - 2 * 3600_000 },
-      { pid: 300, name: 'Google Chrome for Testing', mb: 1900, procs: 3, startedAt: NOW - 52 * 60_000 },
-      { pid: 211, name: 'node test-what-changed.mjs', mb: 1000, procs: 2, startedAt: NOW - 120_000 },
+      { pid: 400, name: 'node vite', mb: 2100, procs: 1, startedAt: NOW - 2 * 3600_000, kept: false },
+      { pid: 300, name: 'Google Chrome for Testing', mb: 1900, procs: 3, startedAt: NOW - 52 * 60_000, kept: false },
+      { pid: 211, name: 'node test-what-changed.mjs', mb: 1000, procs: 2, startedAt: NOW - 120_000, kept: false },
     ]);
   });
 
@@ -99,7 +110,7 @@ describe('what a thread\'s commands left running', () => {
     ];
     // Unnamed, it would read as one program holding everything under it.
     expect(commandTrees(odd).map((t) => t.pid)).toEqual([190]);
-    expect(commandTrees(odd, [200])).toEqual([{ pid: 211, name: 'node test-what-changed.mjs', mb: 700, procs: 1, startedAt: NOW - 600_000 }]);
+    expect(commandTrees(odd, [200])).toEqual([{ pid: 211, name: 'node test-what-changed.mjs', mb: 700, procs: 1, startedAt: NOW - 600_000, kept: false }]);
     // On Linux the hook's parent is a launcher under the agent, and the pids above it are given too.
     expect(commandTrees(odd, [9999, 200, 190]).map((t) => t.pid)).toEqual([211]);
   });
@@ -108,12 +119,44 @@ describe('what a thread\'s commands left running', () => {
     expect(commandTrees(THREAD).map((t) => t.pid)).not.toContain(210);
     // A shell further down is part of what it runs under.
     const nested = [proc(500, 1, '/usr/local/bin/node', 200, { cmd: 'node watch.mjs' }), proc(501, 500, '/bin/sh', 5, { cmd: 'sh -c esbuild' }), proc(502, 501, '/repo/esbuild', 100)];
-    expect(commandTrees(nested)).toEqual([{ pid: 500, name: 'node watch.mjs', mb: 305, procs: 3, startedAt: NOW - 600_000 }]);
+    expect(commandTrees(nested)).toEqual([{ pid: 500, name: 'node watch.mjs', mb: 305, procs: 3, startedAt: NOW - 600_000, kept: false }]);
   });
 
-  it('nor anything marked to keep, which the person may be looking at', () => {
+  it('names what is marked to keep, and says it is: the mark holds off the app\'s sweep, not the agent that set it', () => {
     const kept = [proc(600, 1, '/usr/local/bin/node', 800, { cmd: 'node server.js', keep: true }), proc(601, 600, '/usr/local/bin/node', 100, { cmd: 'node worker.js', keep: true })];
-    expect(commandTrees(kept)).toEqual([]);
+    expect(commandTrees(kept)).toEqual([{ pid: 600, name: 'node server.js', mb: 900, procs: 2, startedAt: NOW - 600_000, kept: true }]);
+    const said = giveBackAsk({ item: 'w-aaa', mb: 1200, programs: kept, at: NOW }, NOW)!;
+    expect(said).toContain('pid 600: node server.js, 0.9 GB in 2 programs, started 10 minutes ago, marked to keep\n');
+    // And says nothing of the mark on what does not carry it.
+    expect(giveBackAsk({ item: 'w-aaa', mb: 6412, programs: THREAD, at: NOW }, NOW)).not.toMatch(/marked to keep/);
+  });
+
+  // The thread that was over at 12:51 on 23 November, as it stood ten minutes on.
+  const SHELL_BROWSER = '/u/Library/Caches/ms-playwright/chromium_headless_shell/chrome-headless-shell';
+  const CODEX = '/usr/local/lib/node_modules/@openai/codex/vendor/codex';
+  const k = { keep: true };
+  const TEST_RUN = [
+    proc(73169, 69711, '/u/.local/bin/claude', 292),
+    proc(83284, 1, '/usr/local/bin/node', 53, { cmd: 'node power-test.mjs', start: NOW / 1000 - 13 * 60, ...k }),
+    proc(34220, 83284, CODEX, 80, k), proc(34899, 34220, '/usr/local/bin/node', 41, { cmd: 'node server.bundle.mjs', ...k }),
+    proc(34261, 83284, CODEX, 78, k), proc(34825, 34261, '/usr/local/bin/node', 40, { cmd: 'node server.bundle.mjs', ...k }),
+    proc(33073, 83284, SHELL_BROWSER, 15, k), proc(33098, 33073, SHELL_BROWSER, 66, k), proc(33138, 33073, SHELL_BROWSER, 152, k),
+    proc(33395, 83284, SHELL_BROWSER, 15, k), proc(33462, 33395, SHELL_BROWSER, 67, k), proc(33522, 33395, SHELL_BROWSER, 140, k),
+  ];
+
+  it('a test run started detached, its testers and browsers under it, is one tree by the pid that ends it', () => {
+    expect(commandTrees(TEST_RUN, [73169])).toEqual([{ pid: 83284, name: 'node power-test.mjs', mb: 747, procs: 11, startedAt: NOW - 13 * 60_000, kept: true }]);
+    expect(giveBackAsk({ item: 'w-aaa', mb: 1265, programs: TEST_RUN, at: NOW }, NOW, { asker: [73169] }))
+      .toContain('pid 83284: node power-test.mjs, 0.7 GB in 11 programs, started 13 minutes ago, marked to keep');
+  });
+
+  it('an agent a command started is a program like any other once the thread\'s own agent is known', () => {
+    // Read with nobody asking, a tester passes for an agent and the run for what it runs under, so nothing is named.
+    expect(commandTrees(TEST_RUN)).toEqual([]);
+    // Known by its pid, the worker alone is the agent, whatever else looks like one.
+    expect(commandTrees(TEST_RUN, [73169]).map((t) => t.pid)).toEqual([83284]);
+    // A pid the listing does not have (a launcher, a worker started since) changes nothing.
+    expect(commandTrees(TEST_RUN, [99999])).toEqual([]);
   });
 
   it('a Codex thread has no agent of its own in the list: its commands stand under their shells', () => {
@@ -122,7 +165,7 @@ describe('what a thread\'s commands left running', () => {
       proc(700, 90, '/bin/bash', 3, { cmd: 'bash -lc npm run dev' }),
       proc(701, 700, '/usr/local/bin/node', 1400, { cmd: 'node /repo/node_modules/.bin/next dev' }),
     ];
-    expect(commandTrees(codex)).toEqual([{ pid: 701, name: 'node next', mb: 1400, procs: 1, startedAt: NOW - 600_000 }]);
+    expect(commandTrees(codex)).toEqual([{ pid: 701, name: 'node next', mb: 1400, procs: 1, startedAt: NOW - 600_000, kept: false }]);
   });
 
   it('a program whose start could not be read says so rather than guessing', () => {
@@ -183,10 +226,12 @@ describe('who may be asked on a thread\'s behalf', () => {
     expect(askedByANestedAgent(holding, [], [200])).toBe(false);
   });
 
-  it('the worker is still told of what its testers started, and never to stop a tester itself', () => {
+  it('the worker is told of a tester as what its command started, with what the tester started under it', () => {
     const said = giveBackAsk(holding, NOW, { asker: [200] })!;
-    expect(said).toContain('pid 511: Google Chrome for Testing, 1.9 GB');
-    for (const agent of [200, 499, 500]) expect(said).not.toContain(`pid ${agent}:`);
+    expect(said).toContain('pid 499: node codex.js, 2.2 GB in 4 programs');
+    expect(said).not.toContain('pid 200:');
+    // Read by name alone it is the same: the tester runs under the worker, so it is not the thread's own agent.
+    expect(commandTrees(LOOP).map((t) => t.pid)).toEqual([499]);
   });
 });
 
@@ -508,7 +553,7 @@ describe('the command gate', () => {
     const history = new CommandHistory();
     history.record('npm test', { peakMb: 900, durationMs: 60_000 });
     const server = new MemoryGateServer({
-      socketPath: path.join(dir, 'g.sock'), history, overAllowance: () => true,
+      socketPath: path.join(dir, 'g.sock'), history, room: () => ({ mb: -2244, at: 1 }),
       readPressure: async () => ({ level: 1, freePct: 60, swapInMbps: 0 }), sampleProcesses: async () => [], pollMs: 30, idlePollMs: 30, takeoverMs: 50, lockPort: 0,
     });
     servers.push(server);

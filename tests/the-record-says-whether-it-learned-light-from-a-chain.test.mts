@@ -50,16 +50,23 @@ describe('the record says whether it learned light from a chain', () => {
     expect(letters(h.programs, 'tail')).toBe('c');
   });
 
-  it('still tells the parts of a heavy chain nothing at all', () => {
-    // THE RULE THIS MUST NOT BREAK. `git status && npm test` measured heavy says
-    // nothing bad about `git status`, so the early return stays exactly as it was.
+  it('marks the parts of a heavy chain, and one mark calls none of them heavy', () => {
+    // THE RULE THIS MUST NOT BREAK. `git status && npm test` measured heavy does
+    // not say `git status` is heavy. Until 2026-11-23 it told the parts nothing,
+    // and parts that only heard of light chains read light for good; now each
+    // carries an `H`, which counts only at four in ten
+    // (tests/a-program-that-keeps-turning-up-in-heavy-commands-is-not-called-light).
     const h = new CommandHistory();
+    h.record('git status | head -3', { peakMb: 20 });
+    h.record('git status | head -3', { peakMb: 20 });
     h.record('git status && npm test', { peakMb: 1200 });
     expect(letters(h.keys, 'git status && npm test')).toBe('h');
-    expect(letters(h.keys, 'git status')).toBe(null);
-    expect(letters(h.keys, 'npm test')).toBe(null);
-    expect(letters(h.programs, 'git')).toBe(null);
-    expect(letters(h.programs, 'npm')).toBe(null);
+    expect(letters(h.keys, 'git status')).toBe('ccH');
+    expect(letters(h.keys, 'npm test')).toBe('H');
+    expect(letters(h.programs, 'git')).toBe('ccH');
+    expect(letters(h.programs, 'npm')).toBe('H');
+    expect(h.classify('git status')).toBe('light');
+    expect(h.classify('npm test')).toBe('unknown');
   });
 
   it('counts a command carrying $(...) as a chain, even with one segment', () => {

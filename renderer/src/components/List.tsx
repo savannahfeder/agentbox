@@ -17,6 +17,7 @@ import { isTroubleRow } from '../trouble-row';
 import { isUpdateRow } from '../update-row';
 import { IMPORT_KEYS, JUST_IMPORTED_WORD, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEYS, isImportRow, isNotImportedRow, justImported, type ImportChoice } from '../import-row';
 import { Hits } from './Hits';
+import { useLetGoWhenGone } from '../threads/steady-rows';
 import type { ThreadSearchDetails } from '../threads/search';
 import { nextRunWords, repeatRow, repeatTag } from '../repeat-words';
 import { Face, TeamRowEnd, firstName, type TeamView } from '../team/people';
@@ -219,6 +220,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
   const waiting = useContext(WaitingContext);
   const fleet = useContext(FleetContext);
   const drag = useRowDrag(table ? onReorder : undefined);
+  useLetGoWhenGone(pointer);
   // The hover does not move while a row is carried: each row crossed would
   // redraw the whole app under the drag (w-6e5b532a95).
   const onHover = (id: string | null) => { if (!drag.carrying()) hoverTo?.(id); };

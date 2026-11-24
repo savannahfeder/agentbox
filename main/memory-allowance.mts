@@ -11,8 +11,6 @@
 // The shares come from one 16 GB Mac's week. They are shares so another size
 // gets an answer, not because other sizes were measured.
 
-import type { Pressure } from './memory-gate.mts';
-
 /** Of the computer's memory: what Agentbox and the biggest other programs hold together before it runs short. */
 export const CEILING_SHARE = 9 / 16;
 /** What Agentbox keeps however much the other programs hold. */
@@ -57,9 +55,18 @@ export function overAllowance(standings: readonly StampedStanding[] | null | und
   return list.some((s) => s.over && now - s.at <= settleMs);
 }
 
-/** What the command gate is told: over the allowance reads as tight, and never as more than the kernel said. */
-export function gatePressure(pressure: Pressure, over: boolean): Pressure {
-  return over && pressure === 'normal' ? 'tight' : pressure;
+/**
+ * How many MB Agentbox has left on this computer, which is what the command
+ * gate starts commands against (main/memory-gate.mts): the allowance less
+ * what the app and its agents hold, negative when they are over. While the
+ * agents hold too little to give anything back it is never under a megabyte,
+ * so a squeeze that is all other programs sends commands one at a time and
+ * holds none. Pure.
+ */
+export function roomMb(stands: Standing | null | undefined): number | null {
+  if (!stands) return null;
+  const left = stands.allowanceMb - stands.agentboxMb;
+  return stands.over ? left : Math.max(1, left);
 }
 
 /**

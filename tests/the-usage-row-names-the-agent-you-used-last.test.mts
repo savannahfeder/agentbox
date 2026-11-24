@@ -26,7 +26,9 @@ const reading = (engine, session, ago = 0) => ({ engine, at: NOW - ago, limits: 
 const claude = reading('claude', 47);
 const codex = reading('codex', 64);
 const row = (props) => renderToStaticMarkup(createElement(UsagePill, { now: NOW, sidebar: true, engineWord: null, usage: claude, all: [claude, codex], ...props }));
-const said = (html) => [...html.matchAll(/class="usage-row-(?:label|num)">([^<]*)</g)].map((m) => m[1]).join(' ');
+// Since 2026-11-23 the row is a bar on your own row: the agent is the first
+// word read aloud and shown on pointing, and its figure is the bar's length.
+const said = (html) => (html ? `${html.match(/aria-label="([^."]+)\./)?.[1]} ${html.match(/class="usage-meter"[^>]*><i style="width:(\d+)%/)?.[1]}%` : '');
 
 describe('which agent you used last', () => {
   const snap = (o) => ({ supervisor: { running: [] }, items: [], engines: { byItem: {} }, ...o });

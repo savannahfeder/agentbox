@@ -107,6 +107,10 @@ function runHook(dir, stdin, env = {}, args = []) {
   fs.mkdirSync(path.join(dir, 'scripts'), { recursive: true });
   fs.copyFileSync(path.join(root, 'scripts/red-test-files.mjs'), path.join(dir, 'scripts/red-test-files.mjs'));
   fs.cpSync(path.join(root, 'scripts/lib'), path.join(dir, 'scripts/lib'), { recursive: true });
+  // The stand-in repository links this checkout's vitest, which the sandbox
+  // will not read; what the sandbox holds is
+  // tests/a-branchs-code-at-ship-runs-where-it-cannot-reach-your-sign-ins.
+  fs.rmSync(path.join(dir, 'scripts/lib/branch-sandbox.mjs'));
   const r = spawnSync(hook, args, { cwd: dir, input: stdin, encoding: 'utf8', env: { ...process.env, AGENTBOX_PUSH_FULL_SUITE: '', ...env } });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 }

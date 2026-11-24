@@ -11,7 +11,7 @@ const ROWS = [
   'claude/Usage', 'claude/Signed in', 'claude/Permission mode',
   'codex/Usage', 'codex/Signed in', 'codex/Permission mode',
   'running/How many run at once', 'running/Hold heavy work when memory is short', 'running/Stop programs agents leave behind',
-  'running/Something felt slow', 'running/Agents you started yourself', 'running/Bring in new chats',
+  'running/Something felt slow', 'running/Terminal sessions', 'running/Bring in new chats',
   'projects/Projects',
   'team/Team',
 ];

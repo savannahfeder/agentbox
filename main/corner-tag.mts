@@ -29,9 +29,9 @@
 //   pointer has to rest on the tag a moment, so passing over the corner opens
 //   nothing, and after a drag it has to leave and come back. The list is in
 //   its own window so the tag never moves. Off both for a moment and it shuts.
-// - IT SHOWS OVER FULL-SCREEN APPS, IT HIDES FOR A WHILE AND COMES BACK, it is
-//   off for good only in Settings, it steps aside while she is in the app, and
-//   it goes when the app's window goes.
+// - IT SHOWS OVER FULL-SCREEN APPS, IT HIDES FOR A WHILE AND COMES BACK or
+//   turns off for good from its own list, only Settings turns it back on, it
+//   steps aside while she is in the app, and it goes when the app's window goes.
 //
 // What the tag counts is not decided here. Only the page knows what the inbox
 // is, so it hands over what is ready and how many are working on
@@ -121,7 +121,7 @@ export interface CornerTagDeps {
 const HIDE_LABELS: Record<string, string> = { '5m': 'Hide for 5 minutes', '30m': 'Hide for 30 minutes', today: 'Hide for the rest of today' };
 const CHANNELS = [
   'zero:corner-tag', 'corner-tag:ready', 'corner-tag:size', 'corner-tag:hover', 'corner-tag:toggle',
-  'corner-tag:press', 'corner-tag:release', 'corner-tag:go', 'corner-tag:hide', 'corner-tag:settings', 'corner-tag:menu',
+  'corner-tag:press', 'corner-tag:release', 'corner-tag:go', 'corner-tag:hide', 'corner-tag:off', 'corner-tag:menu',
   'corner-tag:clickable', 'corner-tag:resize', 'corner-tag:dismiss', 'corner-tag:place',
 ];
 
@@ -567,9 +567,12 @@ export function createCornerTag({
     refresh();
   };
 
-  const openSettings = () => {
-    closeCard();
-    if (bringAppForward()) mainWindow!.webContents.send('zero:open-settings', { pane: 'general' });
+  // Off here rather than in Settings: the tray steps aside while the app is
+  // in front, so Settings made it look off when it was not.
+  const turnOff = () => {
+    saveConfig(config, { cornerTag: false });
+    count('tag_turned_off');
+    refresh();
   };
 
   const partOf = (p: { part?: unknown } | null | undefined): Part => (p?.part === 'card' ? 'card' : 'tag');
@@ -684,7 +687,7 @@ export function createCornerTag({
     return null;
   });
   ipcMain.handle('corner-tag:hide', (_e, choice: unknown) => { hide(choice); return null; });
-  ipcMain.handle('corner-tag:settings', () => { openSettings(); return null; });
+  ipcMain.handle('corner-tag:off', () => { turnOff(); return null; });
 
   // A right-click on the tag offers the same choices as the list does.
   // One place sets the size, whether it came from the list's steps or the menu:
@@ -772,7 +775,7 @@ export function createCornerTag({
       { type: 'separator' },
       ...HIDE_CHOICES.map((c) => ({ label: HIDE_LABELS[c.key], click: () => hide(c.key) })),
       { type: 'separator' },
-      { label: 'Turn off in Settings…', click: openSettings },
+      { label: 'Turn off for good', click: turnOff },
     ]).popup({ window: wins.tag! });
     return null;
   });

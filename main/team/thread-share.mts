@@ -208,6 +208,16 @@ function withLinks(text: string, found: Map<string, FoundCopy>, { typed = false 
   return under.length ? `${out.replace(/\s+$/, '')}\n\n${under.join('\n')}` : out;
 }
 
+const LINKED_UNDER = /^!?\[[^\]\n]*\]\(attachments\/[^)\s]+\)$/;
+
+/** A person's words as typed, without the lines withLinks put under them. */
+function typedPart(text: string): string {
+  const at = text.lastIndexOf('\n\n');
+  if (at < 0) return text.trim();
+  const under = text.slice(at + 2).split('\n');
+  return under.every((l) => LINKED_UNDER.test(l) || l.endsWith(` ${TOO_BIG}`)) ? text.slice(0, at).trim() : text.trim();
+}
+
 const clip = (text: string, home: string) => {
   const clean = hideSecrets(text, { home });
   return clean.length > TEXT_CHARS ? `${clean.slice(0, TEXT_CHARS)}…` : clean;
@@ -707,9 +717,9 @@ export function createThreadShare({
       // A helper's words the owner's copy passed to its agent come back as that agent's reply line.
       const passedOn = new Set((local?.lines ?? []).flatMap((l) => {
         const from = l.patch?.from as { teammate?: unknown } | undefined;
-        return typeof from?.teammate === 'string' && l.patch?.answer ? [`${from.teammate}\n${l.patch.answer}`] : [];
+        return typeof from?.teammate === 'string' && l.patch?.answer ? [`${from.teammate}\n${typedPart(l.patch.answer)}`] : [];
       }));
-      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId && !carried.has(`comment-${c.id}`) && !passedOn.has(`${c.by}\n${c.text}`)).map((c): SharedLine => ({
+      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId && !carried.has(`comment-${c.id}`) && !passedOn.has(`${c.by}\n${c.text.trim()}`)).map((c): SharedLine => ({
         id: threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text } },
       }));
       return {
