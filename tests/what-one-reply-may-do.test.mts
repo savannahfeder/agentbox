@@ -477,6 +477,7 @@ describe('clearing a mode puts the row back on the project setting', () => {
         _fruitless: {},
         _profileCooldown: {},
         _liveSessions: {},
+        _runNow: new Map(),
         emit: () => {},
         tick: () => {},
         // `true` exits 0 at once and emits a real 'spawn' event before it does.
