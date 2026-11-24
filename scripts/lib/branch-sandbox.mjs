@@ -65,8 +65,8 @@ export function sandboxedEnv(env, tmp, { stage = 'tests', home = os.homedir() } 
     npm_config_logs_dir: path.join(tmp, 'npm-logs'),
     npm_config_cache: path.join(stage === 'tests' ? tmp : branchCaches(home), 'npm'),
     electron_config_cache: stage === 'build' ? electronCache(home) : path.join(tmp, 'electron'),
-    // The branch's own .npmrc can name the program npm runs for git; these beat it.
-    ...(stage === 'download' ? { npm_config_ignore_scripts: 'true', npm_config_git: 'git' } : {}),
+    // The branch's own .npmrc can name programs npm runs; these beat it.
+    ...(stage === 'download' ? { npm_config_ignore_scripts: 'true', npm_config_git: 'git', npm_config_node_options: '', npm_config_script_shell: '/bin/sh' } : {}),
   };
 }
 
