@@ -38,9 +38,22 @@ const WRAPPERS = new Set(['time', 'nice', 'env', 'timeout', 'nohup', 'caffeinate
 const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
 const REDIRECT = /^\d*(>>?|<<?<?|&>>?|>&|<&)/;
 
-/** Light below this many MB at its sampled peak, heavy at or above HEAVY_MB. */
+/** Light below this many MB at its sampled peak, heavy at or above HEAVY_MB, on the 16 GB they were measured on. */
 export const LIGHT_MB = 150;
 export const HEAVY_MB = 400;
+const MEASURED_ON_MB = 16 * 1024;
+
+/**
+ * The two lines for a computer with `ramMb` of memory: the same shares of it
+ * that 150 and 400 MB are of 16 GB. What a command takes is learned on each
+ * computer from its own runs; a line in megabytes would judge an 8 GB laptop
+ * and a 64 GB desktop as if they were that one Mac. A size that cannot be
+ * read leaves the measured lines.
+ */
+export function linesFor(ramMb: unknown): { lightMb: number; heavyMb: number } {
+  const ram = typeof ramMb === 'number' && Number.isFinite(ramMb) && ramMb > 0 ? ramMb : MEASURED_ON_MB;
+  return { lightMb: Math.round(LIGHT_MB * ram / MEASURED_ON_MB), heavyMb: Math.round(HEAVY_MB * ram / MEASURED_ON_MB) };
+}
 /** A run this short, never seen big, counts as light. */
 export const QUICK_MS = 2_000;
 /**
@@ -262,7 +275,24 @@ function lastOfEachKind(list: string[]): string[] {
  */
 export type Verdict = 'light' | 'unknown' | 'heavy';
 
-export interface CommandHistoryOptions { lightMb?: number; heavyMb?: number; maxKeys?: number }
+export interface CommandHistoryOptions {
+  lightMb?: number;
+  heavyMb?: number;
+  maxKeys?: number;
+  /** This computer's memory, which the two lines are shares of (`linesFor`). */
+  ramMb?: number;
+}
+
+/** How many sizes a command keeps. */
+const SIZES_KEPT = 5;
+
+/** The middle of a list of sizes, or null for none. */
+function middle(list?: number[] | null): number | null {
+  if (!list?.length) return null;
+  const sorted = [...list].sort((a, b) => a - b);
+  const half = Math.floor(sorted.length / 2);
+  return Math.round(sorted.length % 2 ? sorted[half] : (sorted[half - 1] + sorted[half]) / 2);
+}
 
 export interface RecordOptions {
   peakMb?: number | null;
@@ -277,13 +307,19 @@ export class CommandHistory {
   declare maxKeys: number;
   declare keys: Map<string, string[]>;
   declare programs: Map<string, string[]>;
+  /** What a key took, in MB, the last few times it was measured as itself and was not light. */
+  declare sizes: Map<string, number[]>;
+  /** What the heavy chains that marked a key took. */
+  declare chainSizes: Map<string, number[]>;
 
-  constructor({ lightMb = LIGHT_MB, heavyMb = HEAVY_MB, maxKeys = 2_000 }: CommandHistoryOptions = {}) {
+  constructor({ ramMb, lightMb = linesFor(ramMb).lightMb, heavyMb = linesFor(ramMb).heavyMb, maxKeys = 2_000 }: CommandHistoryOptions = {}) {
     this.lightMb = lightMb;
     this.heavyMb = heavyMb;
     this.maxKeys = maxKeys;
     this.keys = new Map();
     this.programs = new Map();
+    this.sizes = new Map();
+    this.chainSizes = new Map();
   }
 
   /**
@@ -314,8 +350,13 @@ export class CommandHistory {
     // of its parts (`c`), and a heavy one marks each (`H`): agents pipe nearly
     // everything, so parts that only ever heard of the light chains read light
     // for good. Enough marks and a part is no longer light (`HEAVY_CHAINS`).
+    // A size is kept only for a run that was not light: it is there to say how
+    // much room a command needs, and a light one needs none worth counting.
+    const size = obs === 'm' || obs === 'h' ? Math.round(peakMb as number) : null;
     if (keys.length > 1 || opaque) {
-      this._push(this.keys, chainKey(keys, opaque), obs);
+      const whole = chainKey(keys, opaque);
+      this._push(this.keys, whole, obs);
+      if (size !== null) this._keepSize(this.sizes, whole, size);
       if (obs === 'l') {
         for (const key of keys) {
           this._push(this.keys, key, 'c');
@@ -323,7 +364,10 @@ export class CommandHistory {
         }
       } else if (obs === 'h') {
         const marked = [...new Set(keys)].filter((key) => !this._clearedAlone(key));
-        for (const key of marked) this._push(this.keys, key, 'H');
+        for (const key of marked) {
+          this._push(this.keys, key, 'H');
+          this._keepSize(this.chainSizes, key, size!);
+        }
         for (const program of new Set(marked.map(programOf))) this._push(this.programs, program, 'H');
       }
       return true;
@@ -331,8 +375,42 @@ export class CommandHistory {
     for (const key of keys) {
       this._push(this.keys, key, obs);
       this._push(this.programs, programOf(key), obs);
+      if (size !== null) this._keepSize(this.sizes, key, size);
     }
     return true;
+  }
+
+  /**
+   * How many MB this command usually took on this computer when it was not
+   * light, or null when nothing here says: its own record first, the only
+   * reading that covered everything it starts, then the biggest of its parts
+   * that are not light. A record from before sizes were kept answers with the
+   * line its letter crossed.
+   */
+  usualMb(command: unknown): number | null {
+    const { keys, opaque } = commandSegments(command);
+    if (!keys.length) return null;
+    const own = middle(this.sizes.get(keys.length > 1 || opaque ? chainKey(keys, opaque) : keys[0]));
+    if (own !== null) return own;
+    let most: number | null = null;
+    for (const key of new Set(keys)) {
+      if (this._classifyKey(key) === 'light') continue;
+      const weight = middle(this.sizes.get(key)) ?? middle(this.chainSizes.get(key)) ?? this._lineCrossed(key);
+      if (weight !== null && (most === null || weight > most)) most = weight;
+    }
+    return most;
+  }
+
+  _lineCrossed(key: string): number | null {
+    const own = this.keys.get(key) ?? [];
+    if (own.includes('h') || own.includes('H')) return this.heavyMb;
+    return own.includes('m') ? this.lightMb : null;
+  }
+
+  _keepSize(map: Map<string, number[]>, key: string, mb: number) {
+    const list = map.get(key) ?? [];
+    list.push(mb);
+    map.set(key, list.slice(-SIZES_KEPT));
   }
 
   /** 'light' | 'unknown' | 'heavy' for a command about to run. */
@@ -409,20 +487,35 @@ export class CommandHistory {
   _forget(map: Map<string, string[]>) {
     let once = 0;
     for (const list of map.values()) if (list.length <= 1) once++;
+    let gone: string = map.keys().next().value!;
     if (once * 2 > map.size) {
-      for (const [key, list] of map) if (list.length <= 1) { map.delete(key); return; }
+      for (const [key, list] of map) if (list.length <= 1) { gone = key; break; }
     }
-    map.delete(map.keys().next().value!);
+    map.delete(gone);
+    if (map === this.keys) {
+      this.sizes.delete(gone);
+      this.chainSizes.delete(gone);
+    }
   }
 
   toJSON() {
-    return { v: 1, keys: [...this.keys], programs: [...this.programs] };
+    return { v: 1, keys: [...this.keys], programs: [...this.programs], sizes: [...this.sizes], chainSizes: [...this.chainSizes] };
   }
 
   /** Anything unreadable is an empty history, which only means "unknown". */
-  static fromJSON(raw: { v?: unknown; keys?: unknown; programs?: unknown } | null | undefined, opts?: CommandHistoryOptions): CommandHistory {
+  static fromJSON(raw: { v?: unknown; keys?: unknown; programs?: unknown; sizes?: unknown; chainSizes?: unknown } | null | undefined, opts?: CommandHistoryOptions): CommandHistory {
     const h = new CommandHistory(opts);
     if (!raw || raw.v !== 1) return h;
+    const loadSizes = (map: Map<string, number[]>, entries: unknown) => {
+      if (!Array.isArray(entries)) return;
+      for (const e of entries) {
+        if (!Array.isArray(e) || typeof e[0] !== 'string' || !Array.isArray(e[1])) continue;
+        const mbs = e[1].filter((n: unknown): n is number => typeof n === 'number' && Number.isFinite(n) && n > 0).slice(-SIZES_KEPT);
+        if (mbs.length) map.set(e[0], mbs);
+      }
+    };
+    loadSizes(h.sizes, raw.sizes);
+    loadSizes(h.chainSizes, raw.chainSizes);
     const load = (map: Map<string, string[]>, entries: unknown) => {
       if (!Array.isArray(entries)) return;
       for (const e of entries) {
