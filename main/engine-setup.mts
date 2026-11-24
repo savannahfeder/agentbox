@@ -296,9 +296,10 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
       const hit = await find(engine);
       if (!hit?.found) return { engine, found: false, signedIn: false, certain: hit?.certain !== false };
       // One older than runs need cannot run a thread, and before 2.1.40 its sign-in check
-      // fails as "unknown option", which reads as signed out. So it is asked its version first.
+      // fails as "unknown option", which reads as signed out. So it is asked its version first,
+      // where it has been set up: elsewhere nothing is started at all.
       const least = harnessDefinition(engine)?.minVersion;
-      const version = least ? await versionOf(engine, hit.path) : null;
+      const version = least && setUpHere(engine, toolEnv(engine, hit.path)) ? await versionOf(engine, hit.path) : null;
       if (version && least && olderThan(version, least)) return { engine, found: true, signedIn: false, certain: true, tooOld: true, version };
       const read = version ? { version } : {};
       try { return { engine, found: true, signedIn: await signedIn({ engine, log: '' }, hit.path), certain: true, ...read }; }
