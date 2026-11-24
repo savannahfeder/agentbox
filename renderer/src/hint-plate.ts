@@ -138,6 +138,9 @@ export const HINTS: Record<string, HintLine[]> = {
   'thread-files': [{ key: '', what: 'Files in this thread' }],
   'runs-on': [{ key: '', what: 'Where this thread runs' }],
   more: [{ key: '', what: 'More actions' }],
+  // The button after the sidebar's pencil, which says what a press does now.
+  'keep-sidebar': [{ key: '⌘\\', what: 'Keep sidebar open' }],
+  'shrink-sidebar': [{ key: '⌘\\', what: 'Shrink sidebar to icons' }],
   // Comment on the bar over selected words (SelectionBar.tsx).
   comment: [{ key: '⌘/', what: 'Comment on selected words' }],
 };

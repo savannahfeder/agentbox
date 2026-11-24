@@ -15,7 +15,7 @@
 // helper through a file only that push holds, emptied once read.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import type http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -95,7 +95,9 @@ describe('a ship with the GitHub sign-in saved on this computer', () => {
     expect(pushed()).toBe('A file of its own');
   }, 60_000);
 
-  it('leaves the token in no process environment while the hook runs', async () => {
+  // Inside the sandbox a ship runs tests in, ps cannot start, so no test there
+  // can read another process's environment, this one's probe included.
+  it.skipIf(spawnSync('ps', ['-p', String(process.pid)]).error !== undefined)('leaves the token in no process environment while the hook runs', async () => {
     await ship();
     const [hooks, withToken] = fs.readFileSync(seen, 'utf8').trim().split('\n').map(Number);
     expect(hooks).toBeGreaterThan(0);

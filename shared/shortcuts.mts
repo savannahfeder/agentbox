@@ -234,6 +234,8 @@ export const SHORTCUTS: ShortcutGroup[] = [
       { keys: ['⌘1', '⌘2'], join: 'or', what: 'Allow or deny a card asking to run something.' },
       // SelectionBar.tsx, a window keydown in capture, so an editor cannot keep it.
       { keys: ['⌘/'], what: 'Comment on the words you selected.' },
+      // (meta||ctrl) && '\\' → toggleSidebarShrinks, the sidebar button's own press.
+      { keys: ['⌘\\'], what: 'Keep the sidebar open, or shrink it to icons.' },
     ],
   },
 ];

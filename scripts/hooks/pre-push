@@ -111,6 +111,29 @@ if [ -f "$scan" ]; then
   printf '%s\n' "$refs" | node "$scan" "${1:-origin}" || exit 1
 fi
 
+# EVERYTHING THE BRANCH WROTE RUNS IN A SANDBOX from here on: its tests, its
+# packages' install scripts and its own helper scripts. A worker wrote them, and
+# outside one they run as the person, beside the GitHub sign-in this push
+# carries. See scripts/lib/branch-sandbox.mjs. The helper comes from beside this
+# hook, never from the branch; a test's copy of the hook keeps it in scripts/lib.
+sandbox="$hookdir/../lib/branch-sandbox.mjs"
+[ -f "$sandbox" ] || sandbox="$hookdir/scripts/lib/branch-sandbox.mjs"
+reports=$(mktemp -d "${TMPDIR:-/tmp}/zero-pre-push.XXXXXX") || exit 1
+trap 'rm -rf "$reports"' EXIT INT TERM
+branch_code() {
+  if [ -f "$sandbox" ]; then node "$sandbox" --write "$reports" -- "$@"; else "$@"; fi
+}
+# npm fetches with the internet and runs nothing; the install scripts run offline.
+branch_install() {
+  if [ ! -f "$sandbox" ]; then npm ci --no-audit --no-fund; return; fi
+  node "$sandbox" --download -- npm ci --no-audit --no-fund --ignore-scripts \
+    && node "$sandbox" --build -- npm rebuild \
+    && node "$sandbox" --build -- npm run --if-present postinstall \
+    && { [ ! -f "$hookdir/../lib/fetch-electron.mjs" ] || node "$hookdir/../lib/fetch-electron.mjs" "$root"; } \
+    && { [ ! -f node_modules/electron/install.js ] || node "$sandbox" --build -- node node_modules/electron/install.js; }
+}
+[ -f "$sandbox" ] || echo "pre-push: no sandbox beside this hook, so the branch's code runs outside one."
+
 # vitest lives in node_modules, and a worktree without one would otherwise fail
 # in a way that reads like a broken test rather than a missing install.
 if [ ! -x "node_modules/.bin/vitest" ]; then
@@ -129,7 +152,7 @@ fi
 installed="$hookdir/../lib/installed-matches-the-lockfile.mjs"
 if [ -f "$installed" ] && ! node "$installed"; then
   echo "pre-push: installing what package-lock.json says before the tests run..."
-  if ! npm ci --no-audit --no-fund; then
+  if ! branch_install; then
     echo ""
     echo "  PUSH REFUSED. npm ci failed in $root, so the tests would run on the"
     echo "  wrong packages. The reason is above."
@@ -194,7 +217,7 @@ else
 $(grep -rlF -- "$(basename "$gone")" tests 2>/dev/null || true)"
     done
     # A release's own commit moves the version number and nothing a test reads.
-    if node scripts/lib/only-the-version-moved.mjs "$base" "$local_sha"; then
+    if branch_code node scripts/lib/only-the-version-moved.mjs "$base" "$local_sha"; then
       continue
     fi
     changed="$changed
@@ -222,9 +245,9 @@ else
   # name main/supervisor.mts — so over the cap it hands back the files most
   # about the change and GitHub runs the lot after the push. It names the tests
   # that read a changed file as text too, which `related` cannot see.
-  runargs=$(node scripts/lib/tests-the-push-runs.mjs $code | tr '\n' ' ') || runargs=""
+  runargs=$(branch_code node scripts/lib/tests-the-push-runs.mjs $code | tr '\n' ' ') || runargs=""
   if [ -z "$runargs" ]; then
-    readers=$(node scripts/lib/tests-that-read.mjs $code 2>/dev/null || true)
+    readers=$(branch_code node scripts/lib/tests-that-read.mjs $code 2>/dev/null || true)
     runargs="related --run --passWithNoTests $(printf '%s\n' "$code" $readers | tr '\n' ' ')"
     echo "pre-push: running the tests for the $(printf '%s\n' "$code" | wc -l | tr -d ' ') file(s) this push changes."
   fi
@@ -234,16 +257,15 @@ started=$(date +%s)
 
 # The json report rides along with the readable one so the retry below knows
 # WHICH files to re-run. It goes in the system temp dir, never in the repo.
-report="${TMPDIR:-/tmp}/zero-pre-push-$$.json"
-trap 'rm -f "$report"' EXIT INT TERM
+report="$reports/run.json"
 
 # shellcheck disable=SC2086 # runargs is a word list on purpose
-if node_modules/.bin/vitest $runargs --reporter=basic --reporter=json --outputFile.json="$report"; then
+if branch_code node_modules/.bin/vitest $runargs --reporter=basic --reporter=json --outputFile.json="$report"; then
   echo "pre-push: green in $(( $(date +%s) - started ))s. Pushing."
   exit 0
 fi
 
-red=$(node scripts/red-test-files.mjs "$report" 2>/dev/null)
+red=$(branch_code node scripts/red-test-files.mjs "$report" 2>/dev/null)
 
 echo ""
 if [ -z "$red" ]; then
@@ -253,7 +275,7 @@ if [ -z "$red" ]; then
   echo "  once more before this is called a failure."
   echo ""
   # shellcheck disable=SC2086
-  if node_modules/.bin/vitest $runargs --reporter=basic; then
+  if branch_code node_modules/.bin/vitest $runargs --reporter=basic; then
     echo ""
     echo "pre-push: green on the second run, in $(( $(date +%s) - started ))s total."
     echo "The first run died on the machine, not on the code. Pushing."
@@ -275,10 +297,9 @@ echo ""
 # because it conflicts with the default minimum and vitest dies with
 # "options.minThreads and options.maxThreads must not conflict" before it runs
 # a single test.
-again="${TMPDIR:-/tmp}/zero-pre-push-$$-again.json"
-trap 'rm -f "$report" "$again"' EXIT INT TERM
+again="$reports/again.json"
 # shellcheck disable=SC2086
-if node_modules/.bin/vitest run --reporter=basic --reporter=json --outputFile.json="$again" --no-file-parallelism $red; then
+if branch_code node_modules/.bin/vitest run --reporter=basic --reporter=json --outputFile.json="$again" --no-file-parallelism $red; then
   echo ""
   echo "pre-push: they all pass on their own, in $(( $(date +%s) - started ))s total."
   echo "That was the machine, not the code. Pushing."
@@ -290,7 +311,7 @@ fi
 # and a thread is already fixing those (main/main-went-red.mts). Only a file
 # red here and not in that list refuses the push.
 if [ -n "${AGENTBOX_RED_ON_MAIN:-}" ]; then
-  still=$(node scripts/red-test-files.mjs "$again" 2>/dev/null)
+  still=$(branch_code node scripts/red-test-files.mjs "$again" 2>/dev/null)
   [ -z "$still" ] && still="$red"
   mine=""
   for f in $still; do

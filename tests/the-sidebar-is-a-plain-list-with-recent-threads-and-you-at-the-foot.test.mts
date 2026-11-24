@@ -79,6 +79,17 @@ describe('the sidebar, as it was approved', () => {
     expect(phone).not.toContain('ws-new');
     expect(phone).not.toContain('ws-sec');
   });
+  // "these aren't centered + have a strange color background", on the first build.
+  // Measured at eight times size: an older rule sizes every drawing in the sidebar
+  // to 18, so an agent's mark overflowed its 16 point tile and sat 1 right and 1 low
+  // of its row, and the tile's grey fill and rim were grey on the sidebar's grey.
+  it('draws an agent’s mark in Recent bare, at its own size, so it sits on its row’s middle', () => {
+    const P = ':root:root .gt-rail-nav.workspace-navigation .ws-recent-mark > .harness-mark';
+    expect(css).toContain(`${P} { width: 16px; height: 16px; margin: 0; border: 0; background: none; }`);
+    expect(css).toContain(`${P} > svg { flex: none; width: 20px; height: 20px; margin: -2px; }`);
+    // The rule it has to beat, which is why the size is said outright.
+    expect(strip(read('renderer/src/workspace-navigation.css'))).toContain('.workspace-navigation svg { width: 18px; height: 18px; flex: none; }');
+  });
   const me = { id: 'me', email: 'me@example.com', name: 'Me', avatarUrl: null };
   const team = { configured: true, signedIn: true, me, team: { id: 't', name: 'Team' }, people: [me], cards: [], lastSyncAt: 0, error: null };
   const draw = (props = {}) => renderToStaticMarkup(createElement(WorkspaceNavigation, {
@@ -98,7 +109,7 @@ describe('the sidebar, as it was approved', () => {
     expect(settingsRow(draw({ team, onAccount() {} }))).not.toBeNull();
     const fence = read('renderer/src/sidebar.css').match(/@media \(min-width: 701px\) and \(min-height: 521px\) \{([\s\S]*?)\n\}/)?.[1] ?? '';
     expect(fence).toContain('.ws-in-menu');
-    expect(css).toMatch(/@media \(max-width: 700px\), \(max-height: 520px\) \{\s*:root:root \.gt-rail-nav\.workspace-navigation :is\(\.ws-new, \.ws-sec, \.ws-recent\) \{ display: none; \}/);
+    expect(css).toMatch(/@media \(max-width: 700px\), \(max-height: 520px\) \{\s*:root:root \.gt-rail-nav\.workspace-navigation :is\(\.ws-new, \.ws-keep, \.ws-sec, \.ws-recent\) \{ display: none; \}/);
   });
   it('is the same on a real phone as it was, which has no account row to hold Settings', () => {
     expect(settingsRow(draw({ rail: false, team, onAccount() {} }))).not.toContain('ws-in-menu');
