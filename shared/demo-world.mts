@@ -164,7 +164,7 @@ function lines(now: number): DemoRow[] {
         'A file renamed during sleep arrived twice, once per name',
       ],
       result: [
-        '**A move survives sleep, except one case. Fix it before the launch email?**',
+        '**Big moves survive sleep, except one case. Fix it before the launch email?**',
         '',
         'designs/a-move-survives-sleep.png',
         '',

@@ -6,7 +6,7 @@
 // node_modules/.bin/wrangler a worker planted both read the token. Measured
 // with the app's own ship on dummy repos: both printed the dummy token.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -54,7 +54,11 @@ afterAll(() => {
 
 describe('the GitHub push token never reaches the web app deploy', () => {
   it('runs the deploy without the token or any other git variable', async () => {
-    const out = await deployAfterShip({ root, say: () => {}, until: Date.now() + 60 * 60_000 });
+    // On a Mac the real sandbox stops the stand-in npm writing `seen`, so this
+    // runs it with the environment the deploy hands the sandbox, and no more.
+    const sandboxed = (cmd: string, args: string[], { cwd, env }: { cwd: string; env: NodeJS.ProcessEnv }) =>
+      spawnSync(cmd, args, { cwd, env, stdio: 'ignore' }).status ?? 1;
+    const out = await deployAfterShip({ root, say: () => {}, until: Date.now() + 60 * 60_000, sandboxed });
     const lines = fs.readFileSync(seen, 'utf8');
     expect(lines).toMatch(/^npx /m);
     expect(lines).toMatch(/^npm /m);
