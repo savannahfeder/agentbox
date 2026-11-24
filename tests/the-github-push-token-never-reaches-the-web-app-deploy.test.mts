@@ -6,7 +6,7 @@
 // node_modules/.bin/wrangler a worker planted both read the token. Measured
 // with the app's own ship on dummy repos: both printed the dummy token.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import http from 'node:http';
 import os from 'node:os';
@@ -37,7 +37,8 @@ beforeAll(async () => {
   const bin = path.join(tmp, 'bin');
   fs.mkdirSync(bin);
   for (const name of ['npx', 'npm']) {
-    fs.writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${name} token=[$GIT_AGENTBOX_GITHUB_TOKEN] git=[$(env | grep -c '^GIT_')]" >> "${seen}"\necho "logged in"\n`);
+    // npm leaves what the build would, so the deploy goes on to the upload.
+    fs.writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${name} token=[$GIT_AGENTBOX_GITHUB_TOKEN] git=[$(env | grep -c '^GIT_')]" >> "${seen}"\n${name === 'npm' ? "mkdir -p phone-site && echo '<html></html>' > phone-site/index.html\n" : ''}echo "logged in"\n`);
     fs.chmodSync(path.join(bin, name), 0o755);
   }
   process.env.PATH = `${bin}:${saved.PATH}`;
@@ -53,7 +54,11 @@ afterAll(() => {
 
 describe('the GitHub push token never reaches the web app deploy', () => {
   it('runs the deploy without the token or any other git variable', async () => {
-    const out = await deployAfterShip({ root, say: () => {}, until: Date.now() + 60 * 60_000 });
+    // On a Mac the real sandbox stops the stand-in npm writing `seen`, so this
+    // runs it with the environment the deploy hands the sandbox, and no more.
+    const sandboxed = (cmd: string, args: string[], { cwd, env }: { cwd: string; env: NodeJS.ProcessEnv }) =>
+      spawnSync(cmd, args, { cwd, env, stdio: 'ignore' }).status ?? 1;
+    const out = await deployAfterShip({ root, say: () => {}, until: Date.now() + 60 * 60_000, sandboxed });
     const lines = fs.readFileSync(seen, 'utf8');
     expect(lines).toMatch(/^npx /m);
     expect(lines).toMatch(/^npm /m);

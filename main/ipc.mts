@@ -530,7 +530,10 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     },
   });
 
-  ipcMain.handle('zero:refresh-usage', async (event, { engine = DEFAULT_ENGINE, ask = false }: { engine?: string; ask?: boolean } = {}) => {
+  // The cloud's look at the same account can be the newer reading after a reset.
+  supervisor.onCloudReading = (profile, reading) => usage.adopt({ ...reading, profile });
+
+  ipcMain.handle('zero:refresh-usage',async (event, { engine = DEFAULT_ENGINE, ask = false }: { engine?: string; ask?: boolean } = {}) => {
     if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) throw Error('Usage refresh is only available in the main app window.');
     // Codex asks OpenAI only when the person pressed Refresh (`ask`); opening
     // the page reads what this computer already has.
@@ -1312,7 +1315,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     const mates = store.teammates;
     if (!mates) return { ok: false, error: 'Teammates need a store.' };
     if (!TEAMMATE_OPS.has(op as string)) return { ok: false, error: `no teammates call named ${op}` };
-    if (!alphaFeatures(config).teammates) return { ok: false, error: 'Teammates are an alpha feature. Turn them on in Settings, Alpha features.' };
+    if (!alphaFeatures(config).teammates) return { ok: false, error: 'AI teammates are turned off. Turn them on in Settings, General.' };
     try {
       const a = (args && typeof args === 'object' ? args : {}) as TeammateArgs;
       const kill = (id: string) => supervisor.stopSession(id);

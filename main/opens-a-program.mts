@@ -10,17 +10,29 @@ const RUNS = new Set([
   '.fileloc', '.webloc', '.inetloc', '.scpt', '.scptd', '.applescript', '.pkg', '.mpkg', '.jar', '.osax',
 ]);
 
-/** The path a click would open, resolved, or null when it would run a program. A missing file is its own path. */
-function checked(p: string): string | null {
+interface Checked { real: string; dev: number; ino: number }
+
+/**
+ * The file a click would open, resolved; 'runs' when it would run a program;
+ * 'missing' when nothing is there, since what a worker puts there by the time
+ * it is opened was never checked.
+ */
+function checked(p: string): Checked | 'runs' | 'missing' {
   let real: string;
   let st: fs.Stats;
-  try { real = fs.realpathSync(p); st = fs.statSync(real); } catch { return path.resolve(p); }
-  if (RUNS.has(path.extname(real).toLowerCase()) || RUNS.has(path.extname(p).toLowerCase())) return null;
-  return st.isFile() && (st.mode & 0o111) !== 0 ? null : real;
+  try { real = fs.realpathSync(p); st = fs.statSync(real); } catch { return 'missing'; }
+  if (RUNS.has(path.extname(real).toLowerCase()) || RUNS.has(path.extname(p).toLowerCase())) return 'runs';
+  return st.isFile() && (st.mode & 0o111) !== 0 ? 'runs' : { real, dev: st.dev, ino: st.ino };
 }
 
+/** The checked file is still there as it was, so nothing was swapped in while the Mac looked up its app. */
+const unchanged = (was: Checked) => {
+  const now = checked(was.real);
+  return typeof now === 'object' && now.real === was.real && now.dev === was.dev && now.ino === was.ino;
+};
+
 export function opensAProgram(p: string): boolean {
-  return checked(p) === null;
+  return checked(p) === 'runs';
 }
 
 // Only URLForApplicationToOpenURL, which every macOS the app runs on has. The file comes in as argv.
@@ -52,8 +64,10 @@ const runFile: Run = (cmd, args, opts) => new Promise((resolve, reject) => {
  * `app` is an app the Mac listed for this file (main/open-with.mts); only a Mac has that list.
  */
 export async function openForThePerson(shell: OpeningShell, p: string, { app, platform = process.platform, run = runFile, defaultApp = askTheMac }: { app?: string; platform?: NodeJS.Platform; run?: Run; defaultApp?: (file: string) => Promise<string | null> } = {}): Promise<string> {
-  const real = checked(p);
-  if (real === null) { shell.showItemInFolder?.(p); return ''; }
+  const was = checked(p);
+  if (was === 'missing') return 'Failed to open path';
+  if (was === 'runs') { shell.showItemInFolder?.(p); return ''; }
+  const { real } = was;
   if (!shell.openPath) return '';
   // On a Mac, shell.openPath blocks the main thread until the receiving app
   // has started, and the window freezes with it.
@@ -61,6 +75,7 @@ export async function openForThePerson(shell: OpeningShell, p: string, { app, pl
     // Named, the app gets whatever the path has become as a document: a link a
     // worker swapped to its own .app since the check is not launched.
     const by = app ? path.resolve(app) : await defaultApp(real).catch(() => null);
+    if (!unchanged(was)) return 'Failed to open path';
     const args = by ? ['-a', by, real] : [real];
     return run('/usr/bin/open', args, { timeout: OPEN_MS }).then(() => '', () => 'Failed to open path');
   }

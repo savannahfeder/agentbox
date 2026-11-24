@@ -19,14 +19,10 @@
   :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab, .workspace-utilities > button, .ws-recent-row, .ws-sec, .ws-new, .ws-keep, .th-me-btn):hover { background: var(--sidebar-fill); color: var(--text); }
   :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab.active, .workspace-utilities > button[aria-current="page"]) { background: var(--sidebar-fill); box-shadow: none; color: var(--text); font-weight: 500; }
 
-  /* The app's icons are drawn on a 24 grid for 18 and 20 points. Here each is
-     sized so its ink is the same height as the others' and its line is 1.2,
-     in the ink of its word. Search, Feedback and Sign in are drawn inside a
-     group scaled to .8. */
-  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab, .workspace-find button, .workspace-utilities > button, .sb-update-slot > .sb-update-row) > svg { width: 18px; height: 18px; margin: -1px; stroke-width: 1.6px; color: inherit; }
-  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-find button, .workspace-utilities > button) > svg > g { stroke-width: 2px; }
-  :root:root .gt-rail-nav.workspace-navigation .workspace-find button > svg { width: 20px; height: 20px; margin: -2px; }
-  :root:root .gt-rail-nav.workspace-navigation .workspace-find button > svg > g { stroke-width: 1.8px; }
+  /* SidebarGlyph is drawn for exactly this size. Scaling it, or setting its
+     line here, puts the lines between pixels. */
+  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab, .workspace-find button, .workspace-utilities > button, .sb-update-slot > .sb-update-row) > svg { width: 16px; height: 16px; margin: 0; color: inherit; }
+  :root:root .gt-rail-nav.workspace-navigation .sb-update-card-title > svg { width: 16px; height: 16px; }
 
   :root:root .gt-rail-nav.workspace-navigation .th-team { height: 28px; margin: 8px 0 0; padding: 0 0 0 4px; gap: 6px; font-size: 14px; font-weight: 600; letter-spacing: -.18px; color: var(--text); }
   :root:root .gt-rail-nav.workspace-navigation :is(.ws-new, .ws-keep) { flex: none; width: 28px; height: 28px; padding: 0; justify-content: center; border-radius: var(--radius); color: var(--text-faint); cursor: default; transition: opacity .14s .08s; }
@@ -59,7 +55,8 @@
   :root:root .gt-rail-nav.workspace-navigation > .ws-sec::before { content: ''; position: absolute; left: 6px; width: 16px; top: 50%; height: 1px; background: var(--line-strong); opacity: 0; transition: opacity .06s; }
   :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .ws-sec { pointer-events: none; background: none; }
   :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .ws-sec > * { opacity: 0; transition: opacity .06s; }
-  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation > .ws-sec::before { opacity: 1; }
+  /* A folded Workspace has no icons under the line. */
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation > .ws-sec[aria-expanded="true"]::before { opacity: 1; }
 
   /* Recent gives way before the foot does in a short window, and is not drawn at all while the sidebar is closed. */
   :root:root .gt-rail-nav.workspace-navigation .ws-recent { display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0; overflow: hidden; transition: opacity .14s .08s; }

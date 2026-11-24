@@ -1,4 +1,5 @@
 import { currentActivity } from './agent-activity.mts';
+import type { UsageLimit } from '../shared/usage.mts';
 import { workerGitBrief, withWorkerGitBrief } from './worker-git.mts';
 import { handedCommitsNote } from './handed-commits.mts';
 import { harnessFor, supportsHarnessOperation } from './harnesses.mts';
@@ -20,7 +21,7 @@ import { resolveAnsweredNotes } from './notes-wake.mts';
 import { TEAM_LOOK, TEAM_LOOK_LINE } from '../shared/team-look.mts';
 import { shownTitle } from '../shared/thread-title.mts';
 import { editedFilesLine } from '../shared/artifact-marks.mts';
-import { readItemHistory, updateWorkItem } from './store/work-items.mts';
+import { ledgerLinesWritten, readItemHistory, updateWorkItem } from './store/work-items.mts';
 import { reconcileRows, type ReconcilePatch } from './version-reconcile.mts';
 import { taskCommand } from './task-commands.mts';
 import { providerCommand, reviewTarget, nativeCommandNames } from '../shared/provider-commands.mts';
@@ -70,7 +71,7 @@ import { readKeyFrom } from './cloud/key-source.mts';
 import { keySource } from '../shared/cloud-key-sources.mts';
 import { threadsKeysFree } from '../shared/cloud-needs.mts';
 import { fileToSend } from '../shared/cloud-sent-files.mts';
-import { cloudLoginState, mayRunOn, startCloudSignIn, renewCloudCodexLogin, sweepRetiredLogins, forgetOldCloudTokens, listCloudLogins, removeCloudLogin, newCloudAccountKey, lookAtCloudLogin, cloudLimits, markCloudLogin, cloudLoginInUse, cloudAccountsFrom, CLOUD_ACCOUNT_ENV } from './cloud/logins.mts';
+import { cloudLoginState, mayRunOn, startCloudSignIn, renewCloudCodexLogin, sweepRetiredLogins, forgetOldCloudTokens, listCloudLogins, removeCloudLogin, newCloudAccountKey, lookAtCloudLogin, cloudLimits, markCloudLogin, liftCloudLimit, cloudLoginInUse, cloudAccountsFrom, CLOUD_ACCOUNT_ENV } from './cloud/logins.mts';
 import type { CloudLimitReading } from './cloud/logins.mts';
 import type { TickInput } from './teammates.mts';
 import { execFileSync } from 'node:child_process';
@@ -1341,6 +1342,8 @@ export class Supervisor {
   declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;
   declare sessions: Map<string, WorkerSession>;
   declare onChange: (() => void) | null;
+  /** A cloud reading of a login signed in here, for the sidebar's usage (main/ipc.mts). */
+  declare onCloudReading?: ((profile: string, reading: { limits: UsageLimit[]; at: number }) => void) | null;
   /** A run about to start, so its thread's files kept in the cloud start coming back. Never holds the start. */
   declare onStarting?: ((item: WorkItem) => void) | null;
   declare onRecovered: ((news: RecoveryNews) => void) | null;
@@ -2079,7 +2082,8 @@ export class Supervisor {
 
   // When this login's limit lifts, or null when it is not at one: its own
   // filed limit, or the cloud's reading of the same account. A reading taken
-  // before the person picked this account is theirs to overrule.
+  // before the person picked this account is theirs to overrule, and so is one
+  // older than this Mac's own reading with room.
   _limitedUntil(profile: string, now = Date.now()): number | null {
     const key = this._accountKey(DEFAULT_ENGINE, profile);
     const t = this._profileTrouble?.[key];
@@ -2090,6 +2094,8 @@ export class Supervisor {
     const r = this._cloudLoginOf(profile);
     const picked = (this._accountChosenAt ?? 0) > 0 && this.config.activeAccount?.[DEFAULT_ENGINE] === profile;
     if (!r || (picked && !((r.readAt ?? 0) > this._accountChosenAt!))) return null;
+    const here = this._usageSeen?.[profile];
+    if (here && here.at > (r.readAt ?? 0) && here.limits.every((l) => (l?.percent ?? 0) < 100)) return null;
     const full = (r.limits ?? []).map((l) => l as { percent?: number; resetsAt?: number })
       .filter((l) => (l.percent ?? 0) >= 100 && (l.resetsAt ?? 0) > now).map((l) => l.resetsAt!);
     if (full.length) return Math.max(...full);
@@ -2499,6 +2505,13 @@ export class Supervisor {
     }
     out.missing = only.size;
     this._saveState();
+    // A thread held by the cloud account's limit is asked about at once: a
+    // reading with room ends the limit (`lookAtCloudLogins`) and starts it.
+    try {
+      if (out.queued && this._cloudInUseState(DEFAULT_ENGINE) === 'limited') {
+        this.lookAtCloudLogins({ force: true }).catch((e) => console.warn('zero: could not look at the cloud sign-ins:', (e as Error).message));
+      }
+    } catch (e) { console.warn('zero: could not read the cloud account in use:', (e as Error).message); }
     return out;
   }
 
@@ -6644,6 +6657,7 @@ export class Supervisor {
     const trouble = this._profileTrouble?.[key];
     const limits = reading?.limits ?? [];
     if (limits.length) (this._usageSeen ??= {})[profile || 'default'] = { limits, at: reading!.at ?? 0 };
+    if (limits.length && !onlyLimit) this._liftCloudLimitOf(profile || 'default', limits, reading!.at ?? 0);
     if (!trouble || !limits.length) return false;
     if ((reading!.at ?? 0) < (trouble.at ?? trouble.since ?? 0)) return false;
     const proven = (!onlyLimit && ['signed-out', 'org-blocked', 'unknown'].includes(trouble.cause as string))
@@ -6659,6 +6673,20 @@ export class Supervisor {
       this._lastFastExit = null;
     }
     this._saveState();
+    this.onChange?.();
+    this.wake?.();
+    return true;
+  }
+
+  // The cloud runs on this same subscription, so a reading here with room ends
+  // its limit too (main/cloud/logins.mts `liftCloudLimit`).
+  _liftCloudLimitOf(profile: string, limits: readonly { percent?: number | null }[], at: number) {
+    if (!limits.every((l) => (l?.percent ?? 0) < 100)) return false;
+    let rec: ReturnType<Supervisor['_cloudLoginOf']>;
+    try { rec = this._cloudLoginOf(profile); } catch { return false; }
+    if (!rec?.limitedUntil || !liftCloudLimit(DEFAULT_ENGINE, rec.key, rec.id, { limits, readAt: at }, { home: this.config.home })) return false;
+    this._cloudConfigAt = 0;
+    this._cloudInUseSeen?.delete(DEFAULT_ENGINE);
     this.onChange?.();
     this.wake?.();
     return true;
@@ -7070,18 +7098,24 @@ export class Supervisor {
       .filter((r) => !r.broken && (force || !r.readAt || now - r.readAt > 10 * 60_000));
     if (!due.length) return;
     this._cloudLooking = true;
+    let lifted = false;
     try {
       const { transport, storage } = await this._cloudClients();
       for (const r of due) {
-        await lookAtCloudLogin({ transport, storage, key: r.key, home: this.config.home }).catch(() => {
+        if (await lookAtCloudLogin({ transport, storage, key: r.key, home: this.config.home }).catch(() => {
           markCloudLogin(DEFAULT_ENGINE, r.key, r.id, { lookFailedAt: Date.now(), lookError: 'The cloud could not be reached.' }, { home: this.config.home });
-        });
+        }) === 'lifted') lifted = true;
         this.onChange?.();
       }
     } catch (e) {
       console.warn('zero: could not look at the cloud sign-ins:', (e as Error).message);
     } finally {
       this._cloudLooking = false;
+    }
+    if (lifted) {
+      this._cloudConfigAt = 0;
+      this._cloudInUseSeen?.delete(DEFAULT_ENGINE);
+      this.wake?.();
     }
     try { this._noteCloudReadings(); } catch (e) { console.warn('zero: could not read the cloud sign-ins for a limit:', (e as Error).message); }
     if (this._cloudLookAgain) {
@@ -7100,6 +7134,7 @@ export class Supervisor {
     for (const c of this._cloudAccounts()) {
       const limits = c.limits as { percent?: number | null }[] | undefined;
       if (c.engine !== DEFAULT_ENGINE || !c.profile || !limits?.length || !c.readAt) continue;
+      try { this.onCloudReading?.(c.profile as string, { limits: limits as UsageLimit[], at: c.readAt as number }); } catch (e) { console.warn('zero: could not show the cloud reading:', (e as Error).message); }
       if (this.noteUsageReading(c.profile as string, { at: c.readAt as number, limits }, { onlyLimit: true })) cleared = true;
     }
     return cleared;
@@ -9846,17 +9881,19 @@ export class Supervisor {
     // Repeating tasks first, so a run created on this tick is already in the
     // list the fresh-work pass below reads, rather than waiting for the next.
     await this.serveRepeats(now);
-    // Teammates next, for the same reason: a run a message or a schedule made
-    // on this tick is picked up by the pass below.
-    await this.serveTeammates(now);
     // And the folders of rows she has finished, put away. On a timer of its own
     // rather than every pass, because it is a walk of the disk and a tick is
     // fifteen seconds: she closes rows while nothing at all is running, which
     // is exactly when no session exit is coming to do this.
     this.parkOnATimer(now);
     // Every collection pages the heap back in on a swapping Mac, so the threads
-    // are read once a pass, and again only when resolving wrote a mark.
-    const listed = this.store.listItems(now);
+    // are read once a pass, and again only when teammates or resolving wrote.
+    let listed = this.store.listItems(now);
+    // Teammates next, for the same reason as repeating tasks: a run a message
+    // or a schedule made on this tick is picked up by the pass below.
+    const written = ledgerLinesWritten();
+    await this.serveTeammates(now, listed);
+    if (ledgerLinesWritten() !== written) listed = this.store.listItems(now);
     const items = this.resolveAnsweredNotes(now, listed) ? this.store.listItems(now) : listed;
     this.bringBackWhatNeverShipped(items);
     // A task its agent marked ready goes out, one at a time, beside the tick.
@@ -10264,14 +10301,14 @@ export class Supervisor {
 
   // Your words to a teammate that is already on a run go into that run, the
   // way a reply typed in its thread does, live if a session is up.
-  async serveTeammates(now = Date.now()) {
+  async serveTeammates(now = Date.now(), given?: WorkItem[]) {
     if (!teammatesOn(this.config)) return;
     const TEAMMATE_REPLY_DEADLINE_MS = this.config.teammateReplyDeadlineMs ?? 30_000;
     const teammates = this.store.teammates;
     if (!teammates) return;
     let items: WorkItem[];
     try {
-      items = this.store.listItems(now);
+      items = given ?? this.store.listItems(now);
     } catch (err) {
       teammates.noteTrouble?.(`Teammates could not read your threads: ${(err as Error).message}`, now);
       return;

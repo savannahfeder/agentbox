@@ -179,11 +179,11 @@ describe('the team a demo copy is signed in to', () => {
 });
 
 describe('what waits on the person when it opens', () => {
-  it('is six: two teammates and four agents', () => {
+  it('is eight: two teammates, four agents, the AI teammate and the thread Auto offers one on', () => {
     const lines = Object.values(demoLedgerLines()).flat();
     const finished = new Set(lines.filter((l) => l.patch.status === 'done').map((l) => l.id));
     const theirs = new Set(lines.map((l) => l.id).filter((id) => !finished.has(id)));
-    expect(theirs.size + demoMessages().length).toBe(6);
+    expect(theirs.size + demoMessages().length).toBe(8);
   });
 
   it('includes a thread that belongs with a teammate, by name', () => {

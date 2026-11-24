@@ -27,10 +27,18 @@ describe('To offers Auto', () => {
     expect(autoOffered([{ ...video, paused: true }, growth], true)).toBe(true);
   });
 
-  it('and not with none, with every one paused, or where teammates cannot be reached', () => {
-    expect(autoOffered([], true)).toBe(false);
+  // Both testers of w-db46e3fcfd looked for Auto with their first teammate
+  // still setting up and could not find it, so Auto's offer of a teammate for
+  // work that repeats never reached anyone who had none.
+  // In round two, pausing the only teammate took Auto away while the paused
+  // teammate stayed in To.
+  it('with none made yet, or every one paused, since it can still offer to make one', () => {
+    expect(autoOffered([], true)).toBe(true);
+    expect(autoOffered([{ ...video, paused: true }], true)).toBe(true);
+  });
+
+  it('and not with teammates off, or where teammates cannot be reached', () => {
     expect(autoOffered(undefined, true)).toBe(false);
-    expect(autoOffered([{ ...video, paused: true }], true)).toBe(false);
     expect(autoOffered([video], false)).toBe(false);
   });
 

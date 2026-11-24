@@ -42,7 +42,7 @@ beforeAll(async () => {
         el.style.height = height + 'px';
         localStorage.setItem(FOLD_KEY, JSON.stringify(folded ? ['teammates'] : []));
         flushSync(() => root.render(
-          <ChatsContext.Provider key={++n} value={{ teammates: Array.from({ length: mates }, (_, i) => mate(i)), groups: [], now: 0,
+          <ChatsContext.Provider key={++n} value={{ matesOn: true, teammates: Array.from({ length: mates }, (_, i) => mate(i)), groups: [], now: 0,
             onTeammate() {}, onNew() {}, onGroup() {}, onTeam() {}, persons: [{ id: 'p-dev', name: 'Dev Patel', url: null, waits: false }], onPerson() {} }}>
             <ChatsFrame current="team"><div className="team-page" /></ChatsFrame>
           </ChatsContext.Provider>));
