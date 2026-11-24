@@ -51,6 +51,7 @@ export interface CloudLoginRecord {
   retired?: { id: string; at: number }[];
   duplicateOf?: string;
   limitedUntil?: number;
+  limitedAt?: number;
   refusedUntil?: number | null;
   lookFailedAt?: number;
   lookError?: string | null;
@@ -663,15 +664,56 @@ export async function lookAtCloudLogin({ transport, storage, key, home = os.home
     markCloudLogin('claude', key, rec.id, { lookFailedAt: now, lookError: end.message ?? null }, { home });
     return 'failed';
   }
-  const limits = end.limits ?? [];
-  // A limit mark from a run is only a guess at when the limit lifts; a reading
-  // with room on every limit (a reset, say) is the newer fact.
-  const room = limits.length > 0 && limits.every((l) => {
-    const percent = (l as { percent?: unknown } | null)?.percent;
-    return typeof percent === 'number' && percent < 100;
+  return noteCloudReading('claude', key, rec.id, { org: end.org ?? null, limits: end.limits ?? [], readAt: now }, { home });
+}
+
+/**
+ * A look's reading, kept while `id` is still the account's sign-in. A reading
+ * begun after the account was marked at its limit, with nothing at 100%, ends
+ * the mark: the limit was reset early, or named no hour and got a guess.
+ * Returns 'lifted' when it ended one, else 'read', or 'failed' for a sign-in
+ * since replaced.
+ */
+export function noteCloudReading(engine: string, key: string | undefined, id: string, { org, limits, readAt }: { org: string | null; limits: readonly unknown[]; readAt: number }, { home = os.homedir() }: { home?: string } = {}) {
+  return withLock(home, () => {
+    const all = readCloudLogins({ home });
+    const k = accountOf(engine, key);
+    const rec = all[k];
+    if (!rec || rec.id !== id) return 'failed';
+    const lifts = readingEndsLimit(rec, limits, readAt);
+    const next: CloudLoginRecord = { ...rec, org, limits, readAt };
+    if (lifts) { delete next.limitedUntil; delete next.limitedAt; }
+    all[k] = next;
+    writeCloudLogins(all, { home });
+    return lifts ? 'lifted' : 'read';
   });
-  markCloudLogin('claude', key, rec.id, { org: end.org ?? null, limits, readAt: now, ...(room ? { limitedUntil: undefined } : {}) }, { home });
-  return 'read';
+}
+
+/**
+ * The same end to a limit, off a reading of the same subscription taken on
+ * this Mac (`Supervisor#noteUsageReading`), which keeps its own numbers.
+ */
+export function liftCloudLimit(engine: string, key: string | undefined, id: string, { limits, readAt }: { limits: readonly unknown[]; readAt: number }, { home = os.homedir() }: { home?: string } = {}) {
+  return withLock(home, () => {
+    const all = readCloudLogins({ home });
+    const k = accountOf(engine, key);
+    const rec = all[k];
+    if (!rec || rec.id !== id || !readingEndsLimit(rec, limits, readAt)) return false;
+    const next: CloudLoginRecord = { ...rec };
+    delete next.limitedUntil;
+    delete next.limitedAt;
+    all[k] = next;
+    writeCloudLogins(all, { home });
+    return true;
+  });
+}
+
+// Only a reading begun after the mark: one begun before it says nothing about
+// the run that just died on the limit. A mark kept from before `limitedAt`
+// was written is left to run out.
+function readingEndsLimit(rec: CloudLoginRecord, limits: readonly unknown[], readAt: number) {
+  const room = limits.length > 0 && limits.every((l) => ((l as { percent?: number | null } | null)?.percent ?? 0) < 100);
+  return room && !!rec.limitedUntil && rec.limitedUntil > readAt && rec.limitedAt != null && rec.limitedAt < readAt;
 }
 
 /* ------------------------ the first build's tokens ----------------------- */

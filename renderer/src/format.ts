@@ -500,6 +500,8 @@ export function dayAndTime(ts: number, now = Date.now()): string {
 function flatten(body: string, headings: 'drop' | 'keep'): string {
   return body
     .replace(/^#{1,4}\s.*$/gm, (line) => (headings === 'keep' ? line.replace(/^#{1,4}\s*/, '') : ''))
+    // A line that is only a picture is drawn as the picture in the thread.
+    .replace(/^\s*[\w.~/-]+\.(?:png|jpe?g|gif|webp|svg)\s*$/gim, (line) => (headings === 'keep' ? line : ''))
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     // A cloud run's key ask reads as what it asks for (shared/cloud-keys.mts).

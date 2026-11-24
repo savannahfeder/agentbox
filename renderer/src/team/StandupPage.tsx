@@ -100,7 +100,7 @@ function Settings({ s, onChange, onClose }: { s: StandupSettings; onChange: (s: 
   </section>;
 }
 
-export function StandupPage({ now, faces, team = [], dayFor, onOpen, onPerson }: {
+export function StandupPage({ now, faces, team = [], dayFor, onOpen, onPerson, matesOn = true }: {
   now: number;
   faces: ReadonlyMap<string, Member>;
   /** Everyone who could post: a teammate with nothing is named, so quiet never reads as missing. */
@@ -109,6 +109,8 @@ export function StandupPage({ now, faces, team = [], dayFor, onOpen, onPerson }:
   dayFor: (window: { from: number; to: number }) => { people: TodayPerson[] };
   onOpen: (l: TodayLine) => void;
   onPerson?: (key: string) => void;
+  /** AI teammates are on; off, there is nothing for them to post. */
+  matesOn?: boolean;
 }) {
   const [s, setS] = useState<StandupSettings>(() => readStandup(store() ?? { getItem: () => null }));
   const [picked, setPicked] = useState<number | null>(null);
@@ -131,7 +133,7 @@ export function StandupPage({ now, faces, team = [], dayFor, onOpen, onPerson }:
       <div className="su-top">
         <h2>{dayTitle(day)}</h2><span className="su-date">{dateOf(day)}</span>
         <div className="su-r">
-          <button type="button" className="su-tog" role="switch" aria-checked={s.mates} title="Off, their work is counted in your post" onClick={() => change({ ...s, mates: !s.mates })}><i />AI teammates post too</button>
+          {matesOn && <button type="button" className="su-tog" role="switch" aria-checked={s.mates} title="Off, their work is counted in your post" onClick={() => change({ ...s, mates: !s.mates })}><i />AI teammates post too</button>}
           <button type="button" className={`su-icon${setting ? ' on' : ''}`} aria-expanded={setting} aria-label="Standup settings" title="Standup settings" onClick={() => setSetting(!setting)}>{I.sliders()}</button>
         </div>
       </div>

@@ -7,6 +7,10 @@
 // work was moved off it onto another login until the mark ran out. Measured
 // from ~/.agentbox/cloud-logins.json: readAt 11:23:46, week 0%, limitedUntil
 // 11:43:15.
+//
+// The rule itself is `noteCloudReading`'s (see
+// a-reading-with-room-ends-the-cloud-accounts-limit); this holds the whole
+// look, from the cloud's reading to the login's state.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -26,7 +30,7 @@ describe('a cloud look and the limit mark on that login', () => {
   beforeEach(() => {
     home = fs.mkdtempSync(path.join(os.tmpdir(), 'cloud-look-limit-'));
     recordCloudLogin('claude', 'acct-1', { id: 'id-1' }, { home });
-    markCloudLogin('claude', 'acct-1', 'id-1', { limitedUntil: MARK }, { home });
+    markCloudLogin('claude', 'acct-1', 'id-1', { limitedUntil: MARK, limitedAt: NOW - 3 * 60_000 }, { home });
   });
   afterEach(() => fs.rmSync(home, { recursive: true, force: true }));
 

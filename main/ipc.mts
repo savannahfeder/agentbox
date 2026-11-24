@@ -1312,7 +1312,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     const mates = store.teammates;
     if (!mates) return { ok: false, error: 'Teammates need a store.' };
     if (!TEAMMATE_OPS.has(op as string)) return { ok: false, error: `no teammates call named ${op}` };
-    if (!alphaFeatures(config).teammates) return { ok: false, error: 'Teammates are an alpha feature. Turn them on in Settings, Alpha features.' };
+    if (!alphaFeatures(config).teammates) return { ok: false, error: 'AI teammates are turned off. Turn them on in Settings, General.' };
     try {
       const a = (args && typeof args === 'object' ? args : {}) as TeammateArgs;
       const kill = (id: string) => supervisor.stopSession(id);
