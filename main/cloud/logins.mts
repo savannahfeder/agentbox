@@ -663,7 +663,14 @@ export async function lookAtCloudLogin({ transport, storage, key, home = os.home
     markCloudLogin('claude', key, rec.id, { lookFailedAt: now, lookError: end.message ?? null }, { home });
     return 'failed';
   }
-  markCloudLogin('claude', key, rec.id, { org: end.org ?? null, limits: end.limits ?? [], readAt: now }, { home });
+  const limits = end.limits ?? [];
+  // A limit mark from a run is only a guess at when the limit lifts; a reading
+  // with room on every limit (a reset, say) is the newer fact.
+  const room = limits.length > 0 && limits.every((l) => {
+    const percent = (l as { percent?: unknown } | null)?.percent;
+    return typeof percent === 'number' && percent < 100;
+  });
+  markCloudLogin('claude', key, rec.id, { org: end.org ?? null, limits, readAt: now, ...(room ? { limitedUntil: undefined } : {}) }, { home });
   return 'read';
 }
 
