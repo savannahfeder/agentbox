@@ -92,7 +92,7 @@ export function listening() {
  * rules of one kind: a `remote tcp` deny after a `remote ip` allow matched some
  * ports and not others, so the localhost allow and the port denies are both tcp.
  */
-export function profile({ root, commonDir, home, tmp, node, writable = [], stage = 'tests', inTmp = [], ports = [] }) {
+export function profile({ root, commonDir, home, tmp, node, writable = [], stage = 'tests', inTmp = [], ports = [], packages = path.join(root, 'node_modules') }) {
   const main = path.dirname(commonDir);
   const installing = stage !== 'tests';
   const caches = branchCaches(home);
@@ -107,12 +107,12 @@ ${stage === 'download' ? '(allow network-outbound)\n' : ''}(deny file-write*)
 (allow file-write*${subpaths([root, tmp, TMP, '/dev', ...writable, ...(stage === 'download' ? [caches] : [])])})
 (deny file-write*${others})
 ${writable.length ? `(allow file-write*${subpaths(writable)})\n` : ''}${installing ? '' : `(deny file-write* (subpath ${q(path.join(root, 'node_modules'))}))
-(allow file-write*${subpaths(TEST_CACHES.map((c) => path.join(root, 'node_modules', c)))})
+(allow file-write*${subpaths([...new Set([path.join(root, 'node_modules'), packages])].flatMap((d) => TEST_CACHES.map((c) => path.join(d, c))))})
 `}(deny file-write* (literal ${q(path.join(root, '.git'))}) (subpath ${q(path.join(root, '.git'))}) (subpath ${q(commonDir)}) (subpath ${q(path.join(root, '.claude', 'skills', '.git'))}))
 (deny file-read-data (subpath ${q(home)}))
 (allow file-read-data${subpaths([main, node, path.join(home, 'Library', 'Caches', 'ms-playwright'), path.join(home, '.config', 'git'), ...writable, ...(installing ? [caches, electronCache(home)] : [])])} (literal ${q(path.join(home, '.gitconfig'))}) (literal ${q(path.join(home, '.agentbox', 'team.config.json'))}))
 (deny file-read-data (subpath ${q(path.join(main, '.claude', 'worktrees'))}))
-(allow file-read-data (subpath ${q(root)}))
+(allow file-read-data (subpath ${q(root)}) (subpath ${q(packages)}))
 (deny file-read-data${[root, main].flatMap((d) => PRIVATE_FILES.map((f) => ` (literal ${q(path.join(d, f))})`)).join('')})
 (deny process-exec (literal "/usr/bin/open") (literal "/usr/bin/osascript") (literal "/usr/bin/security") (literal "/bin/launchctl") (literal "/usr/bin/sudo") (literal "/usr/bin/ssh") (subpath "/Applications") (subpath "/System/Applications"))
 (allow process-exec (literal "/bin/ps") (with no-sandbox))
@@ -122,6 +122,14 @@ ${writable.length ? `(allow file-write*${subpaths(writable)})\n` : ''}${installi
 
 // Git hands its hooks open files (a ship's sign-in rides on fd 3), and a child keeps any it inherits.
 const CLOSE_INHERITED = 'for fd in 3 4 5 6 7 8 9; do eval "exec $fd>&-"; done; exec "$@"';
+
+/** The checkout `cwd` is in and its git folder; outside a repository, the folder itself. */
+export function whereItRuns(cwd) {
+  const asked = (...a) => { try { return execFileSync('git', a, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim(); } catch { return null; } };
+  const root = real(asked('rev-parse', '--show-toplevel') ?? cwd);
+  const common = asked('rev-parse', '--git-common-dir');
+  return { root, commonDir: real(common ? path.resolve(cwd, common) : path.join(root, '.git')) };
+}
 
 export function alreadySandboxed() {
   const r = spawnSync(SANDBOX_EXEC, ['-p', '(version 1)(allow default)', '/usr/bin/true'], { encoding: 'utf8' });
@@ -144,8 +152,7 @@ export function runSandboxed(cmd, args, { cwd = process.cwd(), env = process.env
     const r = spawnSync(cmd, args, { cwd, env, stdio, timeout, killSignal: 'SIGKILL' });
     return r.status ?? 1;
   }
-  const root = real(execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd, encoding: 'utf8' }).trim());
-  const commonDir = real(path.resolve(cwd, execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd, encoding: 'utf8' }).trim()));
+  const { root, commonDir } = whereItRuns(cwd);
   const inTmp = fs.readdirSync(TMP);
   // Short, because a socket's path may not pass 104 characters and the tests
   // put theirs in the temp folder.
@@ -153,7 +160,7 @@ export function runSandboxed(cmd, args, { cwd = process.cwd(), env = process.env
   const homeDir = real(home);
   if (stage === 'download') fs.mkdirSync(branchCaches(homeDir), { recursive: true });
   try {
-    const text = profile({ root, commonDir, home: homeDir, tmp, node: real(path.dirname(path.dirname(process.execPath))), writable: writable.map(real), stage, inTmp, ports: listening() });
+    const text = profile({ root, commonDir, home: homeDir, tmp, node: real(path.dirname(path.dirname(process.execPath))), writable: writable.map(real), stage, inTmp, ports: listening(), packages: real(path.join(root, 'node_modules')) });
     const r = spawnSync(SANDBOX_EXEC, ['-p', text, '/bin/sh', '-c', CLOSE_INHERITED, 'sh', cmd, ...args], { cwd, env: sandboxedEnv(env, tmp, { stage, home: homeDir }), stdio, timeout, killSignal: 'SIGKILL' });
     return r.status ?? 1;
   } finally {

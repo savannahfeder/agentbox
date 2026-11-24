@@ -16,13 +16,15 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runSandboxed, alreadySandboxed } from '../scripts/lib/branch-sandbox.mjs';
+import { runSandboxed, alreadySandboxed, whereItRuns, profile } from '../scripts/lib/branch-sandbox.mjs';
 import { cleanCopy } from '../scripts/lib/web-app-deploy.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HOOK = path.join(ROOT, 'scripts/hooks/pre-push');
 const onAMac = process.platform === 'darwin' && fs.existsSync('/usr/bin/sandbox-exec') && !alreadySandboxed();
 const ZERO = '0000000000000000000000000000000000000000';
+// Another computer's HTTPS, which nothing here listens on.
+const OFF_THIS_MAC = { host: '1.1.1.1', port: Number('443') };
 const real = (p: string) => fs.realpathSync(p);
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 
@@ -152,7 +154,7 @@ describe.skipIf(!onAMac)('the sandbox', () => {
   });
 
   it('runs the install scripts with no way out, and lets only npm itself fetch', () => {
-    expect(connect({ host: '1.1.1.1', port: 443 }, { stage: 'build' })).toBe('stopped');
+    expect(connect(OFF_THIS_MAC, { stage: 'build' })).toBe('stopped');
     expect(probe(`if (process.env.npm_config_ignore_scripts !== 'true') throw 0`, { stage: 'download' })).toBe('through');
   });
 
@@ -170,7 +172,7 @@ describe.skipIf(!onAMac)('the sandbox', () => {
     expect(own(`0,'127.0.0.1'`, `{host:'127.0.0.1',port:s.address().port}`)).toBe('through');
     expect(own(`0,'::1'`, `{host:'::1',port:s.address().port}`)).toBe('through');
     expect(own(`require('path').join(require('os').tmpdir(),'own.sock')`, `{path:require('path').join(require('os').tmpdir(),'own.sock')}`)).toBe('through');
-    expect(connect({ host: '1.1.1.1', port: 443 })).toBe('stopped');
+    expect(connect(OFF_THIS_MAC)).toBe('stopped');
   });
 
   it('reaches no port that was already listening when it started', async () => {
@@ -184,6 +186,31 @@ describe.skipIf(!onAMac)('the sandbox', () => {
     expect(probe(`if (process.env.GH_TOKEN || process.env.ANTHROPIC_API_KEY || process.env.AWS_SECRET_ACCESS_KEY) throw 0`, { env: { GH_TOKEN: 'x', ANTHROPIC_API_KEY: 'x', AWS_SECRET_ACCESS_KEY: 'x' } })).toBe('through');
     expect(probe(`require('child_process').execFileSync('/usr/bin/security',['list-keychains'])`)).toBe('stopped');
     expect(probe(`require('child_process').execFileSync('/usr/bin/open',['-a','Terminal'])`)).toBe('stopped');
+  });
+});
+
+describe('where the sandbox puts its walls', () => {
+  it('takes a checkout\'s root and git folder, and a folder outside any repository as its own root', () => {
+    const dir = repo('where');
+    fs.mkdirSync(path.join(dir, 'sub'));
+    expect(whereItRuns(path.join(dir, 'sub'))).toEqual({ root: dir, commonDir: path.join(dir, '.git') });
+    const loose = real(fs.mkdtempSync(path.join(os.tmpdir(), 'not-a-repo-')));
+    expect(whereItRuns(loose)).toEqual({ root: loose, commonDir: path.join(loose, '.git') });
+    fs.rmSync(loose, { recursive: true, force: true });
+  });
+
+  it('lets tests read linked packages and write only their caches there', () => {
+    const text = profile({ root: '/task', commonDir: '/app/.git', home: '/home', tmp: '/t', node: '/node', packages: '/app/node_modules' });
+    expect(text).toContain('(allow file-read-data (subpath "/task") (subpath "/app/node_modules"))');
+    expect(text).toContain('(subpath "/app/node_modules/.vite")');
+    expect(text).not.toMatch(/allow file-write\*[^\n]*\(subpath "\/app\/node_modules"\)/);
+  });
+
+  it('refuses ports already listening with the same kind of rule that allows localhost', () => {
+    const text = profile({ root: '/task', commonDir: '/app/.git', home: '/home', tmp: '/t', node: '/node', ports: [3000, 47263] });
+    expect(text).toContain('(allow network-outbound (remote tcp "localhost:*") (remote udp "localhost:*"))');
+    expect(text).toContain('(deny network-outbound (remote tcp "localhost:3000") (remote tcp "localhost:47263"))');
+    expect(text).not.toContain('remote ip');
   });
 });
 
