@@ -5,6 +5,7 @@
 import { useEffect, useRef } from 'react';
 import { drawMountains, type Mountains } from '../home/mountains';
 import { boxIn, flyBirds } from '../home/birds';
+import { releaseCanvas } from '../home/sky';
 
 const QUIET = { x: 0.5, y: 0.62, rx: 0.3, ry: 0.14 };
 const LIGHT: Mountains = { inks: [[238, 96, 24], [240, 112, 46], [242, 128, 70], [244, 146, 96]], alpha: 0.5, lift: 0.9, at: 40, quiet: QUIET };
@@ -25,7 +26,7 @@ export function WelcomeSky({ dark }: { dark: boolean }) {
     const resized = () => { clearTimeout(wait); wait = window.setTimeout(draw, STILL_MS); };
     addEventListener('resize', resized);
     const stop = flyBirds(sky, { ink: dark ? [250, 110, 50] : [238, 96, 24], sky: (_W, H) => ({ top: H * 0.08, bottom: H * 0.5, avoid: boxIn(document.querySelector('.ob-welcome .ob-hero'), sky, 24) }) });
-    return () => { stop(); clearTimeout(wait); removeEventListener('resize', resized); };
+    return () => { stop(); clearTimeout(wait); removeEventListener('resize', resized); releaseCanvas(ground); };
   }, [dark]);
 
   return <div className="ob-sky" aria-hidden="true"><canvas ref={land} /><div ref={air} /></div>;

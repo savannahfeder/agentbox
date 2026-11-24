@@ -252,7 +252,7 @@ function lines(now: number): DemoRow[] {
         'Someone who signed up by email keeps one account, not two',
       ],
       result: [
-        '**Sign in with Google is built. Turn it on for everyone?**',
+        '**Google sign-in is built. Turn it on for everyone?**',
         '',
         'designs/sign-in-with-google.png',
         '',

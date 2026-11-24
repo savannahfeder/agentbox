@@ -75,38 +75,47 @@ async function until(fn: () => boolean, what: string, ms = 20_000) {
   }
 }
 
-// Starts a run that never ends by itself and answers how long after the
-// machine came up its work reached home.
+// Starts a run that never ends by itself. Answers how long after the machine
+// came up its work reached home, and how long the agent itself ran before it
+// was told to stop. The upper bounds are on the second: the first also holds
+// the clone and the upload, which a loaded CI Mac stretches by a second or more.
 async function savedAfter({ deadlineMs, setup = null }: { deadlineMs: number; setup?: string | null }) {
   packedRepo({ setup });
+  const clock = path.join(tmp, 'agent-clock.json');
+  const agent = `const f=${JSON.stringify(clock)};const t0=Date.now();`
+    + `process.on('SIGTERM',()=>{require('fs').writeFileSync(f,JSON.stringify({ran:Date.now()-t0}));process.exit(0)});`
+    + 'setInterval(()=>{},1000)';
   const machineUp = Date.now();
   sandbox = createSandbox({ workRoot: path.join(tmp, 'vm'), killGraceMs: 100, setupLog: path.join(tmp, 'setup.log') });
   const started = await sandbox.handle({
     action: 'start', runId: 'run-d', cwd: path.join(tmp, 'vm', 'w'), branch: 'agentbox/w-1', bundleUrl: `${base}/in.bundle`,
-    argv: [process.execPath, '-e', 'setInterval(()=>{},1000)'], env: {}, deadlineMs,
+    argv: [process.execPath, '-e', agent], env: {}, deadlineMs,
     results: { bundleUrl: `${base}/t/out`, changesUrl: `${base}/t/ch`, eventsUrl: `${base}/t/ev`, doneUrl: `${base}/t/done`, bring: [] },
   });
   expect(started.ok).toBe(true);
   await until(() => files.has('/t/done'), 'the run to be stopped and saved');
   expect(JSON.parse(files.get('/t/done').toString())).toMatchObject({ ok: true, cancelled: 'SIGTERM' });
-  return Date.now() - machineUp;
+  const took = Date.now() - machineUp;
+  // No clock means the stop came before the agent had even listened for it.
+  const agentRan = fs.existsSync(clock) ? JSON.parse(fs.readFileSync(clock, 'utf8')).ran : 0;
+  return { took, agentRan };
 }
 
 describe('a cloud run stopped at its deadline', () => {
   it('is stopped on time counted from the machine coming up, however long its setup took', async () => {
-    const took = await savedAfter({ deadlineMs: 2000, setup: 'sleep 1.5\n' });
+    const { took, agentRan } = await savedAfter({ deadlineMs: 2000, setup: 'sleep 1.5\n' });
     expect(took).toBeGreaterThanOrEqual(2000);
-    expect(took).toBeLessThan(3000);
+    expect(agentRan).toBeLessThan(1500);
   });
 
   it('still gets its whole deadline when it was ready at once', async () => {
-    const took = await savedAfter({ deadlineMs: 1500 });
+    const { took } = await savedAfter({ deadlineMs: 1500 });
     expect(took).toBeGreaterThanOrEqual(1500);
   });
 
   it('is stopped straight away when getting ready took longer than the deadline', async () => {
-    const took = await savedAfter({ deadlineMs: 1500, setup: 'sleep 2\n' });
+    const { took, agentRan } = await savedAfter({ deadlineMs: 1500, setup: 'sleep 2\n' });
     expect(took).toBeGreaterThanOrEqual(2000);
-    expect(took).toBeLessThan(2800);
+    expect(agentRan).toBeLessThan(1000);
   });
 });

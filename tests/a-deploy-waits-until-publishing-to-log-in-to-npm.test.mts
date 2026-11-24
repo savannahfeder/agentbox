@@ -54,6 +54,9 @@ function deploy({ signedIn = false, expireDuringBuild = false, buildOk = true,
       }
       // Nobody presses Enter to retry a failed publish here; a-deploy-calls-you-back-when-npm-needs-you covers that.
       if (command === 'bash') return failed;
+      // GitHub cannot publish here, so these cases are the sign-in on this Mac
+      // that the deploy falls back to; a-release-goes-on-npm-without-anyone-signing-in covers GitHub.
+      if (command === 'gh' && args[0] === 'workflow') return failed;
       if (command === 'security') return ok('"Developer ID Application: Test (ABCDEFGHIJ)"');
       if (command === 'gh' && args[0] === 'api') return ok('true');
       if (command === 'gh' && args[0] === 'release') return ok('v1.0.0');

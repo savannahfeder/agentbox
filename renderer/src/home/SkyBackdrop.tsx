@@ -1,5 +1,5 @@
 import { useLayoutEffect } from 'react';
-import { paintSky, type SkyArt } from './sky';
+import { paintSky, releaseCanvas, type SkyArt } from './sky';
 import { followTheCard } from './sky-follows-the-card';
 import { useSidebarShrinks } from '../sidebar-shrinks';
 import { boxIn, flyBirds } from './birds';
@@ -57,7 +57,7 @@ export function SkyBackdrop({ art, from = 0, span = 220 }: { art: SkyArt; from?:
         return { top: H * 0.06, bottom: H * 0.42, avoid: homeWords(wrap) };
       } });
     }
-    return () => { land(); soft?.stop(); stop(); wrap.remove(); };
+    return () => { land(); soft?.stop(); stop(); wrap.remove(); releaseCanvas(canvas); };
   }, [art, from, span, folds]);
   return null;
 }

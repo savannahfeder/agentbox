@@ -1,5 +1,5 @@
 import { useLayoutEffect } from 'react';
-import { paintSky, type Box, type SkyArt } from './sky';
+import { paintSky, releaseCanvas, type Box, type SkyArt } from './sky';
 import { followTheCard } from './sky-follows-the-card';
 import { useSidebarShrinks } from '../sidebar-shrinks';
 
@@ -62,7 +62,7 @@ export function InboxSky({ art, band = 190, shape = 'head' }: { art: SkyArt; ban
       },
     }, { watch, folds });
     return () => {
-      stop(); head.remove();
+      stop(); head.remove(); releaseCanvas(canvas);
       // The list's sky and the empty page's can be up together.
       if (!host.querySelector(':scope > .inbox-sky')) host.style.removeProperty('--sky-under');
     };

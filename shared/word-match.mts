@@ -2,7 +2,8 @@
 // search (renderer/src/search.ts) and the search over lines, files and
 // comments (main/everything-found.mts) share: every word must appear, each at
 // the start of a word, and only the last may be a prefix, since it is the one
-// still being typed.
+// still being typed. A word with an ending also finds its other forms
+// (`stemOf`).
 
 // Folding must keep the length, because callers slice the original text at
 // offsets found in the folded one. Curly quotes and dashes fold to what a
@@ -56,7 +57,36 @@ export function queryOf(query: string): WordQuery {
   return { terms, phrase: terms.length > 1 ? terms.join(' ') : '', quoted: quoted && terms.length > 0 };
 }
 
-const termAt = (hay: string, terms: string[], i: number, from = 0): number => wordStart(hay, terms[i], from, i < terms.length - 1);
+/**
+ * The front of a typed word that its other forms share: "opening" is "open",
+ * "threads" is "thread". Null when nothing is cut, and never under four
+ * letters, so "notes" stays "note" and does not find "nothing".
+ */
+export function stemOf(term: string): string | null {
+  if (term.length < 5) return null;
+  for (const end of ['ing', 'ies', 'es', 'ed', 's']) {
+    if (!term.endsWith(end) || (end === 's' && term.endsWith('ss'))) continue;
+    const stem = term.slice(0, -end.length);
+    if (stem.length >= 4) return stem;
+  }
+  return null;
+}
+
+/** Where a typed word starts a word in `hay`: itself, or any word that starts with its stem. */
+export function termStart(hay: string, term: string, from = 0, whole = false): number {
+  const stem = stemOf(term);
+  return stem ? wordStart(hay, stem, from, false) : wordStart(hay, term, from, whole);
+}
+
+/** Where a hit that starts at `at` ends: the typed word, or the rest of the word its stem found. */
+export function termEnd(hay: string, term: string, at: number): number {
+  if (!stemOf(term)) return at + term.length;
+  let end = at;
+  while (end < hay.length && isWordChar(hay[end])) end++;
+  return end;
+}
+
+const termAt = (hay: string, terms: string[], i: number, from = 0): number => termStart(hay, terms[i], from, i < terms.length - 1);
 
 /** Whether folded text holds the whole query. */
 export function holds(foldedText: string, q: WordQuery): boolean {

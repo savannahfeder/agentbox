@@ -17,6 +17,7 @@ import { fixtureFolders } from './fixtures';
 import { NAME, Name } from '../../shared/product-name.mjs';
 import type { CarryState } from '../../shared/carried-files.mts';
 import type { WasBeforeClose } from '../../shared/reopen-as-it-was.mts';
+import type { FindAnswer, FindCandidate } from '../../shared/find-by-description.mts';
 
 // Preload calls the bridge type in types.ts does not list yet.
 interface LaterBridge {
@@ -1100,6 +1101,12 @@ export const api = {
     return got.ok === false ? none : got;
   },
   warmFindInThreads(): void { void window.zero?.warmFindInThreads?.()?.catch?.(() => {}); },
+  /** Null when this copy's main cannot ask an agent. */
+  findByDescription: (): ((p: { description: string; candidates: FindCandidate[] }) => Promise<FindAnswer>) | null => {
+    const ask = window.zero?.findByDescription;
+    if (!ask) return null;
+    return (p) => ask(p).catch((err: unknown) => ({ ok: false as const, error: String((err as Error)?.message ?? err) }));
+  },
   async teamComment(p: { personId: string; threadId: string; text: string }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamComment(p)); },
   async teamReact(p: { product: string; id: string; on: string; emoji: string; off?: boolean }): Promise<TeamCallResult> { return teamCall(() => window.zero!.teamReact(p)); },
   async fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }> {
