@@ -7492,7 +7492,7 @@ export default function App() {
   // The Team page opens on the standup: a post from each teammate per standup day.
   const standupPage = (onPerson?: (key: string) => void) => snap && team?.state.signedIn && !team.state.team ? <StartTeam me={team.state.me} multiplayer={team.state.multiplayer} onStarted={() => void refresh()} /> : snap ? <StandupPage now={now} onPerson={onPerson}
     team={members.flatMap((m) => (m.kind === 'person' || m.key.startsWith('mate:') ? [{ key: m.key, name: m.name, kind: m.kind === 'person' ? 'person' as const : 'mate' as const }] : []))}
-    faces={new Map(members.map((m) => [m.key, m]))} dayFor={(w) => teamDayFor('today', w)} onOpen={openTodayLine} /> : null;
+    faces={new Map(members.map((m) => [m.key, m]))} dayFor={(w) => teamDayFor('today', w)} onOpen={openTodayLine} matesOn={teammatesUi.live} /> : null;
   const todayEl = todayShown ? todayPage() : null;
   const homeShown = homeOn && homeOpen && !!snap && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
