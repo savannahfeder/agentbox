@@ -828,12 +828,13 @@ export function agentOnThisWork<T extends { status?: string; labels?: string[]; 
 }
 
 /**
- * Whether To offers Auto (shared/auto-route.mts): only with an AI teammate that
- * is working to give a thread to, and only where the box can reach teammates.
+ * Whether To offers Auto (shared/auto-route.mts): whenever AI teammates are on.
+ * With none working it sends the thread to an agent and may offer to make a
+ * teammate for it. `mates` is absent with teammates off.
  * Auto keeps the Model row, so what it runs on is still yours to pick.
  */
 export function autoOffered(mates: readonly { paused?: boolean }[] | null | undefined, canReachTeammates: boolean): boolean {
-  return canReachTeammates && !!mates?.some((t) => !t.paused);
+  return canReachTeammates && !!mates;
 }
 
 /**

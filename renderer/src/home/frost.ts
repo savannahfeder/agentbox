@@ -4,6 +4,7 @@
 // mountains lies over the crisp ones, seen through a hole the shape of each pane.
 
 import { boxIn } from './birds';
+import { releaseCanvas } from './sky';
 
 export type Pane = { x: number; y: number; w: number; h: number; r: number };
 
@@ -33,6 +34,7 @@ function halved(canvas: HTMLCanvasElement, width: number): HTMLCanvasElement {
     const g = to.getContext('2d');
     if (!g) return from;
     g.drawImage(from, 0, 0, to.width, to.height);
+    if (from !== canvas) releaseCanvas(from);
     from = to;
   }
   return from;
@@ -90,7 +92,9 @@ export function frost(wrap: HTMLElement, canvas: HTMLCanvasElement): { paint: ()
       if (!g) return;
       // Safari's canvas has no filter; the stretch alone is soft enough there.
       if ('filter' in g) g.filter = 'blur(2px) saturate(1.25)';
-      g.drawImage(halved(canvas, soft.width * 2), 0, 0, soft.width, soft.height);
+      const small = halved(canvas, soft.width * 2);
+      g.drawImage(small, 0, 0, soft.width, soft.height);
+      if (small !== canvas) releaseCanvas(small);
       fit();
     },
     stop: () => {
@@ -98,6 +102,7 @@ export function frost(wrap: HTMLElement, canvas: HTMLCanvasElement): { paint: ()
       host.removeEventListener('scroll', fit, true);
       if (frame) cancelAnimationFrame(frame);
       soft.remove();
+      releaseCanvas(soft);
     },
   };
 }

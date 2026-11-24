@@ -165,6 +165,7 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
       gx.fillStyle = gr; gx.fillRect(0, 0, W, H);
       g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(gc, 0, 0); g.restore();
     }
+    releaseCanvas(gc);
   }
 
   const q = (v: number, th: number) => { const s = Math.min(1, Math.max(0, v / 255)) * (levels - 1); const f = Math.floor(s); return ((f + (s - f > th ? 1 : 0)) / (levels - 1)) * 255; };
@@ -221,8 +222,20 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
   }
 }
 
+/** A canvas's drawing, given back at once rather than when it is collected: on a 5K screen one sky is 55 MB. */
+export function releaseCanvas(canvas: HTMLCanvasElement | null | undefined): void {
+  if (!canvas) return;
+  canvas.width = 0;
+  canvas.height = 0;
+}
+
 const drawn = new Map<string, HTMLCanvasElement>();
-const KEPT = 3;
+/** The newest sky is always kept; older ones only while all of them fit in this. */
+const KEPT_BYTES = 48 * 1024 * 1024;
+const bytesOf = (c: HTMLCanvasElement) => c.width * c.height * 4;
+
+/** What the kept copies hold, in bytes. */
+export const skyCacheBytes = () => [...drawn.values()].reduce((n, c) => n + bytesOf(c), 0);
 
 /** drawSky, copying a sky already drawn with the same art at the same size instead of drawing it again. */
 export function paintSky(canvas: HTMLCanvasElement, art: SkyArt, opts: Parameters<typeof drawSky>[2]) {
@@ -241,5 +254,9 @@ export function paintSky(canvas: HTMLCanvasElement, art: SkyArt, opts: Parameter
   copy.width = canvas.width; copy.height = canvas.height;
   copy.getContext('2d')?.drawImage(canvas, 0, 0);
   drawn.set(key, copy);
-  for (const old of drawn.keys()) { if (drawn.size <= KEPT) break; drawn.delete(old); }
+  for (const [old, c] of drawn) {
+    if (drawn.size <= 1 || skyCacheBytes() <= KEPT_BYTES) break;
+    drawn.delete(old);
+    releaseCanvas(c);
+  }
 }

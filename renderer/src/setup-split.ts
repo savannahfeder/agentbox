@@ -122,6 +122,29 @@ export function nextChoice<T>(all: readonly T[], now: T, by: 1 | -1): T {
 }
 
 
+type ChatSource = 'terminal' | 'editor' | 'desktop' | 'codex' | string | undefined;
+const CHAT_AGENT: Record<string, string> = { terminal: 'Claude Code', editor: 'Claude Code in your editor', desktop: 'Claude app', codex: 'Codex' };
+
+const FOLDER_MOST = 32;
+/** A long folder keeps its end, which is the part that names it. */
+const endOfFolder = (f: string) => (f.length <= FOLDER_MOST ? f : `…/${f.split('/').filter(Boolean).slice(-2).join('/')}`);
+
+/** A recent chat's line under its title in setup: the agent it ran in, then its folder. `whole` keeps a long folder whole. */
+export function chatFrom(t: { source?: ChatSource; short?: string }, { whole = false } = {}): string {
+  const folder = t.short?.trim() ?? '';
+  return [CHAT_AGENT[t.source ?? ''] ?? 'Claude Code', whole ? folder : endOfFolder(folder)].filter(Boolean).join(' · ');
+}
+
+export function chatReplyLabel(source: ChatSource): string {
+  const who = source === 'codex' ? 'Codex' : source === 'desktop' ? 'Claude' : 'Claude Code';
+  return `${who}, last reply`;
+}
+
+/** What an opened chat shows. The list reads a chat's end only for its newest ones, so `said` can be empty. */
+export function chatOpened(t: { firstSaid?: string; lastSaid?: string; endUnknown?: boolean }): { asked: string; said: string } {
+  return { asked: (t.firstSaid ?? '').trim(), said: t.endUnknown ? '' : (t.lastSaid ?? '').trim() };
+}
+
 /** Enter held down repeats, and a repeat is not a press: one press moves one step. Arrows may repeat. */
 export const heldPress =(e: { key: string; repeat?: boolean }): boolean => e.key === 'Enter' && !!e.repeat;
 

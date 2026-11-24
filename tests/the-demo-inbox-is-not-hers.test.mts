@@ -297,7 +297,8 @@ describe('how the demo rows are written', () => {
   // because... they should all have 1, 2, 3 options", and "They don't really
   // show me screenshots or visuals". Two of four agent threads had neither.
   it('gives every agent thread waiting on you two or three options to pick', () => {
-    expect(bodies.length).toBe(4);
+    // Four agents', the AI teammate's, and the one Auto offers a teammate on.
+    expect(bodies.length).toBe(6);
     for (const body of bodies) {
       const options = body.split('\n## Options\n')[1];
       expect(options).toBeTruthy();

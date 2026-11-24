@@ -1,9 +1,10 @@
 // THE TEAMMATE AUTO OFFERS FOR THIS KIND OF WORK, as a card under the newest
 // answer (designs/w-bb45118b10/teammate-card-1-hire-card-v2.png). Its words are
 // in ../teammate-offer.ts.
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { MatesOnContext } from '../teammates/mate-place';
 import { api } from '../api';
-import { drawSky, skyTheme } from '../home/sky';
+import { drawSky, releaseCanvas, skyTheme } from '../home/sky';
 import { useHomeSettings } from '../home/home-settings';
 import { aRole, chooseFold, foldChosen, markSeen, offerCard, seenBefore, startsFolded } from '../teammate-offer';
 import type { WorkItem } from '../types';
@@ -28,7 +29,7 @@ function Sky() {
     let width = canvas.clientWidth;
     const watch = new ResizeObserver(() => { if (canvas.clientWidth !== width) { width = canvas.clientWidth; paint(); } });
     watch.observe(canvas);
-    return () => watch.disconnect();
+    return () => { watch.disconnect(); releaseCanvas(canvas); };
   }, [worn]);
   return <div className="to-sky" aria-hidden="true"><canvas ref={ref} /></div>;
 }
@@ -57,8 +58,9 @@ export function TeammateOffer({ item }: { item: WorkItem }) {
   const [folded, setFolded] = useState(() => startsFolded({ choice: foldChosen(item), seen: seenBefore(item) }));
   const offer = item.routed?.offer;
   const answered = pressed ?? offer?.answered;
-  const seenRef = useSeen(item, !!offer && !answered && !folded);
-  if (!offer) return null;
+  const matesOn = useContext(MatesOnContext);
+  const seenRef = useSeen(item, !!offer && !answered && !folded && matesOn);
+  if (!offer || !matesOn) return null;
   const card = offerCard(offer);
   const face = offerFace(item.id);
   // Only the press itself is answered with this line; an offer made on an earlier visit, or answered on another thread, draws nothing.
