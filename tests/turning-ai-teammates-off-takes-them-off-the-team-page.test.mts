@@ -2,13 +2,13 @@
 // teammate's page and went back: the page was blank, and the Team list still
 // had its AI teammates section with New teammate in it, and the Standup its
 // "AI teammates post too" switch. In round two a thread still offered to make
-// a teammate. Off, those go, and a page left on a teammate that is gone opens
-// the Standup instead.
+// a teammate, and their setup threads were listed in your own Standup post.
+// Off, those go, and a page left on a teammate that is gone opens the Standup.
 import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ChatsColumn, ChatsContext } from '../renderer/src/teammates/ChatsColumn.tsx';
-import { MatesOnContext, placeWithoutGoneMate } from '../renderer/src/teammates/mate-place.ts';
+import { MatesOnContext, placeWithoutGoneMate, theDaysThreads } from '../renderer/src/teammates/mate-place.ts';
 import { TeammateOffer } from '../renderer/src/components/TeammateOffer.tsx';
 import { StandupPage } from '../renderer/src/team/StandupPage.tsx';
 
@@ -61,5 +61,15 @@ describe('a thread where Auto offered a teammate', () => {
   it('shows the offer while teammates are on, and nothing while they are off', () => {
     expect(offer(true)).toContain('Make a Support lead');
     expect(offer(false)).toBe('');
+  });
+});
+
+describe("the team's day, which the Standup is written from", () => {
+  const mine = { id: 'w-1', labels: ['founder'] };
+  const theirs = { id: 'w-2', labels: ['founder', 'teammate:t-aaaaaaaaaa'] };
+
+  it('leaves out what AI teammates ran while they are off, and keeps it while they are on', () => {
+    expect(theDaysThreads([mine, theirs], false)).toEqual([mine]);
+    expect(theDaysThreads([mine, theirs], true)).toEqual([mine, theirs]);
   });
 });

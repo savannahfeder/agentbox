@@ -151,7 +151,7 @@ import { TeammatesContext } from './teammates/row-lead';
 import { ChatsContext, ChatsFrame, LAST_CHAT_KEY, type ChatsValue } from './teammates/ChatsColumn';
 import { queuedTeammateRun, threadsItOpened } from './teammates/chat-lines';
 import { teammateIdOf } from '../../shared/teammates.mts';
-import { MatesOnContext, placeWithoutGoneMate } from './teammates/mate-place';
+import { MatesOnContext, placeWithoutGoneMate, theDaysThreads } from './teammates/mate-place';
 import { faceSeed } from '../../shared/teammate-face.mts';
 import { asksWho } from '../../shared/auto-route.mts';
 import { RoomBoard } from './team/rooms/RoomBoard';
@@ -7475,7 +7475,7 @@ export default function App() {
   const needsYouCount = { inbox: (mineShown ? shownCount(inbox) : 0) + theirCount('inbox') + leadCount + sharedFileNews.length + followingNews.length };
   const todayShown = teamMode && todayOn && !!snap && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused && !teammatesShown && !roomShown && !filesShown && !connectionsShown;
   const teamDayFor = (range: TodayRange, window?: { from: number; to: number }) => teamToday({
-    range, ...(window ? { window } : {}), now, me: team?.me ?? null, items, products: snap?.products ?? [], cards: weekCards,
+    range, ...(window ? { window } : {}), now, me: team?.me ?? null, items: theDaysThreads(items, teammatesUi.live), products: snap?.products ?? [], cards: weekCards,
     decisions: Object.values(snap?.team?.rooms?.decisions ?? {}).flat(),
     needs: mineInNeeds, mentions: roomsUi.live ? roomsUi.mentions : [], needsCount: needsYouCount.inbox,
     approvals: (filesForToday?.files ?? []).flatMap((f) => (f.approved ?? []).map((a) => ({ key: f.key, name: f.name, by: a.by ?? team?.me ?? null, at: a.at, threads: f.sentIn.flatMap((s) => (s.product && s.id ? [`${s.product}/${s.id}`] : [])) }))),
