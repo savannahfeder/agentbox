@@ -1,0 +1,76 @@
+name: Publish to npm
+
+# `npm run deploy` starts this once the Mac app is out, so nobody signs in to
+# npm on their own machine. npm trusts this file by name (trusted publishing,
+# set once on npmjs.com under the package's settings), and the id-token below
+# is what it checks instead of a password or a key.
+on:
+  workflow_dispatch:
+    inputs:
+      commit:
+        description: The commit on main the release was built from
+        required: true
+      version:
+        description: The version that commit says
+        required: true
+      posthog:
+        description: The analytics project key the package carries (public; every copy ships it)
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publisher
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    # A Mac, because the package carries the tray's and the window's glass,
+    # which only a Mac can build.
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      COMMIT: ${{ inputs.commit }}
+      VERSION: ${{ inputs.version }}
+      POSTHOG_KEY: ${{ inputs.posthog }}
+    steps:
+      - name: The inputs are what the deploy sends
+        run: |
+          [[ "$COMMIT" =~ ^[0-9a-f]{40}$ ]] || { echo "commit is not a full commit id: $COMMIT"; exit 1; }
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "version is not x.y.z: $VERSION"; exit 1; }
+          [[ "$POSTHOG_KEY" =~ ^phc_[A-Za-z0-9]+$ ]] || { echo "the analytics key does not look like one"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Trusted publishing needs npm 11.5.1 or later.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+      - run: npm install -g npm@^11.5.1
+
+      - name: The commit is on main and says the version
+        run: |
+          git merge-base --is-ancestor "$COMMIT" refs/remotes/origin/main || { echo "$COMMIT is not on main"; exit 1; }
+          said="$(node -p 'require("./package.json").version')"
+          [ "$said" = "$VERSION" ] || { echo "$COMMIT says $said, not $VERSION"; exit 1; }
+
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+
+      - name: The glass was built
+        run: ls main/native/liquid-glass/build/liquid-glass.node main/native/window-glass/build/window-glass.node
+
+      - name: The package carries the analytics key
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const p = JSON.parse(fs.readFileSync("package.json", "utf8")); p.bakedPosthogKey = process.env.POSTHOG_KEY; fs.writeFileSync("package.json", JSON.stringify(p, null, 2) + "\n")'
+
+      # The build and the checks before-publish.mjs makes are the steps above.
+      - run: npm publish --ignore-scripts
