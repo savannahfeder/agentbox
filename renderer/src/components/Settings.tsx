@@ -2432,7 +2432,7 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
                 <Switch label="Shrink the sidebar to icons" on={sidebarShrinks} onChange={setSidebarShrinks} />
               </Row>
             </Group>
-            <Group id="teammates" label="AI teammates">
+            <Group id="teammates">
               <Row label="AI teammates" desc="Agents with a standing job that work on their own, talk in one team chat and reach you only when they need you.">
                 <Switch label="AI teammates" on={!!w.alpha?.teammates} onChange={(v) => setWorkspace('alphaTeammates', v)} />
               </Row>
@@ -2946,7 +2946,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
         <Group id="privacy" label={`What ${NAME} sends`}>
           {toggle('Counts and crash reports', 'diagnostics', w.diagnostics, `That ${NAME} was opened, that a task was opened, that a reply was sent, and a report when something breaks. Never your code, your prompts, your keys or your paths, and never a title.`)}
         </Group>
-        <Group id="teammates" label="AI teammates">{toggle('AI teammates', 'alphaTeammates', !!w.alpha?.teammates, 'Agents with a standing job that work on their own, talk in one team chat and reach you only when they need you.')}</Group>
+        <Group id="teammates">{toggle('AI teammates', 'alphaTeammates', !!w.alpha?.teammates, 'Agents with a standing job that work on their own, talk in one team chat and reach you only when they need you.')}</Group>
         <Group id="adhd">{toggle('ADHD mode', 'adhdMode', w.adhdMode)}</Group>
         <Group id="updates" label="Updates"><Row label={`${NAME} ${s.version}`} /></Group>
       </Page>
