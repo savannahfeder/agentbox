@@ -158,7 +158,7 @@ describe('a Codex login that uses an API key', () => {
     expect(html).toContain('API key');
     expect(html).not.toContain('Not signed in');
     expect(html).not.toContain(OLD);
-    expect(tile.about).toEqual(['Agentbox runs on a ChatGPT plan']);
+    expect(tile.about).toEqual(['Run codex login to use your ChatGPT plan']);
     expect(tile.cmd).toBe('codex login');
     expect(html).toContain('codex login');
     // The app's own sign-in would find it signed in and open nothing.

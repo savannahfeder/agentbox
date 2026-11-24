@@ -594,7 +594,7 @@ export function accountTile(a: OneAccount, { many, now, onUse, cloud = false, on
   const waiting = mine?.phase === 'signing-in';
   const starting = mine?.phase === 'checking' || mine?.phase === 'installing';
   const notSignedIn = waiting ? ['Finish in your browser'] : starting ? ['Signing in…']
-    : h?.apiKey ? ['Agentbox runs on a ChatGPT plan']
+    : h?.apiKey ? ['Run codex login to use your ChatGPT plan']
     : h?.email && !h.trouble ? ['Signed out'] : [];
   const places: Where[] = !cloud || signingIn ? [] : [...(h ? ['here' as const] : []), ...(c && !broken ? ['cloud' as const] : [])];
   const signIn = (word: string, key: string | null) => (onCloudSignIn ? { word, onUse: () => onCloudSignIn(key, h?.email ?? c?.name ?? null) } : null);
