@@ -5,6 +5,10 @@
 // agents already on this computer." and a grey "What they send you lands in
 // your inbox."), and every row carried its project as well as its age. Now
 // the heading is one line with no second one, and a row says only how long ago.
+//
+// 2026-11-24 (w-6235a4e92a): a row also says which agent and folder it came
+// from, on its own line under the title, since a new person on a call could
+// not tell where a chat came from. Beside the title it is still only the age.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 

@@ -132,6 +132,9 @@ export interface SessionThread {
   endUnknown?: boolean;
   /** That question, short enough for one line. */
   ask?: string;
+  /** What the person typed first, and the agent's last reply, as main/agent-sessions.mts read them. */
+  firstSaid?: string;
+  lastSaid?: string;
 }
 
 /**
