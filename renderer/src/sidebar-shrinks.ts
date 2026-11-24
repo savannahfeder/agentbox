@@ -14,7 +14,7 @@ export const pointerMoved = (e: { movementX: number; movementY: number }) => e.m
 export const OPENS_AFTER_MS = 140;
 export const CLOSES_AFTER_MS = 300;
 
-type At = { x: number; y: number };
+type At = { x: number; y: number; t?: number };
 type Box = { left: number; top: number; right: number; bottom: number };
 const OUT_OF_THE_WINDOW: At = { x: -Infinity, y: -Infinity };
 
@@ -24,12 +24,41 @@ const OUT_OF_THE_WINDOW: At = { x: -Infinity, y: -Infinity };
 export const crossedIn = (from: At | null, box: Box) =>
   !!from && (from.x < box.left || from.x >= box.right || from.y < box.top || from.y >= box.bottom);
 
-/** Where the pointer was one move ago. */
+/** Faster than this, in points a millisecond, the pointer is still on its way and not resting. */
+export const RESTS_BELOW_SPEED = 0.15;
+
+export const stillTravelling = (from: At | null, to: At) => {
+  if (!from || !Number.isFinite(from.x) || from.t === undefined || to.t === undefined) return true;
+  const dt = to.t - from.t;
+  const far = Math.hypot(to.x - from.x, to.y - from.y);
+  return dt > 0 ? far / dt > RESTS_BELOW_SPEED : far > 0;
+};
+
+/** Whether to open the folded sidebar. It opens OPENS_AFTER_MS after the pointer,
+ *  having come in from outside, last stopped travelling; a hand that overshoots
+ *  a tab beside it into the sidebar and swings back never rests there. */
+export function hoverIntent() {
+  let cameIn = false;
+  let waiting = false;
+  return {
+    /** A move over the sidebar: answers whether the wait to open starts (over) now. */
+    move(before: At | null, now: At, box: Box): boolean {
+      cameIn ||= crossedIn(before, box);
+      if (!cameIn) return false;
+      if (waiting && !stillTravelling(before, now)) return false;
+      waiting = true;
+      return true;
+    },
+    left() { cameIn = false; waiting = false; },
+  };
+}
+
+/** Where the pointer was one move ago, and when. */
 export function pointerTrail() {
   let before: At | null = null;
   let now: At | null = null;
   return {
-    moved(x: number, y: number) { before = now; now = { x, y }; },
+    moved(x: number, y: number, t?: number) { before = now; now = { x, y, t }; },
     left() { now = OUT_OF_THE_WINDOW; },
     before: () => before,
   };
@@ -37,7 +66,7 @@ export function pointerTrail() {
 
 /** Feeds a trail from the window, ahead of any handler that could stop the event. */
 export function followPointer(win: Window, trail: ReturnType<typeof pointerTrail>) {
-  const moved = (e: MouseEvent) => trail.moved(e.clientX, e.clientY);
+  const moved = (e: MouseEvent) => trail.moved(e.clientX, e.clientY, e.timeStamp);
   const out = (e: MouseEvent) => { if (!e.relatedTarget) trail.left(); };
   win.addEventListener('mousemove', moved, true);
   win.addEventListener('mouseout', out, true);

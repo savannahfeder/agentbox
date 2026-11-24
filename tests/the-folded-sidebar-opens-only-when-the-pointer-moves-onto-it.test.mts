@@ -24,8 +24,8 @@ describe('a pointer that moved', () => {
 
 describe('the folded sidebar', () => {
   it('opens on a pointer that moved over it, never on one it appeared under', () => {
-    expect(nav).toMatch(/onMouseMove: \(e: \{ movementX: number; movementY: number \}\) => \{/);
-    expect(nav).toContain('if (hoverAt.current || !pointerMoved(e)) return;');
+    expect(nav).toMatch(/onMouseMove: \(e: \{ movementX: number; movementY: number[;}]/);
+    expect(nav).toContain('if (!pointerMoved(e) || !navBox.current) return;');
     expect(nav).not.toMatch(/onMouseEnter: \(\) => \{ hoverAt\.current = setTimeout/);
   });
   // Since 2026-11-24 it closes a beat after the pointer leaves, so one that slips

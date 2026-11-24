@@ -57,7 +57,8 @@ describe('the sidebar asks it', () => {
     expect(nav).toMatch(/followPointer\(/);
   });
   it('opens only once the pointer crossed in, and forgets that when it leaves', () => {
-    expect(nav).toMatch(/crossedIn\(pointer\.before\(\), navBox\.current\.getBoundingClientRect\(\)\)/);
-    expect(nav).toMatch(/onMouseLeave: \(\) => \{[^}]*cameIn\.current = false;/);
+    expect(fs.readFileSync(new URL('../renderer/src/sidebar-shrinks.ts', import.meta.url), 'utf8')).toMatch(/cameIn \|\|= crossedIn\(before, box\);\s+if \(!cameIn\) return false;/);
+    expect(nav).toMatch(/intent\.move\(pointer\.before\(\), \{ x: e\.clientX, y: e\.clientY, t: e\.timeStamp \}, navBox\.current\.getBoundingClientRect\(\)\)/);
+    expect(nav).toMatch(/onMouseLeave: \(\) => \{[^}]*intent\.left\(\);/);
   });
 });

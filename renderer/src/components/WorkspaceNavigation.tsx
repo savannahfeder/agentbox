@@ -10,7 +10,7 @@ import { changeLines, closedHere, readMoveClosed, readUpdateClosed, writeMoveClo
 import { AccountMenu } from '../team/account-menu';
 import type { Invisible } from '../team/rooms/GoInvisible';
 import { chord } from '../this-keyboard';
-import { CLOSES_AFTER_MS, OPENS_AFTER_MS, crossedIn, followPointer, pointerMoved, pointerTrail } from '../sidebar-shrinks';
+import { CLOSES_AFTER_MS, OPENS_AFTER_MS, followPointer, hoverIntent, pointerMoved, pointerTrail } from '../sidebar-shrinks';
 import { actsOnPress } from '../press';
 import { foldedSet, toggleFold } from '../teammates/chat-lines';
 
@@ -145,20 +145,21 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   const hoverAt = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveAt = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navBox = useRef<HTMLElement>(null);
-  const cameIn = useRef(false);
+  const [intent] = useState(hoverIntent);
   const [pointer] = useState(pointerTrail);
   useEffect(() => (rail ? followPointer(window, pointer) : undefined), [rail, pointer]);
   const hover = rail && onHover ? {
-    onMouseMove: (e: { movementX: number; movementY: number }) => {
+    onMouseMove: (e: { movementX: number; movementY: number; clientX: number; clientY: number; timeStamp: number }) => {
       if (leaveAt.current) { clearTimeout(leaveAt.current); leaveAt.current = null; }
-      if (hoverAt.current || !pointerMoved(e)) return;
-      cameIn.current ||= !!navBox.current && crossedIn(pointer.before(), navBox.current.getBoundingClientRect());
-      if (cameIn.current) hoverAt.current = setTimeout(() => onHover(true), OPENS_AFTER_MS);
+      if (!pointerMoved(e) || !navBox.current) return;
+      if (!intent.move(pointer.before(), { x: e.clientX, y: e.clientY, t: e.timeStamp }, navBox.current.getBoundingClientRect())) return;
+      if (hoverAt.current) clearTimeout(hoverAt.current);
+      hoverAt.current = setTimeout(() => onHover(true), OPENS_AFTER_MS);
     },
     onMouseLeave: () => {
       if (hoverAt.current) clearTimeout(hoverAt.current);
       hoverAt.current = null;
-      cameIn.current = false;
+      intent.left();
       if (leaveAt.current) clearTimeout(leaveAt.current);
       leaveAt.current = setTimeout(() => { leaveAt.current = null; onHover(false); }, CLOSES_AFTER_MS);
     },
