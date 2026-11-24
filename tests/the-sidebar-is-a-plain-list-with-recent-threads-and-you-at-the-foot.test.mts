@@ -109,7 +109,7 @@ describe('the sidebar, as it was approved', () => {
     expect(settingsRow(draw({ team, onAccount() {} }))).not.toBeNull();
     const fence = read('renderer/src/sidebar.css').match(/@media \(min-width: 701px\) and \(min-height: 521px\) \{([\s\S]*?)\n\}/)?.[1] ?? '';
     expect(fence).toContain('.ws-in-menu');
-    expect(css).toMatch(/@media \(max-width: 700px\), \(max-height: 520px\) \{\s*:root:root \.gt-rail-nav\.workspace-navigation :is\(\.ws-new, \.ws-sec, \.ws-recent\) \{ display: none; \}/);
+    expect(css).toMatch(/@media \(max-width: 700px\), \(max-height: 520px\) \{\s*:root:root \.gt-rail-nav\.workspace-navigation :is\(\.ws-new, \.ws-keep, \.ws-sec, \.ws-recent\) \{ display: none; \}/);
   });
   it('is the same on a real phone as it was, which has no account row to hold Settings', () => {
     expect(settingsRow(draw({ rail: false, team, onAccount() {} }))).not.toContain('ws-in-menu');

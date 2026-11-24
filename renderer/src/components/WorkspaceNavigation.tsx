@@ -62,7 +62,9 @@ function SearchGlyph() {
  *  deselected tab that is --text-faint at 400, exactly the word Inbox beside it;
  *  on the active one it is --text at 500. There is one rule rather than two.
  */
-export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSearch, onCompose, recent = [], inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, statuses = true, onAccount, onSignIn, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove, invisible = null, inboxLabel = 'Inbox', onPalette, rail = false, onHover, groups = null, onGroupsPage = false, onTeammatesPage = false, onFiles, filesPage = false, onConnections, connectionsPage = false, onTasks, tasksPage = false, onHome, homePage = false }: {
+export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSearch, onCompose, recent = [], keptOpen = false, onKeepOpen, inboxCount = 0, scheduledCount: _scheduledCount = 0, usage, onSettings, onInstructions, page: pageIn, hasTeam = false, onTeam, teamPage = false, team = null, onInvite, statuses = true, onAccount, onSignIn, onFeedback, onSignOut, update = null, onUpdate, move = null, onMove, invisible = null, inboxLabel = 'Inbox', onPalette, rail = false, onHover, groups = null, onGroupsPage = false, onTeammatesPage = false, onFiles, filesPage = false, onConnections, connectionsPage = false, onTasks, tasksPage = false, onHome, homePage = false }: {
+  /** Whether the sidebar stays open with the pointer away, and the press that flips it. */
+  keptOpen?: boolean; onKeepOpen?: () => void;
   /** The threads you last had open, newest first. Drawn on a desktop, and not while the sidebar is closed. */
   recent?: RecentRow[];
   /** Whether one of the teammates' pages is up, which unlights Threads. */
@@ -200,6 +202,9 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
       {mark}<span className="th-team-name">{teamName}</span>
       {rail && onCompose && <button type="button" className="ws-new" aria-label="New thread" title="New thread (N)" onClick={onCompose}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h8" /><path d="m4 20 1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5 4 20Z" /></svg>
+      </button>}
+      {rail && onKeepOpen && <button type="button" className="ws-keep" aria-label={keptOpen ? 'Shrink sidebar to icons' : 'Keep sidebar open'} aria-pressed={keptOpen} {...(keptOpen ? { 'data-hint': 'shrink-sidebar' } : { 'data-hint': 'keep-sidebar' })} data-hint-side="above" onClick={onKeepOpen}>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2.5" y="3.5" width="11" height="9" rx="2" /><path d="M6.5 3.75v8.5" /></svg>
       </button>}
     </div>
     {/* Search is a way to look, not a place to go, so it sits above the tabs

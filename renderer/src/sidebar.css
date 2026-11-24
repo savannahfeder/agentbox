@@ -14,7 +14,7 @@
   :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab, .workspace-find button, .workspace-utilities > button, .ws-recent-row) {
     width: 100%; height: 30px; padding: 0 6px; gap: 8px; border-radius: var(--radius); font-size: inherit; font-weight: inherit; color: inherit; text-align: left; cursor: default;
   }
-  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab, .workspace-utilities > button, .ws-recent-row, .ws-sec, .ws-new, .th-me-btn):hover { background: var(--sidebar-fill); color: var(--text); }
+  :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab, .workspace-utilities > button, .ws-recent-row, .ws-sec, .ws-new, .ws-keep, .th-me-btn):hover { background: var(--sidebar-fill); color: var(--text); }
   :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab.active, .workspace-utilities > button[aria-current="page"]) { background: var(--sidebar-fill); box-shadow: none; color: var(--text); font-weight: 500; }
 
   /* The app's icons are drawn on a 24 grid for 18 and 20 points. Here each is
@@ -27,9 +27,11 @@
   :root:root .gt-rail-nav.workspace-navigation :is(.workspace-tab.active, .workspace-tab:hover, .workspace-utilities > button:hover) > svg { color: var(--text-dim); }
 
   :root:root .gt-rail-nav.workspace-navigation .th-team { height: 28px; margin: 8px 0 0; padding: 0 0 0 4px; gap: 6px; font-size: 14px; font-weight: 600; letter-spacing: -.18px; color: var(--text); }
-  :root:root .gt-rail-nav.workspace-navigation .ws-new { flex: none; width: 28px; height: 28px; padding: 0; justify-content: center; border-radius: var(--radius); color: var(--text-faint); cursor: default; transition: opacity .14s .08s; }
-  :root:root .gt-rail-nav.workspace-navigation .ws-new > svg { width: 16px; height: 16px; }
-  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .ws-new { visibility: hidden; opacity: 0; transition: opacity .06s, visibility 0s .06s; }
+  :root:root .gt-rail-nav.workspace-navigation :is(.ws-new, .ws-keep) { flex: none; width: 28px; height: 28px; padding: 0; justify-content: center; border-radius: var(--radius); color: var(--text-faint); cursor: default; transition: opacity .14s .08s; }
+  :root:root .gt-rail-nav.workspace-navigation :is(.ws-new, .ws-keep) > svg { width: 16px; height: 16px; }
+  /* The two sit 2 apart; the row's own gap is 6. */
+  :root:root .gt-rail-nav.workspace-navigation .ws-keep { margin-left: -4px; }
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation :is(.ws-new, .ws-keep) { visibility: hidden; opacity: 0; transition: opacity .06s, visibility 0s .06s; }
 
   /* Search is a field, so its keys are read before they are needed. */
   :root:root .gt-rail-nav.workspace-navigation .workspace-find { margin: 12px 0 0; }
@@ -93,5 +95,5 @@
 
 /* In a window that small, what this sidebar adds is not drawn. */
 @media (max-width: 700px), (max-height: 520px) {
-  :root:root .gt-rail-nav.workspace-navigation :is(.ws-new, .ws-sec, .ws-recent) { display: none; }
+  :root:root .gt-rail-nav.workspace-navigation :is(.ws-new, .ws-keep, .ws-sec, .ws-recent) { display: none; }
 }

@@ -1,7 +1,7 @@
 import { previewFocus } from './preview-focus';
 import { picturesNamedIn, warmPictures } from './components/FittedImg';
 import { PhoneStatus } from './components/PhoneStatus';
-import { sidebarFolded, useSidebarShrinks } from './sidebar-shrinks';
+import { sidebarFolded, toggleSidebarShrinks, useSidebarShrinks } from './sidebar-shrinks';
 import { GlassBand } from './components/GlassBand';
 import { cloudChord, cloudOffAsks, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
 import { usePhoneBack, onCloudPhone, onPhone } from './phone-screen';
@@ -5983,6 +5983,7 @@ export default function App() {
         setModal((m) => (m === 'palette' ? null : 'palette'));
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\' && !onPhone()) { e.preventDefault(); toggleSidebarShrinks(); return; }
       const toastsO = oIsTheToasts(e.key, toast, sentAt.current, Date.now(), lastToast.current);
       // A ROOM OWNS THE KEYBOARD WHILE IT IS OPEN, as Settings does: the list
       // behind it is not on the screen. Escape goes back to the threads and
@@ -7824,6 +7825,7 @@ export default function App() {
       <WorkspaceNavigation
         onPalette={() => setModal('palette')}
         recent={recentRows}
+        keptOpen={!sidebarShrinks} onKeepOpen={toggleSidebarShrinks}
         update={announcesUpdate(snap?.update, { closed: '' }) ? { installing: !!snap?.update?.installing, version: snap?.update?.newVersion, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
         onUpdate={() => { void api.updateInstall(); }}
         /* AND THE COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS
