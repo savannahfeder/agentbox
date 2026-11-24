@@ -28,6 +28,10 @@ concurrency:
 jobs:
   publish:
     if: github.ref == 'refs/heads/main'
+    # npm trusts this file by name, and a branch can carry an edited copy; the
+    # environment is held in GitHub's settings, limited to main, and npm's
+    # trusted publisher names it too.
+    environment: agentbox-npm-publisher
     # A Mac, because the package carries the tray's and the window's glass,
     # which only a Mac can build.
     runs-on: macos-latest
