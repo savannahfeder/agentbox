@@ -2,7 +2,8 @@
 // card beside it saying the key to press. Which thing is ../tour.ts; this reads
 // the window, draws, and hears the ways out.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { MAC } from '../this-keyboard';
 import { Name } from '../../../shared/product-name.mjs';
 import { FIRST_RUN_STEP } from '../first-run';
@@ -341,8 +342,28 @@ export function Tour({ tour, practice = false, practiceId = null, practiceOpen =
     return () => clearInterval(t);
   }, [live, tour, view, thread, covered, palette, answering, onChange, tried, practiceId, practiceOpen]);
 
-  // THE CARD, beside the glow, kept inside the window.
+  // THE GLOW NEVER OUTLIVES WHAT IT LIGHTS. The reading above is eight times a second, so a press that took
+  // its target away left the ring round nothing, or round whatever came there, for up to 120 ms. Every
+  // change to the page is checked before it is drawn, and costs nothing while the page holds still.
   useEffect(() => {
+    if (!step || !box) return undefined;
+    const check = () => {
+      const b = boxOf(step, targetsOf(step, practiceId));
+      if (same(boxNow.current, b)) return;
+      boxNow.current = b;
+      flushSync(() => setBox(b));
+    };
+    // The birds restyle every frame, and the glow and card restyle themselves.
+    const ours = (n: Node) => !!(n instanceof Element ? n : n.parentElement)?.closest('.home-sky, .ob-sky, .tour-glow, .tour-card');
+    const watch = new MutationObserver((changes) => { if (changes.some((c) => !ours(c.target))) check(); });
+    watch.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
+    window.addEventListener('scroll', check, true);
+    window.addEventListener('resize', check);
+    return () => { watch.disconnect(); window.removeEventListener('scroll', check, true); window.removeEventListener('resize', check); };
+  }, [step, box, practiceId]);
+
+  // THE CARD, beside the glow, kept inside the window, placed before it is drawn so it never trails the glow.
+  useLayoutEffect(() => {
     const c = cardRef.current;
     if (!box || !step || !c) { if (cardNow.current) { cardNow.current = null; setCardAt(null); } return; }
     const w = c.offsetWidth, h = c.offsetHeight;
