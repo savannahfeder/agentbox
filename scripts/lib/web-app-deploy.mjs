@@ -7,6 +7,8 @@
 // that has the site's address and a Cloudflare sign-in. A ship whose deploy did
 // not work is still shipped; it says so, with the command that puts it up.
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { teamConfigFile } from '../phone-site-config.mjs';
 
@@ -47,8 +49,29 @@ export async function deployWebApp({ site, head, mainTip, fetchPage, changedSinc
 // `until`, the ship queue (main/ship-queue.mts, 20 minutes) would cut it off.
 export const DEPLOY_NEEDS_MS = 6 * 60_000;
 
+/**
+ * The shipped commit, checked out afresh, with the app folder's packages. The
+ * branch's tests ran in `root` and could write anything there, node_modules
+ * aside, and the deploy runs with the person's Cloudflare sign-in and outside
+ * any sandbox. Packages come from `trusted` when its lockfile is the same, and
+ * from a fresh install of the shipped lockfile when not.
+ */
+export function cleanCopy({ root, sha, trusted, into, env = process.env }) {
+  const copy = path.join(into, 'app');
+  execFileSync('git', ['clone', '--quiet', '--shared', '--no-checkout', root, copy], { stdio: 'ignore' });
+  execFileSync('git', ['-C', copy, 'checkout', '--quiet', '--detach', sha], { stdio: 'ignore' });
+  const lockOf = (dir) => { try { return fs.readFileSync(path.join(dir, 'package-lock.json'), 'utf8'); } catch { return null; } };
+  const packages = trusted && path.resolve(trusted) !== path.resolve(root) ? path.join(trusted, 'node_modules') : null;
+  if (packages && fs.existsSync(packages) && lockOf(trusted) === lockOf(copy)) {
+    execFileSync('cp', [process.platform === 'darwin' ? '-cR' : '-R', packages, path.join(copy, 'node_modules')]);
+  } else {
+    execFileSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: copy, env, stdio: 'inherit' });
+  }
+  return copy;
+}
+
 /** The same, with this checkout's git, the network and npm, done by `until`. */
-export function deployAfterShip({ root, say, until }) {
+export function deployAfterShip({ root, say, until, trusted }) {
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
   // npm and npx run the branch's own code. The push token and the git settings
   // that hand it over are for git alone.
@@ -64,12 +87,19 @@ export function deployAfterShip({ root, say, until }) {
     known: (sha) => spawnSync('git', ['cat-file', '-e', `${sha}^{commit}`], { cwd: root }).status === 0,
     deploy: () => {
       if (until - Date.now() < DEPLOY_NEEDS_MS) return { ok: false, why: 'the ship ran long, so there was no time left to build it' };
-      const signedIn = spawnSync('npx', ['--yes', 'wrangler@4', 'whoami'], { cwd: root, env: branchEnv, encoding: 'utf8', timeout: 120_000 });
-      if (signedIn.status !== 0 || /not authenticated|You are not logged in/i.test(`${signedIn.stdout}${signedIn.stderr}`)) {
-        return { ok: false, why: 'this computer is not signed in to Cloudflare (npx wrangler login)' };
+      const into = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-deploy-'));
+      try {
+        let copy;
+        try { copy = cleanCopy({ root, sha: git('rev-parse', 'HEAD'), trusted, into, env: branchEnv }); } catch (err) { return { ok: false, why: `a clean copy to build it from could not be made (${err?.message ?? err})` }; }
+        const signedIn = spawnSync('npx', ['--yes', 'wrangler@4', 'whoami'], { cwd: copy, env: branchEnv, encoding: 'utf8', timeout: 120_000 });
+        if (signedIn.status !== 0 || /not authenticated|You are not logged in/i.test(`${signedIn.stdout}${signedIn.stderr}`)) {
+          return { ok: false, why: 'this computer is not signed in to Cloudflare (npx wrangler login)' };
+        }
+        const r = spawnSync('npm', ['run', 'phone:deploy'], { cwd: copy, env: branchEnv, stdio: 'inherit', timeout: Math.max(60_000, until - Date.now()) });
+        return r.status === 0 ? { ok: true } : { ok: false, why: r.error?.message ?? `npm run phone:deploy ended with ${r.status}` };
+      } finally {
+        fs.rmSync(into, { recursive: true, force: true });
       }
-      const r = spawnSync('npm', ['run', 'phone:deploy'], { cwd: root, env: branchEnv, stdio: 'inherit', timeout: Math.max(60_000, until - Date.now()) });
-      return r.status === 0 ? { ok: true } : { ok: false, why: r.error?.message ?? `npm run phone:deploy ended with ${r.status}` };
     },
     log: say,
   });

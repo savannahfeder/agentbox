@@ -133,7 +133,8 @@ describe('staging a pasted or dropped file', () => {
   });
 
   // The real thing, on a Mac: GitHub's macOS runner and the push hook there.
-  it.runIf(process.platform === 'darwin')('turns a real TIFF into a real PNG with sips', async () => {
+  // sips needs Mac services the sandbox a ship runs tests in keeps from them.
+  it.runIf(process.platform === 'darwin' && process.env.AGENTBOX_BRANCH_SANDBOX !== '1')('turns a real TIFF into a real PNG with sips', async () => {
     const file = path.join(dir, HERS);
     fs.writeFileSync(file, tinyTiff(40, 30, (x) => (x < 20 ? [255, 0, 0] : [0, 0, 255])));
     const out = await turnIntoPicture(file);

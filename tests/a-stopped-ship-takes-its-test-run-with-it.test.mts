@@ -14,7 +14,7 @@
 // the hook starts vitest, then checking whether that program is still alive.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { execFileSync, spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import type { ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -33,8 +33,12 @@ afterEach(() => {
 });
 
 // A zombie is dead; it only waits for an init that reaps (a container's may not).
+// Inside the sandbox a ship runs tests in, ps cannot start, and asking the
+// process itself is all there is (scripts/lib/branch-sandbox.mjs).
 const alive = (pid: number) => {
-  try { return !execFileSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' }).trim().startsWith('Z'); } catch { return false; }
+  const ps = spawnSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' });
+  if (ps.error || ps.signal || /not permitted/i.test(ps.stderr ?? '')) { try { process.kill(pid, 0); return true; } catch { return false; } }
+  return ps.status === 0 && !ps.stdout.trim().startsWith('Z');
 };
 const pidFile = () => path.join(tmp, 'pids');
 const startedBy = () => fs.existsSync(pidFile()) ? fs.readFileSync(pidFile(), 'utf8').split('\n').filter(Boolean).map(Number) : [];
