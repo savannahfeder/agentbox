@@ -37,7 +37,8 @@ beforeAll(async () => {
   const bin = path.join(tmp, 'bin');
   fs.mkdirSync(bin);
   for (const name of ['npx', 'npm']) {
-    fs.writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${name} token=[$GIT_AGENTBOX_GITHUB_TOKEN] git=[$(env | grep -c '^GIT_')]" >> "${seen}"\necho "logged in"\n`);
+    // npm leaves what the build would, so the deploy goes on to the upload.
+    fs.writeFileSync(path.join(bin, name), `#!/bin/sh\necho "${name} token=[$GIT_AGENTBOX_GITHUB_TOKEN] git=[$(env | grep -c '^GIT_')]" >> "${seen}"\n${name === 'npm' ? "mkdir -p phone-site && echo '<html></html>' > phone-site/index.html\n" : ''}echo "logged in"\n`);
     fs.chmodSync(path.join(bin, name), 0o755);
   }
   process.env.PATH = `${bin}:${saved.PATH}`;

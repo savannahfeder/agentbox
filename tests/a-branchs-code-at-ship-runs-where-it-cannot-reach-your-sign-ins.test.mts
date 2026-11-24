@@ -209,8 +209,17 @@ describe('where the sandbox puts its walls', () => {
   it('refuses ports already listening with the same kind of rule that allows localhost', () => {
     const text = profile({ root: '/task', commonDir: '/app/.git', home: '/home', tmp: '/t', node: '/node', ports: [3000, 47263] });
     expect(text).toContain('(allow network-outbound (remote tcp "localhost:*") (remote udp "localhost:*"))');
-    expect(text).toContain('(deny network-outbound (remote tcp "localhost:3000") (remote tcp "localhost:47263"))');
+    expect(text).toContain('(deny network-outbound (remote tcp "localhost:9229") (remote tcp "localhost:3000") (remote tcp "localhost:47263"))');
     expect(text).not.toContain('remote ip');
+  });
+
+  it('refuses Node\'s debugger port even when nothing listened on it at the start', () => {
+    // A signal wakes the debugger of any plain Node program the person runs,
+    // on this port, and it answers with no key.
+    const text = profile({ root: '/task', commonDir: '/app/.git', home: '/home', tmp: '/t', node: '/node', ports: [] });
+    expect(text).toContain('(deny network-outbound (remote tcp "localhost:9229"))');
+    const listed = profile({ root: '/task', commonDir: '/app/.git', home: '/home', tmp: '/t', node: '/node', ports: [3000, 9229] });
+    expect(listed.match(/localhost:9229/g)).toHaveLength(1);
   });
 });
 

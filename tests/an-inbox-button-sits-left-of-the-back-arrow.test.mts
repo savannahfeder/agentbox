@@ -26,7 +26,9 @@ describe('the Inbox button', () => {
     expect(inbox).toBeGreaterThan(-1);
     expect(inbox).toBeLessThan(backArrow);
     expect(bf).toContain('M5 7h14M5 12h14M5 17h9');
-    expect(read('renderer/src/components/WorkspaceNavigation.tsx')).toContain('M5 7h14M5 12h14M5 17h9');
+    // The sidebar's is the same three lines, redrawn for its own size.
+    expect(read('renderer/src/components/WorkspaceNavigation.tsx')).toContain("<SidebarGlyph name={onHome ? 'inbox' : 'tray'} />");
+    expect(read('renderer/src/components/SidebarGlyph.tsx')).toContain('inbox: <path d="M2.5 4.5h11M2.5 8.5h11M2.5 12.5h7" />');
   });
 
   it('names esc on its plate, since it is only drawn where esc goes to the inbox', () => {
