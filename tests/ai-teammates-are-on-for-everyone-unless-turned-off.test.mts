@@ -30,9 +30,9 @@ describe('the switch', () => {
     const settings = read('renderer/src/components/Settings.tsx');
     const general = settings.slice(settings.indexOf("pane === 'general' && ("), settings.indexOf("pane === 'claude' && enginePage"));
     const alpha = settings.slice(settings.indexOf("pane === 'alpha' && ("), settings.indexOf("pane === 'general' && ("));
-    expect(general).toMatch(/<Switch label="AI teammates" on=\{!!w\.alpha\?\.teammates\} onChange=\{\(v\) => setWorkspace\('alphaTeammates', v\)\} \/>/);
+    expect(general).toMatch(/<Switch label="Use AI teammates" on=\{!!w\.alpha\?\.teammates\} onChange=\{\(v\) => setWorkspace\('alphaTeammates', v\)\} \/>/);
     expect(alpha).not.toMatch(/alphaTeammates/);
-    expect(read('renderer/src/settings-search.ts')).toMatch(/page: 'general', label: 'AI teammates'/);
+    expect(read('renderer/src/settings-search.ts')).toMatch(/page: 'general', label: 'Use AI teammates'/);
     expect(read('main/settings.mts')).toMatch(/case 'alphaTeammates':\n\s+saveConfig\(config, \{ alphaTeammates: !!value \}\);/);
     expect(read('shared/phone-settings.mts')).toMatch(/alphaTeammates: bool,/);
   });
