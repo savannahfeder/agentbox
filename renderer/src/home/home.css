@@ -143,12 +143,11 @@ html:root[data-skin="ember-grid"][data-sky-dark] {
 .hm-mate-wrap { position: relative; }
 .hm-mate-act { position: absolute; right: 12px; top: 50%; width: 28px; height: 28px; margin-top: -14px; padding: 0; display: grid; place-items: center;
   appearance: none; border: 0; border-radius: 50%; background: transparent; color: var(--text-dim); cursor: pointer;
-  opacity: 0; pointer-events: none; transition: opacity .14s ease, background-color .14s ease, color .14s ease; }
+  opacity: 0; pointer-events: none; }
 .hm-mate-act:hover, .hm-mate-wrap.menu .hm-mate-act { background: rgba(255, 255, 255, .09); color: var(--text); }
 :root[data-theme="light"] :is(.hm-mate-act:hover, .hm-mate-wrap.menu .hm-mate-act) { background: rgba(30, 22, 36, .07); }
 .hm-mate-act:focus-visible { outline: 1px solid var(--text-faint); outline-offset: 0; }
 .hm-mate-wrap:hover .hm-mate-act, .hm-mate-wrap.menu .hm-mate-act, .hm-mate-act:focus-visible { opacity: 1; pointer-events: auto; }
-.hm-week { transition: opacity .14s ease; }
 .hm-mate-wrap:hover .hm-week, .hm-mate-wrap.menu .hm-week, .hm-mate-wrap:focus-within .hm-week { opacity: 0; }
 .hm-mate-wrap:is(:hover, .menu) > .hm-row { background: rgba(255, 255, 255, .045); }
 :root[data-theme="light"] .hm-mate-wrap:is(:hover, .menu) > .hm-row { background: rgba(30, 22, 36, .04); }
@@ -179,7 +178,7 @@ html:root[data-skin="ember-grid"][data-sky-dark] {
 /* The hidden ones, listed, arrive softly. */
 @keyframes hm-arrive { from { opacity: 0; transform: translateY(-3px); } }
 .hm-mate-wrap.gone { animation: hm-arrive .2s ease-out both; }
-@media (prefers-reduced-motion: reduce) { .hm-mate-wrap.gone { animation: none; } .hm-mate-act, .hm-week, .hm-chev { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .hm-mate-wrap.gone { animation: none; } .hm-chev { transition: none; } }
 
 .hm-face { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 500; color: var(--text); background: rgba(255, 255, 255, .12); position: relative; box-sizing: border-box; }
 .hm-face > .hm-photo { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
