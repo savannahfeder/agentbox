@@ -42,10 +42,12 @@ export const dashGoesBack = (steps: readonly SetupStep[], i: number, at: number,
 /** Only the steps that can apply on this build: most people are not on a team,
  *  and an AI teammate needs a project to work in. Tools are not asked for: the
  *  person's Claude Code and Codex already carry their connections. */
-export function setupSteps({ chats, team, teammates, project, signedIn = true, plan = 'free', onTeam = false, agents = 1, invited = false }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean; plan?: SetupPlan; onTeam?: boolean; agents?: number; invited?: boolean }): SetupStep[] {
-  const out: SetupStep[] = [chats > 0 ? 'chats' : 'folder'];
+export function setupSteps({ chats, team, teammates, project, signedIn = true, plan = 'free', onTeam = false, agents = 1, unready = 0, invited = false }: { chats: number; team: boolean; teammates: boolean; project: boolean; signedIn?: boolean; plan?: SetupPlan; onTeam?: boolean; agents?: number; unready?: number; invited?: boolean }): SetupStep[] {
+  // An agent that is not ready gets its card first, so nobody is put on the other one without a word.
+  const out: SetupStep[] = unready > 0 ? ['agent'] : [];
+  out.push(chats > 0 ? 'chats' : 'folder');
   // With Claude Code and Codex both ready, which one starts your threads is yours to say.
-  if (agents > 1) out.push('agent');
+  if (agents > 1 && !unready) out.push('agent');
   // Signing in is required, so it is a step, and what needs it comes after.
   if (team && !signedIn) out.push('account');
   // One page offers Pro and takes its payment. The team is a paid thing, so inviting comes only once Pro is started.
@@ -147,6 +149,26 @@ export function chatOpened(t: { firstSaid?: string; lastSaid?: string; endUnknow
 
 /** Enter held down repeats, and a repeat is not a press: one press moves one step. Arrows may repeat. */
 export const heldPress =(e: { key: string; repeat?: boolean }): boolean => e.key === 'Enter' && !!e.repeat;
+
+/** What the ready check said about one agent. */
+export interface AgentReading { engine: string; found?: boolean; signedIn?: boolean; certain?: boolean; tooOld?: boolean; version?: string }
+/** What a press on its card is doing: setup's own phases, plus `updating`. */
+export interface AgentPress { phase: string; error?: string | null }
+
+/** One agent's card on the agents step: whether it is ready, the line under its name, and its one button. */
+export function agentCard(r: AgentReading, press: AgentPress | null = null): { ready: boolean; sub: string | null; act: string | null } {
+  const not = (sub: string, act: string | null) => ({ ready: false, sub, act });
+  if (press?.phase === 'ready') return { ready: true, sub: null, act: null };
+  if (press?.phase === 'checking') return not('Checking…', null);
+  if (press?.phase === 'installing') return not('Installing…', null);
+  if (press?.phase === 'updating') return not('Updating…', null);
+  if (press?.phase === 'signing-in') return not('Finish in your browser', 'Open again');
+  if (press?.phase === 'failed') return not(press.error || 'It did not finish', 'Try again');
+  if (r.tooOld) return not(r.version ? `Version ${r.version} is too old` : 'Too old to run threads', 'Update');
+  if (!r.found) return not('Not on this computer', 'Install');
+  if (r.signedIn) return { ready: true, sub: null, act: null };
+  return not(r.certain === false ? 'Could not check sign-in' : 'Not signed in', 'Sign in');
+}
 
 export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
 

@@ -15,7 +15,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky, releaseCanvas } from '../home/sky';
-import { PRO_PITCH, bringInBehind, chatFrom, chatOpened, chatReplyLabel, proFreeDays, proOffer, cloudShowcase, heldPress, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, agentCard, bringInBehind, chatFrom, chatOpened, chatReplyLabel, proFreeDays, proOffer, cloudShowcase, heldPress, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type AgentPress, type AgentReading, type SetupPlan, type SetupStep } from '../setup-split';
 import { ENGINE_CHOSEN, writeLastEngine } from '../engines';
 import { startProTrial } from '../pro-trial';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
@@ -95,6 +95,8 @@ export interface SetupSplitProps {
   chats: SessionThread[];
   /** The agents ready on this computer; with both, the setup asks which one starts your threads. */
   engines?: readonly ('claude' | 'codex')[];
+  /** What the ready check said about each agent, for the card of one that is not ready. */
+  readings?: readonly AgentReading[];
   ticks: Set<string>;
   onToggle: (id: string) => void;
   /** Brings the ticked chats in, making their projects; resolves to how many came in. */
@@ -128,10 +130,12 @@ export function SetupSplit(p: SetupSplitProps) {
   const [plan, setPlan] = useState<SetupPlan>('free');
   const [engine, setEngine] = useState<'claude' | 'codex'>('claude');
   const agents = p.engines?.length ?? 1;
+  // Read once: an agent signed in on its card must not take the step out from under it.
+  const unready = useRef((['claude', 'codex'] as const).filter((e) => !agentCard(p.readings?.find((r) => r.engine === e) ?? { engine: e, found: false }).ready).length).current;
   // Found once the account is signed in. Joining takes it off the list, so the page remembers it.
   const invite = p.snap?.team?.invites?.[0] ?? null;
   const [joined, setJoined] = useState<string | null>(null);
-  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart, plan, onTeam, agents, invited: !!invite || !!joined }), [p.chats.length, team, teammatesOn, project, signedInAtStart, plan, onTeam, agents, invite, joined]);
+  const steps = useMemo(() => setupSteps({ chats: p.chats.length, team, teammates: teammatesOn, project, signedIn: signedInAtStart, plan, onTeam, agents, unready: p.readings?.length ? unready : 0, invited: !!invite || !!joined }), [p.chats.length, team, teammatesOn, project, signedInAtStart, plan, onTeam, agents, unready, p.readings, invite, joined]);
   // Read when the look step first shows, so picking does not reorder the list under the pointer.
   const looksAt = useRef<string[] | null>(null);
   const finished = at >= steps.length;
@@ -206,6 +210,54 @@ export function SetupSplit(p: SetupSplitProps) {
     const t = setInterval(() => void look(), 3000);
     return () => { live = false; clearInterval(t); };
   }, [payState, next]);
+
+  // ---- The agents' cards. Nothing runs until a card's button is pressed.
+  const [cards, setCards] = useState<readonly AgentReading[]>(p.readings ?? []);
+  const [presses, setPresses] = useState<Partial<Record<'claude' | 'codex', AgentPress & { via: 'setup' | 'update' }>>>({});
+  const pressing = (['claude', 'codex'] as const).filter((e) => ['checking', 'installing', 'signing-in', 'updating'].includes(presses[e]?.phase ?? ''));
+  const pressOn = (engine: 'claude' | 'codex', press: (AgentPress & { via: 'setup' | 'update' }) | null) =>
+    setPresses((had) => { const n = { ...had }; if (press) n[engine] = press; else delete n[engine]; return n; });
+  const readAgain = useCallback(async (engine: 'claude' | 'codex') => {
+    const r = await api.engineSetup('ready', engine).catch(() => null);
+    if (r) setCards((had) => [...had.filter((x) => x.engine !== engine), r]);
+    return r;
+  }, []);
+  const pressCard = useCallback(async (engine: 'claude' | 'codex', act: string) => {
+    if (act === 'Open again') { void api.engineSetup('again', engine).catch(() => null); return; }
+    const update = act === 'Update' || (act === 'Try again' && presses[engine]?.via === 'update');
+    if (update) {
+      pressOn(engine, { phase: 'updating', via: 'update' });
+      try {
+        const u = await api.agentUpdate(engine, 'start');
+        if (u.state === 'current') { await readAgain(engine); pressOn(engine, null); }
+        else if (u.state !== 'running') pressOn(engine, { phase: 'failed', error: u.message ?? null, via: 'update' });
+      } catch (e) { pressOn(engine, { phase: 'failed', error: (e as Error)?.message ?? null, via: 'update' }); }
+      return;
+    }
+    pressOn(engine, { phase: 'checking', via: 'setup' });
+    const s = await api.engineSetup('start', engine).catch(() => null);
+    pressOn(engine, { phase: s?.phase ?? 'failed', error: s?.error ?? null, via: 'setup' });
+  }, [presses, readAgain]);
+  // A press is watched until it settles.
+  useEffect(() => {
+    if (!pressing.length) return undefined;
+    const tick = setInterval(async () => {
+      for (const engine of pressing) {
+        const via = presses[engine]?.via;
+        if (via === 'update') {
+          const u = await api.agentUpdate(engine, 'status').catch(() => null);
+          if (u?.state === 'current') { await readAgain(engine); pressOn(engine, null); }
+          else if (u?.state === 'failed') pressOn(engine, { phase: 'failed', error: u.message ?? null, via });
+        } else {
+          const s = await api.engineSetup('status', engine).catch(() => null);
+          if (!s) continue;
+          if (s.phase === 'ready') { await readAgain(engine); pressOn(engine, { phase: 'ready', via: 'setup' }); }
+          else pressOn(engine, { phase: s.phase, error: s.error ?? null, via: 'setup' });
+        }
+      }
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [pressing.join(), presses, readAgain]);
 
   // ---- AI teammates
   const left = useMemo(() => starterChoices(starterAsks(p.snap?.teammates?.list ?? [])), [p.snap?.teammates?.list]);
@@ -374,6 +426,22 @@ export function SetupSplit(p: SetupSplitProps) {
         <div className="ss-row"><span className="ss-face ss-ai ss-dash"><Plus /></span><input className="ss-input" placeholder="Describe another job…" value={own} onChange={(e) => setOwn(e.target.value)} /></div>
       </div>
       <div className="ss-acts">{go(count ? `Make ${count === 1 ? '1 teammate' : `${count} teammates`}` : 'Continue', () => void makeTeammates(), true, 'Making…')}{quiet('Skip for now', next)}</div>
+    </>;
+  } else if (step === 'agent' && unready && p.readings?.length) {
+    head = ['Your agents.', ''];
+    body = <>
+      <div className="ss-tiles">
+        {(['claude', 'codex'] as const).map((id) => {
+          const card = agentCard(cards.find((r) => r.engine === id) ?? { engine: id, found: false }, presses[id] ?? null);
+          return <div key={id} className="ss-tile">
+            <span className="ss-tile-logo"><EngineLogo engine={id} size={22} /></span>
+            <span className="ss-tile-name">{id === 'claude' ? 'Claude Code' : 'Codex'}</span>
+            {card.sub && <span className="ss-tile-sub" title={card.sub}>{card.sub}</span>}
+            <span className="ss-tile-end">{card.ready ? <><Tick />Ready</> : card.act && <button type="button" className="ss-tile-btn" onClick={() => void pressCard(id, card.act!)}>{card.act}</button>}</span>
+          </div>;
+        })}
+      </div>
+      <div className="ss-acts">{go('Continue', next)}</div>
     </>;
   } else if (step === 'agent') {
     head = ['Pick your agent.', ''];
