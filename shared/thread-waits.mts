@@ -155,7 +155,9 @@ export function waitChoices({ item, me, people, items, cards, nameOf }: {
   nameOf: NameOf;
 }): { id: string; label: string }[] {
   const humans = people.filter((p) => p.id !== me).map((p) => ({ id: personWait(p.id), label: FIRST(p.name) }));
-  const mine = items.filter((i) => i.product === item.product && i.id !== item.id && i.status !== 'done' && !i.agent)
+  // A teammate's row synced into a shared project is named, and ended, by their card.
+  const theirRow = (i: WaitingItem) => { const runs = i.runner || i.createdBy; return !!me && !!runs && runs !== me; };
+  const mine = items.filter((i) => i.product === item.product && i.id !== item.id && i.status !== 'done' && !i.agent && !theirRow(i))
     .map((i) => ({ id: i.id, label: named(i), at: i.updatedAt ?? 0 }));
   const theirs = cards.filter((c) => c.personId !== me && c.visible && c.state !== 'done' && c.title)
     .map((c) => ({ id: cardWait(c.personId, c.threadId), label: `${FIRST(nameOf(c.personId))}: ${c.title}`, at: c.updatedAt ?? 0 }));

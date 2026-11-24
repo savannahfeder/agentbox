@@ -28,7 +28,9 @@ function sources(): string[] {
   return out.split('\n').filter((f) => /\.(mts|ts|tsx)$/.test(f) && !f.endsWith('.d.mts') && fs.existsSync(path.join(root, f)));
 }
 
-const codeOnly = (line: string) => (/^\s*(?:\/?\*)/.test(line) ? '' : line).replace(/\/\/.*$/, '').replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, "''");
+// A regex literal starts where a value can, never after a name or a bracket, so `a / 2` stays code.
+const REGEX = /(^|[=(,:!&|?;{}[]\s*|\breturn\s+)\/(?![/*])(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\\[\n])+\/[a-z]*/g;
+const codeOnly = (line: string) => (/^\s*(?:\/?\*)/.test(line) ? '' : line).replace(REGEX, '$1/re/').replace(/\/\/.*$/, '').replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, "''");
 
 export function anysIn(text: string): number {
   return text.split('\n').reduce((n, line) => n + (codeOnly(line).match(ANY)?.length ?? 0), 0);
@@ -63,5 +65,12 @@ describe('no type check is switched off, and any only goes down', () => {
     expect(anysIn("const s = 'any: thing';")).toBe(0);
     expect(anysIn('const company = anyone;')).toBe(0);
     expect(anysIn("window.addEventListener('keydown', any, true);")).toBe(0);
+  });
+
+  it('reads a regular expression as text, not as types', () => {
+    expect(anysIn("const ASKING = /^(?:what(?:'s| is)|any (?:preference|thoughts)|where)\\b/i;")).toBe(0);
+    expect(anysIn('if (/a|any/.test(s)) return;')).toBe(0);
+    expect(anysIn('const r = /x/g; let v: any;')).toBe(1);
+    expect(anysIn('const half = a / 2 | any;')).toBe(1);
   });
 });

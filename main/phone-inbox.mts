@@ -239,6 +239,21 @@ type Manifest = ReturnType<ReturnType<typeof createPhoneUploads>['manifest']>;
 type LiveCopy = { since: number; where: 'cloud' | 'mac'; doing: { label: string; startedAt: number }[]; at: number; movable?: boolean; runId?: string };
 type BuiltCopy = { inputs: string; key: string; live: LiveCopy | null; files: Manifest | null; askKey: string; waitKey: string; changeKey: string; base: Snapshot | null };
 
+// A frozen row is the same object until its thread changes, and a thread's
+// lines are only added to: the same row with as many lines and the same first
+// and last is the same thread, with no need to write it all out again.
+const inputsKept = new WeakMap<object, { lines: number; first: unknown; last: unknown; inputs: string }>();
+/** What a thread's copy is built from, as one short text: the same row and lines give the same one. */
+export function inputsOf(item: unknown, history: unknown): string {
+  const row = typeof item === 'object' && item !== null && Object.isFrozen(item) ? item : null;
+  const lines = Array.isArray(history) ? history : null;
+  const was = row && lines ? inputsKept.get(row) : undefined;
+  if (was && was.lines === lines!.length && was.first === lines![0] && was.last === lines![lines!.length - 1]) return was.inputs;
+  const inputs = crypto.createHash('sha1').update(JSON.stringify(item)).update('\0').update(JSON.stringify(history)).digest('base64');
+  if (row && lines) inputsKept.set(row, { lines: lines.length, first: lines[0], last: lines[lines.length - 1], inputs });
+  return inputs;
+}
+
 export function createPhoneInbox({
   backend,
   // Who this inbox sends as, and whether they still are.
@@ -349,7 +364,6 @@ export function createPhoneInbox({
   // seconds. A copy is made of the row and its lines and nothing else, so the
   // same row and lines make the same copy.
   const built = new Map<string, BuiltCopy>();
-  const inputsOf = (item: unknown, history: unknown) => crypto.createHash('sha1').update(JSON.stringify(item)).update('\0').update(JSON.stringify(history)).digest('base64');
   // What each running thread's copy last said about the run, by thread.
   const lives = new Map<string, LiveCopy>();
   const liveNow = (sk: string, slug: string, id: string): LiveCopy | null => {

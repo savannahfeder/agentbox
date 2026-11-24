@@ -34,7 +34,7 @@ describe('one heading and one set of sections', () => {
 
 describe('Unsent with Send, then Sent', () => {
   // A document's Send all sits beside Approve instead (send-all-sits-beside-approve-on-a-document).
-  it('puts this file\'s notes Send would tell the agent under Unsent, with Send on that line on a film or a picture', () => {
+  it('puts this file\'s notes Send would tell the agent under Unsent, with Send on that line on a film', () => {
     expect(side).toMatch(/<NotesSection word="Unsent" send=\{sendBeside \? undefined : \{ count: sendNotes\.length, onSend: \(\) => void pressSend\(\) \}\} \/>/);
     expect(view).toContain('const waitingHere = offers.comment ? openNotes.filter((n) => sendNotes.includes(n.id)) : [];');
   });

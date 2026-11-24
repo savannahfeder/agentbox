@@ -129,7 +129,8 @@ export interface ThreadShareOptions {
 }
 
 export interface ThreadShare {
-  pass(teamId: string | null | undefined): Promise<void>;
+  /** `cards`: the list the caller has just read, so this reads none of its own. */
+  pass(teamId: string | null | undefined, cards?: readonly SyncCard[]): Promise<void>;
   read(owner: string, threadId: string): SharedThreadView;
   folders(): { ownerId: string; threadId: string; version: string }[];
   products(): { slug: string; name: string; dir: string }[];
@@ -205,6 +206,16 @@ function withLinks(text: string, found: Map<string, FoundCopy>, { typed = false 
   };
   const out = text.split(FENCE).map((part, i) => (i % 2 ? part : part.replace(MENTION, swap))).join('');
   return under.length ? `${out.replace(/\s+$/, '')}\n\n${under.join('\n')}` : out;
+}
+
+const LINKED_UNDER = /^!?\[[^\]\n]*\]\(attachments\/[^)\s]+\)$/;
+
+/** A person's words as typed, without the lines withLinks put under them. */
+function typedPart(text: string): string {
+  const at = text.lastIndexOf('\n\n');
+  if (at < 0) return text.trim();
+  const under = text.slice(at + 2).split('\n');
+  return under.every((l) => LINKED_UNDER.test(l) || l.endsWith(` ${TOO_BIG}`)) ? text.slice(0, at).trim() : text.trim();
 }
 
 const clip = (text: string, home: string) => {
@@ -403,9 +414,9 @@ export function createThreadShare({
     goingUp.set(key, run);
   }
 
-  async function publish(teamId: string, heads: ThreadHead[]) {
+  async function publish(teamId: string, heads: ThreadHead[], known?: readonly SyncCard[]) {
     const mine = new Map(heads.filter((h) => h.personId === me).map((h) => [h.threadId, h.hash]));
-    const cards = listCards() ?? [];
+    const cards = known ?? listCards() ?? [];
     readers = new Map(cards.map((c) => [c.threadId, Array.isArray(c.people) ? c.people.filter((p): p is string => typeof p === 'string') : null]));
     if (!cards.length) { built.clear(); return; }
     const threads = listThreads();
@@ -686,11 +697,11 @@ export function createThreadShare({
 
   return {
     /** One pass. Nothing here may stop a sync. */
-    async pass(teamId) {
+    async pass(teamId, cards) {
       if (!backend.threadWorkHeads || !teamId) return;
       const heads = await quietly('reading what is shared', () => backend.threadWorkHeads!());
       if (!heads) return;
-      await publish(teamId, heads);
+      await publish(teamId, heads, cards);
       await take(heads);
       if (backend.fileMarks) await sendWaiting(heads);
       comments = await quietly('reading comments', () => backend.threadComments(), comments);
@@ -706,9 +717,9 @@ export function createThreadShare({
       // A helper's words the owner's copy passed to its agent come back as that agent's reply line.
       const passedOn = new Set((local?.lines ?? []).flatMap((l) => {
         const from = l.patch?.from as { teammate?: unknown } | undefined;
-        return typeof from?.teammate === 'string' && l.patch?.answer ? [`${from.teammate}\n${l.patch.answer}`] : [];
+        return typeof from?.teammate === 'string' && l.patch?.answer ? [`${from.teammate}\n${typedPart(l.patch.answer)}`] : [];
       }));
-      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId && !carried.has(`comment-${c.id}`) && !passedOn.has(`${c.by}\n${c.text}`)).map((c): SharedLine => ({
+      const theirs = comments.filter((c) => c.owner === owner && c.threadId === threadId && !carried.has(`comment-${c.id}`) && !passedOn.has(`${c.by}\n${c.text.trim()}`)).map((c): SharedLine => ({
         id: threadId, ts: c.at, source: 'system', by: c.by, uid: `comment-${c.id}`, patch: { comment: { text: c.text } },
       }));
       return {

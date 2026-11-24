@@ -2,7 +2,7 @@
 // While the pointer is working on the list, rows keep the places they had when
 // it arrived. Nothing is hidden: a new row is drawn at the foot, and the order
 // catches up when the pointer leaves.
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 // A pointer left parked on the list must not hold it for ever.
 export const HOLD_IDLE_MS = 60_000;
@@ -37,6 +37,11 @@ export function usePointerHold() {
   const hold = useRef(pointerHold(setHolding)).current;
   const pointer = useRef({ onPointerMove: hold.move, onPointerLeave: hold.leave }).current;
   return { holding, pointer, letRowsMove: hold.leave };
+}
+
+/** Lets go as the list goes away: opening a thread takes it off the screen with no pointerleave. */
+export function useLetGoWhenGone(pointer: { onPointerLeave: () => void } | undefined) {
+  useEffect(() => () => pointer?.onPointerLeave(), [pointer]);
 }
 
 /** `late` counts the rows that arrived since the hold began, which are the last of `rows`. */

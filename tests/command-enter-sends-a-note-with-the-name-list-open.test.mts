@@ -9,6 +9,10 @@
 //
 // Must still hold: Enter and Tab pick from the list, and ⌘↵ with no list
 // open keeps the note and sends it.
+//
+// A review of ce9fb08f5: ⌘↵ then sent "check the header @Pri" without
+// finishing the name, so no whole @Priya named her and the note went to the
+// agent. ⌘↵ now finishes the highlighted name and sends, in one press.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
@@ -22,8 +26,10 @@ const browserAvailable = chromium && fs.existsSync(chromium.executablePath());
 const D = '/Users/someone/store/designs/w-1';
 const ledger = [{ id: 'l1', ts: Date.UTC(2026, 10, 21, 19, 0, 0), source: 'agent', patch: { result: `The plan:\n\n${D}/plan.md` } }];
 
+const PRIYA = { id: 'u-priya', email: 'priya@example.test', name: 'Priya Shah', avatarUrl: null };
+
 let browser;
-const page = async () => {
+const page = async (people = []) => {
   const bundle = (await build({
     stdin: { contents: `
       import React from 'react';
@@ -32,10 +38,11 @@ const page = async () => {
       const call = () => Promise.resolve(Object.assign([], { ok: true }));
       window.zero = new Proxy({}, { get: (_, k) => (k === 'liveRoom' ? () => Promise.resolve(null) : typeof k === 'string' && k.startsWith('on') ? () => () => {} : call) });
       window.writes = [];
+      window.marks = [];
       createRoot(document.getElementById('root')).render(
-        <ArtifactView product="p" thread="t" lines={${JSON.stringify(ledger)}} numbers={{}} marks={{ notes: [], approvals: [], seen: {} }} me="u-me" people={[]}
+        <ArtifactView product="p" thread="t" lines={${JSON.stringify(ledger)}} numbers={{}} marks={{ notes: [], approvals: [], seen: {} }} me="u-me" people={${JSON.stringify(people)}}
           open={{ path: ${JSON.stringify(`${D}/plan.md`)} }} ownerOfRow="u-me" withAgent onClose={() => {}}
-          write={async (m) => { window.writes.push(m.do); return { ok: true }; }}
+          write={async (m) => { window.writes.push(m.do); window.marks.push(m); return { ok: true }; }}
           files={{ find: async (f) => f, readText: async () => 'Ship the hero.' }} />);`,
     resolveDir: process.cwd(), loader: 'tsx' },
     bundle: true, write: false, format: 'iife', jsx: 'automatic', logLevel: 'error',
@@ -63,6 +70,20 @@ describe.skipIf(!browserAvailable)('the notes box on a file your agent made', ()
     await p.locator('.av-ask-list, [role="listbox"]').first().waitFor();
     await p.keyboard.press('ControlOrMeta+Enter');
     await expect.poll(() => writes(p)).toEqual(['note', 'toagent']);
+    expect(await box(p).inputValue()).toBe('');
+    await p.close();
+  }, 30_000);
+
+  it("⌘↵ with the list open on a teammate's name finishes it and sends the note to them", async () => {
+    const p = await page([PRIYA]);
+    await box(p).click();
+    await p.keyboard.type('check the header @Pri');
+    await p.locator('.av-ask-list, [role="listbox"]').first().waitFor();
+    await p.keyboard.press('ControlOrMeta+Enter');
+    await expect.poll(() => writes(p)).toEqual(['note']);
+    const [note] = await p.evaluate(() => window.marks);
+    expect(note.text).toBe('check the header @Priya');
+    expect(note.mentions).toEqual(['u-priya']);
     expect(await box(p).inputValue()).toBe('');
     await p.close();
   }, 30_000);

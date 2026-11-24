@@ -578,7 +578,9 @@ export function createTeamService({
     });
     const lines = store.readHistory(product.slug, row.id, { max: Number.MAX_SAFE_INTEGER }).filter(Boolean);
     // The newest review or help a teammate handed back, which the giver's note often points at, though they wrote since.
-    const back = [...lines].reverse().find((l) => typeof l.patch?.answer === 'string' && (l.patch.from as { teammate?: unknown } | undefined)?.teammate);
+    // `app` is the app's own notice on the thread (main/teammate-reach.mts), nobody's review.
+    const fromWho = (l: TeamHistoryLine) => (l.patch?.from as { teammate?: unknown } | undefined)?.teammate;
+    const back = [...lines].reverse().find((l) => typeof l.patch?.answer === 'string' && fromWho(l) && fromWho(l) !== 'app');
     const backWho = (back?.patch?.from as { teammate?: string; name?: string } | undefined);
     const backName = backWho ? state.people.find((p) => p.id === backWho.teammate)?.name?.split(/\s+/)[0] || backWho.name?.split(/\s+/)[0] || 'A teammate' : '';
     const words = titled([
@@ -871,7 +873,7 @@ export function createTeamService({
         const on = new Set(phoneProjectsOf(phone.projects(), owner, phoneEligible(products())));
         return products().filter((p) => on.has(p.slug)).map((p) => ({ slug: p.slug, name: p.name || p.slug, dir: p.dir || null, repoPath: p.repoPath || null }));
       },
-      listItems: (slug) => { const p = productOf(slug); try { return p ? disk.readWorkItems(p.dir) : []; } catch { return []; } },
+      listItems: (slug) => { const p = productOf(slug); try { return p ? rowsOf(p.dir) : []; } catch { return []; } },
       historyOf: (slug, id, { all = false }: { all?: boolean } = {}) => { try { return store.readHistory(slug, id, { max: all ? Number.MAX_SAFE_INTEGER : SNAPSHOT_LIMITS.lines * 4 }); } catch { return []; } },
       runsOf: (slug, id) => {
         const p = productOf(slug);
@@ -1415,8 +1417,9 @@ export function createTeamService({
       // A path of the sender's ending in the file is the file: the whole of it becomes the link, or a cut-down path is left to send.
       const quoted = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       for (const [rel, copy] of moved) text = text.replace(new RegExp(`(?<![\\w(\\]])(?:~|/)[^\\s()\\[\\]\`]*/${quoted(rel)}(?![\\w/])`, 'g'), `[${copy.name}](${copy.rel})`);
-      // The file's own path written out is the file too: a bare name in its place opens nothing for the receiver.
-      for (const [rel, copy] of moved) if (rel.includes('/')) text = text.replace(new RegExp(`(?<![\\w/(\\[\\]])${quoted(rel)}(?![\\w/\\]])`, 'g'), `${/\.(?:png|jpe?g|gif|webp|svg)$/i.test(copy.name) ? '!' : ''}[${copy.name}](${copy.rel})`);
+      // The file's own path alone on its line is the file too: a bare name in its place opens nothing for the receiver.
+      // Inside a sentence it stays a name, with the link at the foot: the receiver's view opens a file link only on a line of its own.
+      for (const [rel, copy] of moved) if (rel.includes('/')) text = text.replace(new RegExp(`^(\\s*(?:>\\s?)*)${quoted(rel)}[ \\t]*$`, 'gm'), (_m, lead: string) => `${lead}${/\.(?:png|jpe?g|gif|webp|svg)$/i.test(copy.name) ? '!' : ''}[${copy.name}](${copy.rel})`);
       for (const [rel, copy] of moved) text = text.split(rel).join(copy.name);
       const unlinked = saved.filter((s) => !text.includes(`](${s.rel})`));
       const full = [text, attachmentMarkdown(unlinked)].filter(Boolean).join('\n\n') || named;

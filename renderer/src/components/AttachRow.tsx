@@ -3,13 +3,14 @@
 // chips. The × removes. In a chat's box every one is a tile of one height, with
 // its own × (`look="tiles"`).
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { attachProblem, type Attaching, type PendingAttachment } from '../attachments';
 import { PictureView, type Picture } from './PictureView';
 import { pictureUrl } from '../picture';
 import { overTheLimit, sizeWords, tooBigToSend } from '../../../shared/carried-files.mts';
 import { VoiceNote } from '../team/VoiceNote';
 import { voiceNoteOf } from '../team/voice-note';
+import { focusAtEnd } from '../focus-at-end';
 
 // A staged paste is a path on disk, and a path is asked for on the app's own
 // scheme rather than as file://, which a dev-served window may not load.
@@ -74,6 +75,15 @@ export function AttachRow({ attachments, attaching = [], onRemove, look }: {
   look?: 'tiles';
 }) {
   const [open, setOpen] = useState<{ pictures: Picture[]; start: number } | null>(null);
+  const row = useRef<HTMLDivElement | null>(null);
+  // The caret goes back to the words of the box these files wait in.
+  const backToTheBox = () => {
+    for (let at = row.current?.parentElement; at; at = at.parentElement) {
+      const words = at.querySelector<HTMLTextAreaElement | HTMLElement>('textarea, [contenteditable="true"]');
+      if (words instanceof HTMLTextAreaElement) { focusAtEnd(words); return; }
+      if (words) { words.focus(); return; }
+    }
+  };
   if (!attachments.length && !attaching.length) return null;
   const problem = attachProblem(attachments);
   const viewer = open && (
@@ -81,7 +91,8 @@ export function AttachRow({ attachments, attaching = [], onRemove, look }: {
       pictures={open.pictures}
       start={open.start}
       resolve={() => Promise.resolve(null)}
-      onClose={() => setOpen(null)}
+      onClose={() => { setOpen(null); requestAnimationFrame(backToTheBox); }}
+      overItsBox
     />
   );
   if (look === 'tiles') {
@@ -90,7 +101,7 @@ export function AttachRow({ attachments, attaching = [], onRemove, look }: {
     );
     return (
       <>
-      <div className="attach-row attach-tiles">
+      <div ref={row} className="attach-row attach-tiles">
         {attachments.map((a, i) => {
           const note = voiceNoteOf(a.name);
           if (note) {
@@ -136,7 +147,7 @@ export function AttachRow({ attachments, attaching = [], onRemove, look }: {
   }
   return (
     <>
-    <div className="attach-row">
+    <div ref={row} className="attach-row">
       {attachments.map((a, i) => {
         const note = voiceNoteOf(a.name);
         if (note) {

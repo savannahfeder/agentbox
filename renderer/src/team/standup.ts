@@ -1,6 +1,7 @@
 // The Standup: one post per teammate for each standup day, written from what
 // moved since the standup before it. When it happens is the person's to set.
 import { shownTitle } from '../../../shared/thread-title.mts';
+import { handedFrom } from '../../../shared/thread-link.mts';
 import { groupsOf, type TodayLine, type TodayPerson } from './today';
 
 export interface StandupSettings {
@@ -104,7 +105,8 @@ function postOf(p: TodayPerson, live: boolean): StandupPost {
     helped: [...(p.helped ?? [])].sort(byNewest).map(titled),
     done: g.done.map(titled),
     // A thread whose agent answered and now waits on its owner is still theirs to finish.
-    working: [...g.working, ...(p.waiting ?? [])].sort(byNewest).map(titled),
+    // A thread handed over is a task until its new owner starts their own thread for it, which has its title.
+    working: onceByTitle([...g.working, ...(p.waiting ?? []), ...(live ? handedOver(p) : [])].sort(byNewest).map(titled)),
     // What is stuck is only known as of now, so only today's post says it.
     // A teammate's post also says what they handed you; your own Needs you is the inbox's to say.
     // Two rows under one name (a thread and the ask about it) are said once.
@@ -116,6 +118,10 @@ function postOf(p: TodayPerson, live: boolean): StandupPost {
     privateWorking: p.privateWorking ?? 0,
   };
 }
+
+const handedOver = (p: TodayPerson): TodayLine[] => p.tasks.filter((l) => !l.blocked && !!l.item && !!handedFrom(l.item.body, l.item.createdBy));
+
+const onceByTitle = (lines: TodayLine[]): TodayLine[] => lines.filter((l, i) => lines.findIndex((m) => titleOf(m) === titleOf(l)) === i);
 
 const onceEach = (needs: StandupNeed[]): StandupNeed[] => needs.filter((n, i) => needs.findIndex((m) => titleOf(m.line) === titleOf(n.line) && m.on === n.on) === i);
 

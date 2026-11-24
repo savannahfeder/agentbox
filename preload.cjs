@@ -351,6 +351,7 @@ contextBridge.exposeInMainWorld('zero', {
   // front" because nothing public can focus a pane inside another app.
   agentReply: (payload) => ipcRenderer.invoke('zero:agent-reply', payload),
   agentReveal: (payload) => ipcRenderer.invoke('zero:agent-reveal', payload),
+  bringInSession: (payload) => ipcRenderer.invoke('zero:bring-in-session', payload),
   agentConversation: (payload) => ipcRenderer.invoke('zero:agent-conversation', payload),
   scheduleAgent: (payload) => ipcRenderer.invoke('zero:schedule-agent', payload),
   closeAgent: (payload) => ipcRenderer.invoke('zero:close-agent', payload),
@@ -440,12 +441,6 @@ contextBridge.exposeInMainWorld('zero', {
     const handler = (_e, payload) => fn(payload);
     ipcRenderer.on('zero:open-item', handler);
     return () => ipcRenderer.removeListener('zero:open-item', handler);
-  },
-  // The corner tag's "Turn off…": opens Settings at the switch that does it.
-  onOpenSettings: (fn) => {
-    const handler = (_e, payload) => fn(payload);
-    ipcRenderer.on('zero:open-settings', handler);
-    return () => ipcRenderer.removeListener('zero:open-settings', handler);
   },
   // The window moved to a screen that wants the other set of theme pictures.
   // Only main can see which physical display a window is on, and only main can

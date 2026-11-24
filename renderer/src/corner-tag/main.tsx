@@ -14,10 +14,11 @@
 // - Off both the tag and the list for a moment, and the list shuts.
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Grip, HIDE_CHOICES, cardLines, cardScale, inPoints, tagSays } from '../../../shared/corner-tag.mts';
+import { Grip, cardLines, cardScale, inPoints, tagSays } from '../../../shared/corner-tag.mts';
 import { NAME } from '../../../shared/product-name.mjs';
 import { Lattice, Move, markMoves } from './lattice';
 import { MoveButton, PlacePicker } from './place';
+import { OffPicker } from './off';
 import './corner-tag.css';
 
 type Ready = { id: string; title: string; says: string; since?: number; open?: string | null };
@@ -48,7 +49,7 @@ type Bridge = {
   hide: (choice: string) => Promise<unknown>;
   resize: (by: number) => Promise<unknown>;
   place: (corner: Grip) => Promise<unknown>;
-  settings: () => Promise<unknown>;
+  off: () => Promise<unknown>;
   menu: () => Promise<unknown>;
 };
 
@@ -58,8 +59,8 @@ const part: Part = params.get('part') === 'card' ? 'card' : 'tag';
 
 // For pictures and for working on the page without the app: ?demo=ready or
 // ?demo=working, with -open to show the list; ?s= draws it at a screen's scale;
-// &place=1 opens the list on its four corners.
-function demoState(): { state: State; open: boolean; placing: boolean } | null {
+// &place=1 opens the list on its four corners, &off=1 on its turn-off choices.
+function demoState(): { state: State; open: boolean; placing: boolean; turningOff: boolean } | null {
   const demo = params.get('demo');
   if (!demo) return null;
   const now = Date.now();
@@ -72,7 +73,7 @@ function demoState(): { state: State; open: boolean; placing: boolean } | null {
   const before = Number(params.get('before') ?? 0);
   return {
     state: { ready, before, working: demo.startsWith('ready') ? 20 - n : 20, now, scale, corner: 'br' },
-    open: demo.endsWith('-open'), placing: params.get('place') === '1',
+    open: demo.endsWith('-open'), placing: params.get('place') === '1', turningOff: params.get('off') === '1',
   };
 }
 const demo = demoState();
@@ -239,8 +240,11 @@ function Tag({ state, forceOpen = false }: { state: State; forceOpen?: boolean }
 }
 
 /* --------------------------------- the list -------------------------------- */
-function CardBody({ state, placing, setPlacing }: { state: State; placing: boolean; setPlacing: (on: boolean) => void }) {
+function CardBody({ state, placing, setPlacing, turningOff, setTurningOff }: {
+  state: State; placing: boolean; setPlacing: (on: boolean) => void; turningOff: boolean; setTurningOff: (on: boolean) => void;
+}) {
   const { lines, more } = cardLines(state.ready, state.now);
+  if (turningOff) return <OffPicker onHide={(k) => bridge?.hide(k)} onOff={() => bridge?.off()} onBack={() => setTurningOff(false)} />;
   if (placing) {
     const says = tagSays({ ready: state.ready.length });
     const tray = (
@@ -281,10 +285,6 @@ function CardBody({ state, placing, setPlacing }: { state: State; placing: boole
         </button>
       )}
       <div className="ct-foot">
-        <span>Hide for</span>
-        {HIDE_CHOICES.map((c: { key: string; label: string }) => (
-          <button key={c.key} onClick={() => bridge?.hide(c.key)}>{c.label}</button>
-        ))}
         {/* SIZING THE TRAY FROM THE LIST (2026-10-13, her pick). It lives here
             because the list only opens when she asks for it, so nothing is
             drawn on the tag itself, and because the tag stays in plain sight
@@ -304,7 +304,7 @@ function CardBody({ state, placing, setPlacing }: { state: State; placing: boole
         </span>
         <MoveButton here={state.corner} onOpen={() => setPlacing(true)} />
         <span className="ct-sep" />
-        <button className="ct-off" onClick={() => bridge?.settings()}>Turn off…</button>
+        <button className="ct-off" onClick={() => setTurningOff(true)}>Turn off…</button>
       </div>
     </>
   );
@@ -313,17 +313,18 @@ function CardBody({ state, placing, setPlacing }: { state: State; placing: boole
 function Card({ state }: { state: State }) {
   const ref = useRef<HTMLDivElement>(null);
   const [placing, setPlacing] = useState(!!demo?.placing);
+  const [turningOff, setTurningOff] = useState(!!demo?.turningOff);
   useReportSize(ref, 'card', null);
-  useEffect(() => bridge?.onOpen((o) => { if (!o) setPlacing(false); }), []);
-  // Escape steps back from the corners to the list, and shuts the list.
+  useEffect(() => bridge?.onOpen((o) => { if (!o) { setPlacing(false); setTurningOff(false); } }), []);
+  // Escape steps back from the corners or the turn-off choices to the list, and shuts the list.
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (placing) setPlacing(false); else bridge?.toggle();
+      if (placing) setPlacing(false); else if (turningOff) setTurningOff(false); else bridge?.toggle();
     };
     window.addEventListener('keydown', key);
     return () => window.removeEventListener('keydown', key);
-  }, [placing]);
+  }, [placing, turningOff]);
   return (
     <div
       ref={ref}
@@ -332,7 +333,7 @@ function Card({ state }: { state: State }) {
       onPointerEnter={() => bridge?.hover('card', true)}
       onPointerLeave={() => bridge?.hover('card', false)}
     >
-      <CardBody state={state} placing={placing} setPlacing={setPlacing} />
+      <CardBody state={state} placing={placing} setPlacing={setPlacing} turningOff={turningOff} setTurningOff={setTurningOff} />
     </div>
   );
 }

@@ -17,6 +17,8 @@ export interface AttachmentFile { name?: string; dataBase64?: string; srcPath?: 
 export interface SavedAttachment { rel: string; name: string; image: boolean }
 
 const safeName = (name: string) => name.replace(/[^\w.-]+/g, '-');
+/** The name a file is saved under, after its stamp. */
+export const attachmentName = (name: string) => safeName(name).slice(0, 80);
 
 /** A folder goes as the files inside it, named under it, leaving out hidden ones like Finder's .DS_Store. */
 function filesIn(file: AttachmentFile): AttachmentFile[] {
@@ -37,7 +39,7 @@ export function saveAttachments(dir: string, files?: AttachmentFile[] | null) {
   fs.mkdirSync(outDir, { recursive: true });
   const saved: SavedAttachment[] = [];
   for (const file of (files ?? []).flatMap(filesIn)) {
-    const safe = safeName(String(file?.name ?? 'file')).slice(0, 80);
+    const safe = attachmentName(String(file?.name ?? 'file'));
     // A RANDOM SUFFIX, THE SAME ONE THE STAGING PATH ALREADY USES. The name
     // was the millisecond plus the filename, so two files saved in the same
     // millisecond with the same name overwrote each other and the message

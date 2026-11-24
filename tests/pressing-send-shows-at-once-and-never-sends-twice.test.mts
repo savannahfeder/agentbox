@@ -17,15 +17,15 @@ try { ({ chromium } = require('playwright')); } catch {}
 const browserAvailable = chromium && existsSync(chromium.executablePath());
 
 let browser, page, bundle;
-// A 1×1 PNG.
-const PICTURE = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+// A one-second 16×16 grey film; a film keeps Send all on a bar under the stage.
+const FILM = Buffer.from('GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQJChYECGFOAZwEAAAAAAAHiEU2bdLpNu4tTq4QVSalmU6yBoU27i1OrhBZUrmtTrIHYTbuMU6uEElTDZ1OsggEeTbuMU6uEHFO7a1OsggHM7AEAAAAAAABZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVSalmsirXsYMPQkBNgI1MYXZmNTkuMjcuMTAwV0GNTGF2ZjU5LjI3LjEwMESJiECPQAAAAAAAFlSua8GuAQAAAAAAADjXgQFzxYhMmvOHeQS/ApyBACK1nIN1bmSIgQCGhVZfVlA4g4EBI+ODhDuaygDgibCBELqBEJqBAhJUw2f9c3OgY8CAZ8iaRaOHRU5DT0RFUkSHjUxhdmY1OS4yNy4xMDBzc9djwItjxYhMmvOHeQS/AmfIoUWjh0VOQ09ERVJEh5RMYXZjNTkuMzcuMTAwIGxpYnZweGfIokWjiERVUkFUSU9ORIeUMDA6MDA6MDEuMDAwMDAwMDAwAAAfQ7Z1p+eBAKOigQAAgBACAJ0BKhAAEAAARwiFhYiZhIgCAgAMDWAA/sPgABxTu2uRu4+zgQC3iveBAfGCAaDwgQM=', 'base64');
 
 const harness = (file, path, line) => `
   import React, { useState } from 'react';
   import { createRoot } from 'react-dom/client';
   import { ArtifactView } from './renderer/src/components/ArtifactView';
   import { setPictureLinks } from './renderer/src/picture';
-  setPictureLinks(() => 'http://view.test/picture.png');
+  setPictureLinks(() => 'http://view.test/demo.webm');
   const call = () => Promise.resolve(Object.assign([], { ok: true }));
   window.zero = new Proxy({}, { get: (_, k) => (k === 'liveRoom' ? () => Promise.resolve(null) : typeof k === 'string' && k.startsWith('on') ? () => () => {} : call) });
   const lines = [{ id: 'l1', ts: 1, source: 'agent', patch: { note: ${JSON.stringify(line)} } }];
@@ -56,7 +56,7 @@ const bundleOf = async (contents) => (await build({
 beforeAll(async () => {
   if (!browserAvailable) return;
   bundle = {
-    picture: await bundleOf(harness('step-1.png', 'designs/w-1/step-1.png', 'Here: [step-1.png](designs/w-1/step-1.png)')),
+    film: await bundleOf(harness('demo.webm', 'designs/w-1/demo.webm', 'Here: [demo.webm](designs/w-1/demo.webm)')),
     document: await bundleOf(harness('plan.md', 'designs/w-1/plan.md', 'Here: [plan.md](designs/w-1/plan.md)')),
   };
   browser = await chromium.launch({ headless: true });
@@ -67,17 +67,17 @@ const open = async (kind) => {
   await page?.close();
   page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   page.setDefaultTimeout(5_000);
-  await page.route('http://view.test/**', (r) => (r.request().url().endsWith('.png')
-    ? r.fulfill({ contentType: 'image/png', headers: { 'access-control-allow-origin': '*' }, body: PICTURE })
+  await page.route('http://view.test/**', (r) => (r.request().url().includes('.webm')
+    ? r.fulfill({ contentType: 'video/webm', headers: { 'access-control-allow-origin': '*' }, body: FILM })
     : r.fulfill({ contentType: 'text/html', body: '<div id="root"></div>' })));
   await page.goto('http://view.test/');
   await page.addScriptTag({ content: bundle[kind] });
 };
 const wrote = () => page.evaluate(() => window.wrote.filter((m) => m.do === 'toagent'));
 
-describe.skipIf(!browserAvailable)('Send all under a picture', () => {
+describe.skipIf(!browserAvailable)('Send all under a film', () => {
   beforeEach(async () => {
-    await open('picture');
+    await open('film');
     await page.locator('.av-unsent-bar').getByRole('button', { name: /Send all/ }).waitFor();
   });
 

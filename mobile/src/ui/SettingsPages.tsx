@@ -40,7 +40,7 @@ import { color, corner, DARK, font, LIGHT, type Palette } from './theme';
 
 const MODES = MODE_ORDER.filter((m) => m !== 'custom').map((m) => ({ value: m as string, label: MODE_WORDS[m] }));
 const CODEX = CODEX_MODE_ORDER.map((m) => ({ value: m as string, label: CODEX_MODES[m].label }));
-const AGENT_OPTIONS = [{ value: 'all', label: 'All of them' }, { value: 'waiting', label: 'Only the stuck ones' }, { value: 'off', label: 'None' }];
+const AGENT_OPTIONS = [{ value: 'all', label: 'Always' }, { value: 'waiting', label: 'When they need you' }, { value: 'off', label: 'Never' }];
 const AGENT_SENTENCE: Record<string, string> = {
   all: 'Each one is a row in your inbox. Closing it only takes it out of the inbox.',
   waiting: 'Only the ones waiting for you to type. The rest run without interrupting you.',
@@ -457,7 +457,7 @@ function Running() {
             </View>} />
         ) : null}
       </Group>
-      <Group label="Agents you started yourself">
+      <Group label="Terminal sessions">
         <OutsideAgents />
       </Group>
     </>

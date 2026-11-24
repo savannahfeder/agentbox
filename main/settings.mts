@@ -173,29 +173,16 @@ export interface SettingsDeps {
 // a question, or none. One reader, here, so the settings screen and the
 // snapshot the inbox is drawn from cannot end up believing different defaults.
 //
-// NOBODY'S TERMINAL IS IN THE INBOX UNLESS THEY ASK FOR IT.
+// A SESSION YOU STARTED YOURSELF IS IN THE INBOX UNLESS YOU TURN IT OFF.
 //
-// So the default is `off` on every install, new or old, and the fact it used to
-// turn on — whether this Mac had run Agentbox before — decides nothing any more.
-// Her own file has no `outsideAgents` in it, which is why the default is the
-// whole of what she sees: measured 2026-08-27, her running app resolved `all`
-// out of this line and filed a row for every session on the machine.
-//
-// SEPARATED IS NOT DELETED, and this is the half that makes it honest. An
-// outside session is still on the project's rail in the sidebar (`onTheRail`,
-// shared/agents.mts), which no mode gates, and still opens in one click. It
-// just does not queue up beside the work she has to answer.
-//
-// WHAT SHE IMPORTS IS UNAFFECTED, and it never came through here. The agents
-// taken in during the first run are FILES (~/.claude/agents/*.md), and each one
-// files its own work item asking for a first job (shared/agent-import.mts).
-// That is the "imported manually" side of her answer, and it is already a
-// separate path from this one.
+// It was off while every session got a row in Needs you, busy or not. A
+// session working on what she typed is In progress now, so on is safe to
+// default to. Off, a session is still on its project's rail (`onTheRail`).
 //
 // A setting actually chosen still wins over this line.
 export function outsideAgentsMode(config?: SettingsConfig | null) {
   if (AGENT_MODES.includes(config?.outsideAgents as AgentMode)) return config!.outsideAgents;
-  return 'off';
+  return 'all';
 }
 
 /* ---------------------------- session grants ------------------------------ */

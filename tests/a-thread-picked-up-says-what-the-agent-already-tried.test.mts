@@ -101,6 +101,29 @@ describe('the task a hand-over makes', () => {
     const task = lena.store.listItems().find((i) => isGivenTask(i, lena.store.listProducts().find((p) => p.slug === i.product)))!;
     expect(task.body).toContain('Where it got to:\n\nMade v3.\n\nWhat Lena said back:\n\nLena reviewed this.\n\nKeep the amount in the button.');
   });
+  // A review of f46a33386: the app's own notice on a thread (main/teammate-reach.mts) is written from
+  // `teammate: 'app'`, so it was carried as "What The said back: Your message to Dana could not be sent".
+  it("carries a teammate's review, not the app's own notice written after it", async () => {
+    const t = theo.store.composeItem('api', { title: 'Payment failed copy', body: 'Write the payment failed screen.' });
+    theo.store.recordSessionResult('api', t.id, { result: 'Drafted it.' });
+    theo.store.tellItem('api', t.id, { text: 'Lena reviewed this.\n\nKeep the amount in the button.', from: { teammate: lena.personId, name: 'Lena Fischer' }, hold: true });
+    theo.store.tellItem('api', t.id, { text: 'Your message to Dana could not be sent: offline. It was not sent.', from: { teammate: 'app', name: 'The app' }, hold: true });
+    await theo.service.handOn({ product: 'api', id: t.id, to: lena.personId });
+    for (let k = 0; k < 2; k += 1) { await theo.service.syncNow(); await lena.service.syncNow(); }
+    const task = lena.store.listItems().find((i) => isGivenTask(i, lena.store.listProducts().find((p) => p.slug === i.product)))!;
+    expect(task.body).toContain('What Lena said back:\n\nLena reviewed this.');
+    expect(task.body).not.toContain('could not be sent');
+    expect(task.body).not.toContain('What The said back');
+  });
+  it("carries no review when the app's own notice is all that came back", async () => {
+    const t = theo.store.composeItem('api', { title: 'Payment failed copy', body: 'Write the payment failed screen.' });
+    theo.store.recordSessionResult('api', t.id, { result: 'Drafted it.' });
+    theo.store.tellItem('api', t.id, { text: 'Your owner took back your message to Dana before it went. It was not sent.', from: { teammate: 'app', name: 'The app' }, hold: true });
+    await theo.service.handOn({ product: 'api', id: t.id, to: lena.personId });
+    for (let k = 0; k < 2; k += 1) { await theo.service.syncNow(); await lena.service.syncNow(); }
+    const task = lena.store.listItems().find((i) => isGivenTask(i, lena.store.listProducts().find((p) => p.slug === i.product)))!;
+    expect(task.body).not.toContain('said back');
+  });
   it('says nothing about it when the agent kept no list', async () => {
     const task = await handed();
     expect(task.body).not.toContain('already tried');

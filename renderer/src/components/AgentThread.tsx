@@ -1,64 +1,47 @@
-// THE ITEM IS THE CONVERSATION, WITH THE WORK IN IT — the Claude Code side.
-//
-// WHAT IT REPLACES AND WHY. A ported session's item used to be a card Agentbox
-// wrote ABOUT the conversation (what it was started with, three later
-// messages, one sentence of where it stopped) with the conversation itself
-// behind a button.
-//
-// The card is still written, because the INBOX ROW reads it and two lines under
-// a title is all that surface has. What changed is that opening the row no
-// longer shows her a summary of a conversation she can see: it shows the
-// conversation.
-//
-// AND THE SECOND HALF OF THE PROBLEM IS THE WORK LINES. The answer this
-// component gives: show all of it, in the order it happened, with what it SAID
-// at reading size and what it RAN quiet underneath. Nothing is picked over, so
-// nothing can be picked wrong.
-//
-// WHAT IS LEFT HERE IS THE READING. The drawing moved to Thread. Her own tasks
-// come through the same component now (ItemThread.tsx), so this file's whole
-// job is to fetch one Claude Code transcript and hand it over. Nothing about
-// the look, the folding or the landing lives here any more, which is the point:
-// two chats that are drawn by two files drift, and hers had.
-//
-// STILL NO MODEL AND STILL NOTHING WRITTEN. This opens a file already on her
-// disk and reads it.
+// A session started outside Agentbox, read off its own transcript. Its newest
+// message is laid out like an Agentbox thread from the tool's own words
+// (shared/session-layout.mts): the ask in bold, what the agent wrote around
+// it, its choices. The whole conversation is one link away. No model reads it
+// and nothing is written.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api';
 import { Thread, ThreadWaiting } from './Thread';
-import type { AgentEvent } from '../types';
+import { QueueAnswer, QueueSummary } from './OneThingAtATime';
+import { OptionsOffer } from './OptionsOffer';
+import { agentAnswer, agentContext, agentLayout, answeredWhereItRuns, choicesArePressed } from '../../../shared/agents.mts';
+import { theirWords } from '../../../shared/session-layout.mts';
+import type { AgentEvent, AgentSession } from '../types';
 
-export function AgentThread({ pid, sessionId, cwd, name, movedAt, md }: {
-  pid: number;
-  sessionId: string | null;
-  cwd: string;
-  name: string;
+const FOLD = { shut: 'Show the full conversation', open: 'Hide the full conversation' };
+
+export function AgentThread({ agent, title, movedAt, md, onPick }: {
+  agent: AgentSession;
+  title: string;
   // The session's own clock. A new value means it has said or done something
-  // since the last read, which is exactly when this is worth reading again and
-  // the only time it is: the old fault was a card that never changed, and a
-  // thread that reloads on every snapshot poll would be the same failure with
-  // the opposite symptom.
+  // since the last read, which is when the conversation is worth reading again.
   movedAt: number;
   md: (text: string) => ReactNode;
+  onPick?: (n: number) => void;
 }) {
-  const [state, setState] = useState<{
-    events: AgentEvent[]; omitted: number; total: number; error?: string;
-  } | null>(null);
-  // THE MIDDLE CAN BE ASKED FOR BACK. Read again with the window off rather than
-  // held in the renderer, because this conversation lives in a transcript on
-  // disk and the middle was never sent here in the first place. Dropped when
-  // she moves to another session, so nothing opens at full length.
+  const { pid, sessionId, cwd, name, engine } = agent;
+  const layout = agentLayout(agent);
+  // Working on her newer message, its last answer is not the news: the conversation is, ending on what she said.
+  const laidOut = !answeredWhereItRuns(agent) && !!(agent.lastSaid || agent.question?.length || agent.approval);
+  const [full, setFull] = useState(!laidOut);
   const [whole, setWhole] = useState(false);
+  // Opened by her hand, the conversation stays open when the session moves on (a power tester saw it fold shut).
+  const opened = useRef(false);
   useEffect(() => { setWhole(false); }, [pid, sessionId, cwd]);
+  useEffect(() => { opened.current = false; setFull(!laidOut); }, [pid, sessionId, cwd]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!opened.current) setFull(!laidOut); }, [laidOut]);
 
-  // WHICH CONVERSATION THIS IS, so that re-reading the SAME one does not blank
-  // it. Asking for the middle back re-reads from disk, and clearing `state`
-  // first would unmount the thread, throw away where she was standing and land
-  // her at the bottom again — the opposite of what she pressed for.
+  const [state, setState] = useState<{ events: AgentEvent[]; omitted: number; total: number; error?: string } | null>(null);
+  // Re-reading the same conversation must not blank it and throw away where she was.
   const shown = useRef<string | null>(null);
-  const which = `${pid}|${sessionId ?? ''}|${cwd}`;
-
+  const which = `${engine ?? 'claude'}|${pid}|${sessionId ?? ''}|${cwd}`;
+  // Read while the page shows the ask too, so the link opens it at once. A Codex
+  // session has no pid here; the main process knows it by its session id.
   useEffect(() => {
     let live = true;
     if (shown.current !== which) { setState(null); shown.current = which; }
@@ -69,31 +52,38 @@ export function AgentThread({ pid, sessionId, cwd, name, movedAt, md }: {
           ? { events: (r.turns ?? []) as AgentEvent[], omitted: r.omitted ?? 0, total: r.total ?? 0 }
           : { events: [], omitted: 0, total: 0, error: r?.reason ?? 'That conversation could not be read.' });
       })
-      .catch((err) => {
-        if (live) setState({ events: [], omitted: 0, total: 0, error: String((err as Error)?.message ?? err) });
-      });
+      .catch((err) => { if (live) setState({ events: [], omitted: 0, total: 0, error: String((err as Error)?.message ?? err) }); });
     return () => { live = false; };
-  }, [pid, sessionId, cwd, movedAt, whole]);
+  }, [pid, sessionId, cwd, movedAt, whole]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // WHILE IT IS BEING READ, THE SHAPE OF WHAT IS COMING.There WAS a line here
-  // saying so, and one faint sentence is what 25 characters on a 793px page
-  // looks like, which is to say blank. Reading her longest live conversation
-  // costs 508ms, so this is half a second of nothing, on her own measurement of
-  // it.
-  if (!state) return <ThreadWaiting head={`Reading the conversation with ${name}…`} />;
-  if (state.error) return <div className="thread-wait">{state.error}</div>;
-  if (!state.events.length) {
-    return <div className="thread-wait">Nothing has been said in this session yet.</div>;
+  const [sel, setSel] = useState<number | null>(null);
+  const selRef = useRef<HTMLButtonElement>(null);
+  const choices = choicesArePressed(agent) ? layout.choices.map((text, i) => ({ n: i + 1, text, recommended: false })) : [];
+  const working = answeredWhereItRuns(agent);
+  const head = (laidOut || working) && (
+    <QueueSummary title={title} context={agentContext(agent, theirWords(agent.lastAsked || agent.asked?.at(-1)?.text))} earlier={0}
+      open={full} onToggle={() => { opened.current = !full; setFull((f) => !f); }} fold={laidOut ? FOLD : undefined} />
+  );
+
+  if (!full) {
+    return (
+      <div className="agent-page">
+        {head}
+        <QueueAnswer text={agentAnswer(agent)} md={md} name={title} />
+        {choices.length > 0 && onPick && (
+          <div className="one-choices">
+            <OptionsOffer ask={layout.under ?? layout.bold ?? ''} askAll={layout.under ?? layout.bold ?? ''} options={choices}
+              peekOption={null} askPeek={false} selectedOption={sel} selRef={selRef} onPick={onPick}
+              onOptionEnter={(n) => setSel(n)} onAskEnter={() => {}} setPeek={() => {}} setAskPeek={() => {}} bare />
+          </div>
+        )}
+      </div>
+    );
   }
 
-  return (
-    <Thread
-      events={state.events}
-      omitted={state.omitted}
-      onWhole={() => setWhole(true)}
-      name={name}
-      landOn={`${sessionId ?? pid}`}
-      md={md}
-    />
-  );
+  const body = !state ? <ThreadWaiting head={`Reading the conversation with ${name}…`} />
+    : state.error ? <div className="thread-wait">{state.error}</div>
+      : !state.events.length ? <div className="thread-wait">Nothing has been said in this session yet.</div>
+        : <Thread events={state.events} omitted={state.omitted} onWhole={() => setWhole(true)} name={name} landOn={`${sessionId ?? pid}`} md={md} />;
+  return <>{head}{body}</>;
 }

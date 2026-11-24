@@ -450,7 +450,13 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             return out?.ok ? null : out?.error ?? 'That did not save.';
           }}
           editGoes={`Sent to ${owner}.`}
-          onHandToAgent={onContinue ? (files) => { setBig(null); onContinue(commentsToHand(marks.notes, { me: team?.me ?? null, files }), files); } : undefined}
+          onHandToAgent={onContinue ? (files) => {
+            setBig(null);
+            const comments = commentsToHand(marks.notes, { me: team?.me ?? null, files });
+            // Found where this view opens it; a file not here goes by its name alone.
+            const here = files.map((f) => api.resolveDoc({ product, src: f }).then((r) => (r.ok && r.opened ? r.opened : shownName(f)), () => shownName(f)));
+            void Promise.all(here).then((found) => onContinue(comments, found));
+          } : undefined}
           onBeside={(path) => { setBig(null); beside(path); }}
           onClose={() => setBig(null)} />
       )}

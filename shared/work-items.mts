@@ -138,7 +138,8 @@ export interface FieldWrite {
   forAgent?: AgentVoice;
 }
 
-export interface TalkLine { by: string; ts: number; text: string; voice?: AgentVoice; forAgent?: AgentVoice }
+/** `cut`: the words ran past what the record keeps, so `text` is their start. */
+export interface TalkLine { by: string; ts: number; text: string; voice?: AgentVoice; forAgent?: AgentVoice; cut?: true }
 export interface TalkThread { by: string; text: string; voice?: AgentVoice; replies: TalkLine[] }
 export interface Talk {
   chat: TalkLine[];
@@ -182,6 +183,7 @@ interface Said {
   crossed?: number;
   voice?: AgentVoice;
   forAgent?: AgentVoice;
+  cut?: true;
 }
 interface Close { by: string; ts: number; done: boolean; spoke: boolean }
 type ArtifactLine = ArtifactMarkPatch & { by: string | null; ts: number; uid: string | null };
@@ -943,7 +945,9 @@ export function finishItem(raw: FoldingItem, now = Date.now()): WorkItem {
     const said = edits?.size ? item.said.flatMap((s) => {
       const e = s.uid ? edits.get(s.uid) : null;
       if (!e) return [s];
-      return e.gone ? [] : [{ ...s, text: e.text!.trim().slice(0, TALK_TEXT) }];
+      if (e.gone) return [];
+      const { text, cut } = talkText(e.text!);
+      return [{ ...s, text, cut }];
     }) : item.said;
     delete item.said;
     if (Array.isArray(item.people) && item.people.length) {
@@ -1041,7 +1045,7 @@ export function foldRawInto(items: Map<string, FoldingItem>, lines: unknown, tou
     if (line.by && words && words.trim() && !told) {
       const close = item.status === 'done' ? item.wrote.status : null;
       const crossed = close?.by && close.by !== line.by && line.ts < close.ts && !item.said?.some((s) => s.uid && s.uid === line.uid);
-      (item.said ??= []).push({ uid: line.uid ?? null, by: line.by, ts: line.ts, text: words.trim().slice(0, TALK_TEXT), inReplyTo: patch.inReplyTo ?? null, body: typeof patch.answer !== 'string', ...(crossed ? { crossed: close.ts } : {}), ...(patch.voice ? { voice: patch.voice } : {}), ...(patch.forAgent ? { forAgent: patch.forAgent } : {}) });
+      (item.said ??= []).push({ uid: line.uid ?? null, by: line.by, ts: line.ts, ...talkText(words), inReplyTo: patch.inReplyTo ?? null, body: typeof patch.answer !== 'string', ...(crossed ? { crossed: close.ts } : {}), ...(patch.voice ? { voice: patch.voice } : {}), ...(patch.forAgent ? { forAgent: patch.forAgent } : {}) });
     }
     // Who closed the chat and when, so `whatWaits` can tell a reopen by your own
     // message (still settled) from an undo of the close (not).
@@ -1158,6 +1162,10 @@ export function foldWorkItems(lines: unknown, now = Date.now()): Map<string, Wor
 const WITHDRAWN = '(withdrawn)';
 // How much of a message the record keeps: enough for a row's one line.
 export const TALK_TEXT = 280;
+const talkText = (words: string): { text: string; cut?: true } => {
+  const all = words.trim();
+  return all.length > TALK_TEXT ? { text: all.slice(0, TALK_TEXT), cut: true } : { text: all };
+};
 // How many of the newest messages the record keeps, in the chat and in each
 // thread. The counts it answers stop at your own newest word, which in a chat
 // you are part of is never this far back.
@@ -1216,7 +1224,7 @@ function talkOf(said: Said[]): Talk {
   for (const s of lines) {
     // A rename that sends the same opening words again is not a new message.
     if (s.body) { if (bodies.has(s.text)) continue; bodies.add(s.text); }
-    const said1 = { by: s.by, ts: s.ts, text: s.text, ...(s.voice ? { voice: s.voice } : {}), ...(s.forAgent ? { forAgent: s.forAgent } : {}) };
+    const said1: TalkLine = { by: s.by, ts: s.ts, text: s.text, ...(s.voice ? { voice: s.voice } : {}), ...(s.forAgent ? { forAgent: s.forAgent } : {}), ...(s.cut ? { cut: true } : {}) };
     const parent = s.inReplyTo ? parents.get(s.inReplyTo) : null;
     if (parent) {
       (threads[s.inReplyTo!] ??= { by: parent.by, text: parent.text, replies: [], ...(parent.voice ? { voice: parent.voice } : {}) }).replies.push(said1);

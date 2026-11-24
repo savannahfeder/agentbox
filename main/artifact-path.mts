@@ -41,6 +41,8 @@ import { carryOf, partFile, shelvedFor, threadFileComing } from './team/carried-
 import type { Dirent } from 'node:fs';
 import type { CarryState } from '../shared/carried-files.mts';
 import type { ThreadLine } from '../shared/artifact-marks.mts';
+import { shownName } from '../shared/artifact-marks.mts';
+import { attachmentName } from './save-attachments.mts';
 
 export interface ArtifactProduct {
     slug?: string;
@@ -318,6 +320,25 @@ export function notFoundMessage(raw: string, own: ArtifactProduct | null | undef
         return `${raw} could not be opened. ${product ? `“${product}”` : 'That project'} is not set up in ${NAME}.`;
     return `${raw} is not in ${name}. Nothing was opened.`;
 }
+// A message's file is kept under a stamped name (save-attachments.mts), and the
+// words around it name it by its own: the newest copy of that name is the one meant.
+async function attachedNamed(dir: string, raw: string, fs: ArtifactFs, now: number, fresh: boolean): Promise<string | null> {
+    if (raw.includes('/'))
+        return null;
+    const own = attachmentName(raw);
+    const folder = path.join(dir, 'attachments');
+    const list = (): Promise<string[]> => fs.promises.readdir(folder).catch(() => []);
+    let best: { full: string; m: number } | null = null;
+    for (const name of await freshly(`attached:${folder}`, fs, now, list, fresh)) {
+        if (name === own || shownName(`attachments/${name}`) !== own)
+            continue;
+        const full = path.join(folder, name);
+        const m = await fs.promises.stat(full).then((s) => s.mtimeMs, () => -1);
+        if (m >= 0 && (!best || m > best.m))
+            best = { full, m };
+    }
+    return best?.full ?? null;
+}
 const THREAD_ID = /^w-[0-9a-f]{6,}$/i;
 // A script's output is in no record of what an agent wrote, and a run works in
 // its own checkout, which the hunt skips for being hidden. So a name means a file
@@ -331,9 +352,12 @@ async function fileInCheckout(own: Pick<ArtifactProduct, 'dir' | 'repoPath'>, ra
         return null;
     const root = path.join(own.repoPath, '.claude', 'worktrees');
     const base = path.basename(raw);
-    const within = async (id: string): Promise<CheckoutHit | null> => {
-        // A name with no folder in it is its own base: the same place once.
-        for (const rel of new Set([raw, base, path.join('shots', base), path.join('designs', base)])) {
+    // A name with no folder in it is its own base: the same place once.
+    const places = [...new Set([raw, base, path.join('shots', base), path.join('designs', base)])];
+    const within = async (id: string, held?: CheckoutNames): Promise<CheckoutHit | null> => {
+        for (const rel of places) {
+            if (held && !mayHold(held, rel))
+                continue;
             const file = path.join(root, id, rel);
             try {
                 return { id, file, at: (await fs.promises.stat(file)).mtimeMs };
@@ -353,9 +377,8 @@ async function fileInCheckout(own: Pick<ArtifactProduct, 'dir' | 'repoPath'>, ra
     const had = looked.get(key);
     let hits = had && had.fs === fs && !fresh && now >= had.at && now - had.at < HUNT_FRESH_MS ? had.hits : null;
     if (!hits) {
-        const list = (): Promise<string[]> => fs.promises.readdir(root).catch(() => []);
-        hits = freshly(`checkouts:${root}`, fs, now, list, fresh)
-            .then((all) => Promise.all(all.filter((id) => THREAD_ID.test(id)).map(within)))
+        hits = freshly(`checkouts:${root}`, fs, now, () => namesInCheckouts(root, fs), fresh)
+            .then((all) => Promise.all([...all].map(([id, held]) => within(id, held))))
             .then((found) => found.filter((hit) => hit !== null).sort((a, b) => b.at - a.at));
         if (looked.size >= LOOKS_KEPT)
             looked.delete(looked.keys().next().value!);
@@ -365,6 +388,56 @@ async function fileInCheckout(own: Pick<ArtifactProduct, 'dir' | 'repoPath'>, ra
     return (await hits).find((hit) => threadNames(own.dir, hit.id, base))?.file ?? null;
 }
 interface CheckoutHit { id: string; file: string; at: number }
+// What one checkout holds where a bare name is looked for: its own folder,
+// shots/ and designs/. Listed once for every name asked while the lists are
+// fresh, so a checkout is asked about a name only when a list holds it.
+// A list that could not be read is null, and says nothing: the checkout is asked.
+interface CheckoutNames { top: Set<string> | null; shots: Set<string> | null; designs: Set<string> | null }
+// The disk may match a name in another case; the look that follows decides.
+const folded = (name: string): string => name.toLowerCase();
+const BETWEEN_FOLDERS = path.sep === '\\' ? /[\\/]+/ : /\/+/;
+async function namesInCheckouts(root: string, fs: ArtifactFs): Promise<Map<string, CheckoutNames>> {
+    const list = async (dir: string): Promise<Set<string> | null> => {
+        try {
+            return new Set((await fs.promises.readdir(dir)).map(folded));
+        }
+        catch {
+            return null;
+        }
+    };
+    const ids = (await fs.promises.readdir(root).catch((): string[] => [])).filter((id) => THREAD_ID.test(id));
+    const all = new Map<string, CheckoutNames>();
+    let next = 0;
+    const reader = async (): Promise<void> => {
+        while (next < ids.length) {
+            const id = ids[next++]!;
+            const dir = path.join(root, id);
+            const top = await list(dir);
+            all.set(id, {
+                top,
+                shots: top?.has('shots') ? await list(path.join(dir, 'shots')) : null,
+                designs: top?.has('designs') ? await list(path.join(dir, 'designs')) : null,
+            });
+        }
+    };
+    await Promise.all(Array.from({ length: READS_AT_ONCE }, reader));
+    // In the order the folder listed them, whichever reader finished first.
+    return new Map(ids.map((id) => [id, all.get(id)!]));
+}
+// Whether a checkout with these lists can hold `rel`. A name outside plain
+// letters is always asked about: the disk folds those its own way.
+function mayHold(held: CheckoutNames, rel: string): boolean {
+    if (!held.top || /[^\x20-\x7e]/.test(rel))
+        return true;
+    const parts = rel.split(BETWEEN_FOLDERS).filter(Boolean).map(folded);
+    if (!parts.length || !held.top.has(parts[0]!))
+        return false;
+    if (parts.length === 2 && parts[0] === 'shots')
+        return held.shots?.has(parts[1]!) ?? true;
+    if (parts.length === 2 && parts[0] === 'designs')
+        return held.designs?.has(parts[1]!) ?? true;
+    return true;
+}
 const looked = new Map<string, { at: number; fs: ArtifactFs; hits: Promise<CheckoutHit[]> }>();
 const LOOKS_KEPT = 2048;
 // A finished thread's folder is given back, and work that came home from the
@@ -590,6 +663,9 @@ export async function resolveArtifact({ src, product, products = [], accountRoot
         if (fs.existsSync(full))
             return withCarry({ ok: true, path: full });
     }
+    const attached = own?.dir ? await attachedNamed(own.dir, raw, fs, now, fresh) : null;
+    if (attached)
+        return withCarry({ ok: true, path: attached });
     // A folder given back has nothing to walk: most threads asked about are finished.
     if (mine && mineIsThere && raw.split('/')[0] !== 'runs') {
         const found = await huntByName(path.basename(raw), [mine], fs, now, fresh, raw);

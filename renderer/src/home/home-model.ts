@@ -151,17 +151,17 @@ export function showMate(c: TeamCardChoice, key: string): TeamCardChoice {
 type Marked<T> = T & { pinned: boolean; hidden: boolean };
 
 /** Team this week as drawn: whoever waits on you, even someone you hid, then
- *  who you pinned in the order you pinned them, then everyone else busiest
+ *  everyone else. Within each, who you pinned comes first in the order you
+ *  pinned them, so a pin always moves someone up, and the rest go busiest
  *  first. `hidden` is the rest of the ones you hid. */
 export function teamCard<T extends { key: string; state: TeamRowState; week: readonly number[]; total: number }>(rows: readonly T[], choice: TeamCardChoice): { shown: Marked<T>[]; hidden: Marked<T>[] } {
   const pinned = new Set(choice.pinned);
   const hid = new Set(choice.hidden);
   const marked = rows.map((r) => ({ ...r, pinned: pinned.has(r.key) && !hid.has(r.key), hidden: hid.has(r.key) }));
-  const waiting = marked.filter((r) => r.state === 'waiting');
-  const rest = marked.filter((r) => r.state !== 'waiting' && !r.hidden);
   const byPin = (r: Marked<T>) => choice.pinned.indexOf(r.key);
+  const pinsFirst = (group: Marked<T>[]) => [...group.filter((r) => r.pinned).sort((a, b) => byPin(a) - byPin(b)), ...busiestFirst(group.filter((r) => !r.pinned))];
   return {
-    shown: [...busiestFirst(waiting), ...rest.filter((r) => r.pinned).sort((a, b) => byPin(a) - byPin(b)), ...busiestFirst(rest.filter((r) => !r.pinned))],
+    shown: [...pinsFirst(marked.filter((r) => r.state === 'waiting')), ...pinsFirst(marked.filter((r) => r.state !== 'waiting' && !r.hidden))],
     hidden: marked.filter((r) => r.hidden && r.state !== 'waiting'),
   };
 }
