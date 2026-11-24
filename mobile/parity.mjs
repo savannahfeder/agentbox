@@ -144,6 +144,7 @@ export const PARITY = {
   'settings:general/Show keyboard shortcut hints': { desktopOnly: KEYS },
   'settings:general/Shrink the sidebar to icons': { desktopOnly: MAC },
   'settings:general/Counts and crash reports': { phone: SET, find: 'label="Counts and crash reports"' },
+  'settings:general/AI teammates': { phone: SET, find: 'k="alphaTeammates"' },
   'settings:general/Where things are kept': { desktopOnly: MAC },
   'settings:general/Check for updates': { desktopOnly: MAC },
   'settings:appearance/Theme': { phone: SET, find: '<Group label="Theme">' },
