@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-/** main/memory-gate-history.mts's line, kept here so this runs on a node that cannot load the app's files. */
+/** main/memory-gate-history.mts's heavy line at 16 GB, kept here so this runs on a node that cannot load the app's files. */
 const HEAVY_MB = 400;
 const LIGHT_LETTERS = new Set(['l', 'c']);
 const isLight = (o) => LIGHT_LETTERS.has(o);
@@ -54,15 +54,20 @@ const quantile = (list, p) => {
  * slot while the Mac itself was fine. Waiting under `tight` is reported apart
  * from it and must not be added in.
  */
-export function summariseGrants(entries) {
+export function summariseGrants(entries, { heavyMb = HEAVY_MB } = {}) {
   const out = {
     lines: entries.length,
     byClass: {},
     refusals: { total: 0, underNormal: 0, underTight: 0, commands: [] },
     // Commands answered with what their thread holds (main/memory-give-back.mts).
     askedBack: 0,
-    // Of the commands measured at HEAVY_MB or more (and at 1 GB or more), how many started as light.
+    // Of the commands measured at the heavy line or more (and at 1 GB or more), how many started as light.
     calledLight: { heavy: 0, ofHeavy: 0, overGb: 0, ofOverGb: 0 },
+    // The room rule (main/memory-gate.mts). `told` lines carry the room the
+    // command started in; `startedWithout` are the ones that needed a slot and
+    // did not fit it (one at a time, or tried unmeasured), with what they then
+    // took; `expected` had a size on record and were measured again.
+    room: { told: 0, startedWithout: 0, startedWithoutMb: 0, expected: 0, withinTwice: 0, tookOverTwice: 0 },
     slotPressedWaitMs: 0,
     tightWaitMs: 0,
     waitedAtAllUnderNormal: 0,
@@ -101,7 +106,21 @@ export function summariseGrants(entries) {
       else out.refusals.underNormal++;
       if (out.refusals.commands.length < 25) out.refusals.commands.push({ waitMs: wait, pressure: e.pressure ?? null, cmd: e.cmd ?? '' });
     }
-    if (!e.shared && Number.isFinite(e.peakMb) && e.peakMb >= HEAVY_MB) {
+    const sized = !e.shared && Number.isFinite(e.peakMb);
+    if (Number.isFinite(e.room)) {
+      out.room.told++;
+      const need = Number.isFinite(e.need) ? e.need : heavyMb;
+      if (wantedASlot && !e.refused && need > e.room) {
+        out.room.startedWithout++;
+        if (sized) out.room.startedWithoutMb += e.peakMb;
+      }
+    }
+    if (sized && Number.isFinite(e.need) && e.need > 0) {
+      out.room.expected++;
+      if (e.peakMb > e.need * 2) out.room.tookOverTwice++;
+      else if (e.peakMb >= e.need / 2) out.room.withinTwice++;
+    }
+    if (sized && e.peakMb >= heavyMb) {
       out.calledLight.ofHeavy++;
       if (cls === 'light') out.calledLight.heavy++;
       if (e.peakMb >= 1000) {
@@ -176,7 +195,7 @@ const mins = (ms) => `${(ms / 60_000).toFixed(1)} min`;
 const secs = (ms) => (ms === null ? 'n/a' : `${(ms / 1000).toFixed(1)}s`);
 const day = (ms) => (ms === null ? 'n/a' : new Date(ms).toISOString().slice(0, 16).replace('T', ' '));
 
-function printGrants(s) {
+function printGrants(s, heavyMb = HEAVY_MB) {
   console.log(`\n=== IS TWO HEAVY SLOTS THE RIGHT NUMBER ===`);
   console.log(`${s.lines} grant lines, ${day(s.span.fromMs)} to ${day(s.span.toMs)}`);
   const days = s.span.fromMs && s.span.toMs ? (s.span.toMs - s.span.fromMs) / 86_400_000 : 0;
@@ -190,8 +209,11 @@ function printGrants(s) {
   console.log(`  median ${s.peaks.heldSlotMedianMb ?? 'n/a'}, p90 ${s.peaks.heldSlotP90Mb ?? 'n/a'}, worst ${s.peaks.heldSlotMaxMb ?? 'n/a'}`);
   console.log(`  readings dropped as shared: ${s.peaks.sharedDropped}; never measured: ${s.peaks.neverMeasured}`);
   console.log(`\nASKED TO GIVE MEMORY BACK: ${s.askedBack}`);
-  console.log(`\nHEAVY COMMANDS CALLED LIGHT: ${s.calledLight.heavy} of the ${s.calledLight.ofHeavy} measured at ${HEAVY_MB} MB or more`);
+  console.log(`\nHEAVY COMMANDS CALLED LIGHT: ${s.calledLight.heavy} of the ${s.calledLight.ofHeavy} measured at ${heavyMb} MB or more, this computer's heavy line`);
   console.log(`  of those at 1 GB or more: ${s.calledLight.overGb} of ${s.calledLight.ofOverGb}. A light command starts at once, whatever the memory.`);
+  console.log(`\nROOM: ${s.room.told} commands started with the room known`);
+  console.log(`  started though they did not fit (one at a time, or tried unmeasured): ${s.room.startedWithout}, which then took ${(s.room.startedWithoutMb / 1024).toFixed(1)} GB in all`);
+  console.log(`  with a size on record and measured again: ${s.room.expected}; took between half and twice it: ${s.room.withinTwice}; over twice: ${s.room.tookOverTwice}`);
   console.log(`\nREFUSALS: ${s.refusals.total} (${s.refusals.underNormal} under normal, ${s.refusals.underTight} under tight)`);
   for (const r of s.refusals.commands) {
     console.log(`  ${secs(r.waitMs).padStart(8)}  ${String(r.pressure).padEnd(8)} ${r.cmd.slice(0, 80).replace(/\n/g, ' ')}`);
@@ -242,7 +264,9 @@ function main(argv) {
       try { entries.push(JSON.parse(line)); } catch { /* a half-written last line */ }
     }
     console.log(`grants: ${grantsPath}`);
-    printGrants(summariseGrants(entries));
+    // The same share of this computer's memory that 400 MB is of 16 GB (main/memory-gate-history.mts).
+    const heavyMb = Math.round(HEAVY_MB * os.totalmem() / (16 * 1024 ** 3)) || HEAVY_MB;
+    printGrants(summariseGrants(entries, { heavyMb }), heavyMb);
     any = true;
   }
 

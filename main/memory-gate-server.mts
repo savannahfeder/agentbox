@@ -364,7 +364,10 @@ export class MemoryGateServer {
 
   status() {
     const snap = this.gate.snapshot();
-    return { role: this.role, ...snap, freePct: this.reading.freePct, counts: { ...this.counts } };
+    // The Agents page says what the gate is doing, and with no room left it
+    // holds what is known to be big as it does when memory is tight.
+    const pressure: Pressure = snap.pressure === 'normal' && this.gate.room !== null && this.gate.room <= 0 ? 'tight' : snap.pressure;
+    return { role: this.role, ...snap, pressure, freePct: this.reading.freePct, counts: { ...this.counts } };
   }
 
   /* --------------------------- owning the socket --------------------------- */

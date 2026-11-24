@@ -83,6 +83,31 @@ describe('the gate log reading adds up', () => {
     expect(summariseGrants([]).calledLight).toEqual({ heavy: 0, ofHeavy: 0, overGb: 0, ofOverGb: 0 });
   });
 
+  it('sets what each command was expected to take beside what it took, and counts the starts with no room', () => {
+    // What the room rule is judged by (tests/a-command-starts-when-this-computer-has-room-for-it).
+    const s = summariseGrants([
+      // Fitted, and took about what it took before.
+      grant({ need: 900, room: 2_000, peakMb: 1_000 }),
+      // Did not fit, so it went alone; it took three times what was expected.
+      grant({ need: 400, room: 291, peakMb: 1_200 }),
+      // Nothing had measured it and there was no room: tried on its own, and small.
+      grant({ cls: 'unknown', room: -800, peakMb: 12 }),
+      // A light one needs no room, and one from before the rule carries neither figure.
+      grant({ cls: 'light', need: 0, room: -800, peakMb: 8 }),
+      grant({ peakMb: 700 }),
+    ]);
+    expect(s.room).toEqual({ told: 4, startedWithout: 2, startedWithoutMb: 1_212, expected: 2, withinTwice: 1, tookOverTwice: 1 });
+    expect(summariseGrants([]).room).toEqual({ told: 0, startedWithout: 0, startedWithoutMb: 0, expected: 0, withinTwice: 0, tookOverTwice: 0 });
+  });
+
+  it('counts heavy by the line of the computer it is run on', () => {
+    const lines = [grant({ cls: 'light', peakMb: 300 }), grant({ cls: 'light', peakMb: 1_700 })];
+    expect(summariseGrants(lines).calledLight).toMatchObject({ heavy: 1, ofHeavy: 1 });
+    expect(summariseGrants(lines, { heavyMb: 200 }).calledLight).toMatchObject({ heavy: 2, ofHeavy: 2 });
+    expect(summariseGrants(lines, { heavyMb: 1_600 }).calledLight).toMatchObject({ heavy: 1, ofHeavy: 1 });
+    expect(summariseGrants(lines, { heavyMb: 1_701 }).calledLight).toMatchObject({ heavy: 0, ofHeavy: 0 });
+  });
+
   it('survives a half-written line and an empty log', () => {
     expect(summariseGrants([]).lines).toBe(0);
     expect(summariseGrants([null, undefined, 'nonsense']).lines).toBe(3);

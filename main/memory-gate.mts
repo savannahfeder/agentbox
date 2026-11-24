@@ -38,6 +38,16 @@
 //     first in line bought nothing. Its commands now run whatever the slots and
 //     whatever "tight" says, and wait only while memory is critical. They still
 //     take a slot while they run, so everything else waits behind them.
+//   - WHERE THE ROOM IS KNOWN, A COMMAND STARTS WHEN IT FITS (2026-11-24). The
+//     slots count commands whatever they take, two to a 16 GB Mac, and a 1.4 GB
+//     copy of the app started with 291 MB of room left. So the gate is told how
+//     much room Agentbox has on this computer and compares what the command
+//     took here before, counting what the running ones may still take. One
+//     that does not fit goes one at a time. With no room, what is known to be
+//     big waits, and a command nothing has measured is tried one at a time:
+//     held outright, four in five of those turned out under 150 MB. The slots
+//     stay as the most that run at once, and as the rule where no room is
+//     known. The kernel's word that the computer is short outranks all of it.
 //   - COMMANDS MEASURED AS ONE FIGURE HOLD ONE SLOT (w-713aba0c89). Every Codex
 //     thread runs under one app-server, so two Codex commands at once read as
 //     the same number, and a `cat` beside a test run used to hold a slot of its

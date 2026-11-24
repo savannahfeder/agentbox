@@ -293,6 +293,23 @@ describe('the gate the app runs', () => {
     return { dir, server, ask, post, lines };
   }
 
+  it('still reads as tight on the Agents page while there is no room, as it has since the allowance', async () => {
+    let room: { mb: number; at: number } | null = { mb: -2244, at: 500 };
+    const g = harness({ room: () => room });
+    await g.server._poll();
+    expect(g.server.gate.pressure).toBe('normal');
+    expect(g.server.status().pressure).toBe('tight');
+    room = { mb: 0, at: 600 };
+    await g.server._poll();
+    expect(g.server.status().pressure).toBe('tight');
+    room = { mb: 1, at: 700 };
+    await g.server._poll();
+    expect(g.server.status().pressure).toBe('normal');
+    room = null;
+    await g.server._poll();
+    expect(g.server.status().pressure).toBe('normal');
+  });
+
   it('is told the room on every reading, and each grant line says what was expected and the room it started in', async () => {
     const g = harness({ room: () => ({ mb: 1_000, at: 500 }) });
     await g.server._poll();
