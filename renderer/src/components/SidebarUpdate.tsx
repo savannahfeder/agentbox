@@ -24,6 +24,7 @@
 import type { ReactNode } from 'react';
 import { NAME } from '../../../shared/product-name.mjs';
 import { MOVE_SAY, SAY } from '../update-row';
+import { SidebarGlyph } from './SidebarGlyph';
 import { sayWhere } from '../../../shared/where-it-runs-from.mts';
 
 export const SIDE_SAY = {
@@ -77,11 +78,11 @@ export function SidebarMove({ place, error = null, collapsed, rail = false, onMo
 // A box with an arrow going into it. Grey like the restart arrow, for the
 // reason at the top of this file: a red mark reads as something broken.
 function MoveIcon() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="M4 14v5a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19v-5"/><path d="M12 3.5v10"/><path d="M8.5 10 12 13.5 15.5 10"/></svg>;
+  return <SidebarGlyph name="move" />;
 }
 
 function RestartIcon() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg>;
+  return <SidebarGlyph name="restart" />;
 }
 
 function CloseIcon() {

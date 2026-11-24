@@ -1,6 +1,7 @@
 // The phone's Files place: every file a thread's cloud copy names
 // (`snapshot.attached`, main/phone-inbox.mts), one row per project and path,
 // shown by the desktop Files page's own rules (renderer/src/files/files-shown.ts).
+import { isChangePath } from '../../../renderer/src/code-artifact';
 import { apartScratch, filesShown, sortFiles } from '../../../renderer/src/files/files-shown';
 import { isBookkeeping } from '../../../renderer/src/message-artifacts';
 import { phoneSlug, type Aliases, type PhoneRows } from '../../../renderer/src/phone-rows';
@@ -66,6 +67,11 @@ export function phoneFiles(threads: PhoneRows['threads'], projects: readonly { s
     f.sentIn = f.threads.map((t) => ({ kind: 'thread' as const, product: t.product, id: t.id, title: t.title }));
   }
   return sortFiles(files, 'recent');
+}
+
+/** A run's change is read in its thread, whose change card opens each file; any other file opens itself. */
+export function threadOfChange(f: Pick<PhoneFile, 'path' | 'threads'>): FileThread | null {
+  return isChangePath(f.path) ? f.threads[0] ?? null : null;
 }
 
 /** What the box, a kind and a project leave; an agent's check pictures only when searched for, as on the desktop. */
