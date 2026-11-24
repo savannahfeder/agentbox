@@ -109,7 +109,7 @@ describe('the corners are big enough to press', () => {
 
 describe('the list never reopens on the corners', () => {
   it('goes back to its threads when it shuts, and on Escape', () => {
-    expect(page).toMatch(/bridge\?\.onOpen\(\(o\) => \{ if \(!o\) setPlacing\(false\); \}\)/);
-    expect(page).toMatch(/if \(placing\) setPlacing\(false\); else bridge\?\.toggle\(\);/);
+    expect(page).toMatch(/bridge\?\.onOpen\(\(o\) => \{ if \(!o\) \{ setPlacing\(false\);/);
+    expect(page).toMatch(/if \(placing\) setPlacing\(false\); else if \(turningOff\) setTurningOff\(false\); else bridge\?\.toggle\(\);/);
   });
 });

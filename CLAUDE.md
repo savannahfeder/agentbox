@@ -71,6 +71,14 @@ those files still counts as a change to the look. Never move the fingerprints in
 `tests/fixtures/the-trays-approved-look.json` without that approval. Taking
 those pictures puts windows on their screen, so ask before you do it.
 
+The glass is drawn by the Mac, not by the page. A picture taken anywhere else
+(the cloud, Linux, a browser on the page's `?demo=` view) shows the page's
+plain fallback and is not the approved look, so never show one for approval
+and never change the look to match one. A change to what the list says or
+offers leaves the glass, tint, ink and light-or-dark files alone; check that
+only the parts you meant to change fail the approved-look test, then take the
+pictures on the Mac (2026-11-15: this mistake had cost hours of rework).
+
 ## THE DESIGN IS ROUNDED (2026-11-10)
 
 A button, card, tip, key cap or ring with a border has rounded corners. Square

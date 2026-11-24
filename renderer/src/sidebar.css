@@ -33,7 +33,7 @@
 
   /* Search is a field, so its keys are read before they are needed. */
   :root:root .gt-rail-nav.workspace-navigation .workspace-find { margin: 12px 0 0; }
-  :root:root .gt-rail-nav.workspace-navigation .workspace-find button { font-weight: 400; color: var(--text-faint); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-strong); transition: background-color .14s, box-shadow .14s; }
+  :root:root .gt-rail-nav.workspace-navigation .workspace-find button { font-weight: 400; color: var(--text-faint); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-strong); }
   :root:root .gt-rail-nav.workspace-navigation .workspace-find button:hover { background: var(--surface); color: var(--text-dim); }
   :root:root .gt-rail-nav.workspace-navigation .workspace-keys { font-size: 12px; letter-spacing: 0; opacity: 1; }
   :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .workspace-find button { background: transparent; box-shadow: none; }

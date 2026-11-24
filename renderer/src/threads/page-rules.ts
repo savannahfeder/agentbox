@@ -1056,6 +1056,16 @@ export function taskHandedFrom<T extends TeamRow & { id: string; body?: string |
   }) ?? null;
 }
 
+/** Who has a thread you handed over, as its row and its card say it; null on one not handed over. `items` is null with no team. */
+export function handedOnWord<T extends TeamRow & { id: string; body?: string | null }>(item: { id: string; status?: string; answer?: string | null }, items: readonly T[] | null, me: string | null): string | null {
+  const name = handedTo(item);
+  if (!name) return null;
+  const first = name.split(/\s+/)[0];
+  const task = items ? taskHandedFrom(items, item.id, me) : null;
+  if (task?.status === 'done' && task.wrote?.status?.by === task.assignee) return `${first} finished it`;
+  return task && task.status !== 'done' ? `With ${first}` : `Handed to ${first}`;
+}
+
 /** "Dev, Maya": the conversation itself is named for who is in it, unless someone renamed it. */
 export function conversationName(item: WorkItem, product: Product | undefined | null, me: string | null, nameOf: (id: string) => string): string | null {
   if (!isDirect(product) || isWorkThread(item) || isTaskRow(item) || nameIsAPersons(item)) return null;

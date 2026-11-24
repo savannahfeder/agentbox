@@ -12,20 +12,27 @@ export interface WindowLag { longMs: number; longest: number; slow: number; wors
 /** Adds up long tasks and slow answers to input until taken. Pure. */
 export function lagCounter() {
   let lag: WindowLag = { longMs: 0, longest: 0, slow: 0, worst: 0 };
+  let presses = new Set<number>();
   return {
     task(ms: number) {
       lag.longMs += ms;
       lag.longest = Math.max(lag.longest, ms);
     },
-    input(ms: number) {
+    /** `press` is the browser's id for one click or key, which reaches the page as several events. */
+    input(ms: number, press?: number) {
       if (!(ms >= SLOW_INPUT_MS)) return;
-      lag.slow += 1;
       lag.worst = Math.max(lag.worst, ms);
+      if (press) {
+        if (presses.has(press)) return;
+        presses.add(press);
+      }
+      lag.slow += 1;
     },
     /** The minute so far, rounded, and a fresh start; null when nothing was held. */
     take(): WindowLag | null {
       const was = lag;
       lag = { longMs: 0, longest: 0, slow: 0, worst: 0 };
+      presses = new Set();
       if (!was.longMs && !was.slow) return null;
       return { longMs: Math.round(was.longMs), longest: Math.round(was.longest), slow: was.slow, worst: Math.round(was.worst) };
     },
@@ -41,7 +48,7 @@ export function installWindowLag(say: ((lag: WindowLag) => unknown) | undefined 
   try {
     // Only entries with an interaction are a click, a key or a tap; the rest are moves and scroll ticks.
     new PerformanceObserver((list) => {
-      for (const e of list.getEntries() as (PerformanceEntry & { interactionId?: number })[]) if (e.interactionId) lag.input(e.duration);
+      for (const e of list.getEntries() as (PerformanceEntry & { interactionId?: number })[]) if (e.interactionId) lag.input(e.duration, e.interactionId);
     }).observe({ type: 'event', durationThreshold: SLOW_INPUT_MS } as PerformanceObserverInit);
   } catch { /* nor of slow answers */ }
   setInterval(() => {

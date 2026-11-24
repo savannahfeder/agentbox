@@ -131,6 +131,11 @@ export function quickOnBar({ full, thread }: { full: boolean; thread: boolean })
   return full && !thread;
 }
 
+/** A thread's reply box names who started it, except you: the chat calls you "You". */
+export function replyBoxWords(root: Pick<RoomMessage, 'by'>, me: string | null, nameOf: (id: string | null) => string): string {
+  return me && root.by === me ? 'Reply in thread' : `Reply to ${nameOf(root.by)}`;
+}
+
 /** The newest message of mine in the chat itself, for ↑ in an empty box. */
 export function myNewest(messages: readonly RoomMessage[], me: string | null, inReplyTo: string | null = null): RoomMessage | null {
   for (let i = messages.length - 1; i >= 0; i -= 1) {

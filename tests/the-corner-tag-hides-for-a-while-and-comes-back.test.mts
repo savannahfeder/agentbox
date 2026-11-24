@@ -531,7 +531,7 @@ describe('hiding it for a while', () => {
     expect(r.saved.filter((p) => 'cornerTagHiddenUntil' in p)).toHaveLength(0);
   });
 
-  it('offers the sizes, the hides and a way to Settings on right-click, and nothing that closes it for good', () => {
+  it('offers the sizes, the hides and turning it off for good on right-click', () => {
     const r = rig();
     r.showTag();
     r.call('corner-tag:menu');
@@ -539,13 +539,16 @@ describe('hiding it for a while', () => {
     // The sizes joined this menu on 2026-10-13, when she asked to be able to
     // resize the tray: dragging its corner is the way most people will find,
     // and this is the way somebody looks second, plus the only way back to the
-    // automatic size. Nothing here still closes it for good.
+    // automatic size.
     expect(labels).toEqual([
       'Bigger', 'Smaller', 'Size for this screen',
       'Hide for 5 minutes', 'Hide for 30 minutes', 'Hide for the rest of today',
-      'Turn off in Settings…',
+      'Turn off for good',
     ]);
-    expect(labels.some((l) => /close|quit|never|for good/i.test(l))).toBe(false);
+    r.tag.menu.find((m) => m.label === 'Turn off for good').click();
+    expect(r.config.cornerTag).toBe(false);
+    expect(r.win().visible).toBe(false);
+    expect(r.main.shown).toBe(0);
   });
 
   it('shows again after waking from sleep once a hide has run out meanwhile', () => {
@@ -565,12 +568,22 @@ describe('turning it off, and opening things', () => {
     expect(r.windows).toHaveLength(0);
   });
 
-  it('takes you to Settings from the tag', () => {
+  // The tray steps aside while the app is in front, so sending you to
+  // Settings to turn it off made it vanish there and come back later, still on.
+  it('turns off for good from the tag, without bringing the app forward', () => {
     const r = rig();
     r.showTag();
-    r.call('corner-tag:settings');
-    expect(r.main.shown).toBe(1);
-    expect(r.main.sent).toContainEqual(['zero:open-settings', { pane: 'general' }]);
+    r.point();
+    r.listUp();
+    r.call('corner-tag:off');
+    expect(r.saved).toContainEqual({ cornerTag: false });
+    expect(r.win().visible).toBe(false);
+    expect(r.win('card').visible).toBe(false);
+    expect(r.main.shown).toBe(0);
+    expect(r.main.sent).toEqual([]);
+    r.call('zero:corner-tag', READY(2_000_000));
+    r.advance(24 * 60 * 60_000);
+    expect(r.win().visible).toBe(false);
   });
 
   it('a line in the list brings the app forward on that thread', () => {

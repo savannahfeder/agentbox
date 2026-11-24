@@ -33,7 +33,7 @@ import {
   backWords, timeHeading, updatedWords,
   type BoardEntry, type Display, type PageId, type Privacy, type UpdatedWindow,
 } from './page-rules';
-import { asksForYourWords, cellUnderTab, handedTo as handedOnTo, taskHandedFrom, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
+import { asksForYourWords, cellUnderTab, handedOnWord, messageLine, messagePriority, rowPriorityId, rowSharing, waitingWord } from './page-rules';
 import { STATE_WORD, linkWords } from './summary-rules';
 import { facesOnButton, peopleWorthADot, togglePicked, whoseWord } from './people-rules';
 import { stopKey } from './walk-rules';
@@ -682,7 +682,7 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
   line?: RowLine | null;
   /** Try again, on a thread nothing will start (TryAgainButton). */
   retry?: ReactNode;
-  /** Pinned to the top of the list (w-20323283e6): a faint pin after the title. */
+  /** Pinned to the top of the list (w-20323283e6): a pin after the title that a long title never cuts off. */
   pinned?: boolean;
   /**
    * WHAT IS HAPPENING ON THIS THREAD, in the column of its own (w-ec2b04d449).
@@ -721,7 +721,7 @@ export function RowCells({ status, retry, lead, title, hidden = false, lock = fa
     {/* THE MARK SAYS WHICH KIND OF SHARED, QUIETLY (w-41ff964775): the two
         people with a small count beside them for a thread only a few people
         see. The whole team, the default, carries nothing (2026-10-02). */}
-    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}${aside ? ' with-aside' : ''}${moved}`}><span className="th-slot">{who?.face ?? lead}</span>{aside ? <span className="th-title-text">{title}</span> : title}{who?.name && <span className="th-who-name">{who.name}</span>}{aside && <span className="th-aside-box"><span className={`th-aside${late ? ' late' : ''}`}>{aside}</span></span>}{held && <span className="th-aside">not started</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{pinned && <PinMark size={13} className="th-pin" />}</div>
+    <div className={`th-cell-title subject${hidden ? ' hidden' : ''}${aside ? ' with-aside' : pinned ? ' with-pin' : ''}${moved}`}><span className="th-slot">{who?.face ?? lead}</span>{aside || pinned ? <span className="th-title-text">{title}</span> : title}{who?.name && <span className="th-who-name">{who.name}</span>}{aside && <span className="th-aside-box"><span className={`th-aside${late ? ' late' : ''}`}>{aside}</span></span>}{held && <span className="th-aside">not started</span>}{shared && <SharedMark label={chosen ? `Visible to ${chosen} ${chosen === 1 ? 'person' : 'people'}` : 'Visible to the team'} />}{chosen > 0 && <span className="th-shared-n" aria-hidden="true">{chosen}</span>}{lock && <LockMark />}{pinned && <PinMark size={13} className="th-pin" />}</div>
     <div className={`th-cell-state${status?.why ? ' has-card' : ''}${retry ? ' can-retry' : ''}`} title={status?.why ? undefined : status?.title}>{status && <><StatusMark status={status} />{status.word}</>}{retry}
       {status?.why && <span className="th-why-card" role="tooltip"><b>{status.why.head}</b><span>{status.why.body}</span></span>}</div>
     {/* Third in the grid: the phone layout draws only the first, second and last cells, so it never shows this. */}
@@ -814,11 +814,7 @@ export function ThreadCells({ item, product, now, person, tab }: {
   // Out with someone you asked: say who, not that nothing is running.
   const askedOut = team && !cell.live && !backFrom ? askedOutWord(allItems ?? [], team.me, item.id, (id) => team.byId.get(id)?.name ?? '', askSeen(team.state.seen)) : null;
   // Handed on, it did not finish: it says who has it now.
-  const handedOnName = handedOnTo(item);
-  const handedTask = handedOnName && team ? taskHandedFrom(allItems ?? [], item.id, team.me) : null;
-  const handedWord = !handedOnName ? null
-    : handedTask?.status === 'done' && handedTask.wrote?.status?.by === handedTask.assignee ? `${handedOnName.split(/\s+/)[0]} finished it`
-      : handedTask && handedTask.status !== 'done' ? `With ${handedOnName.split(/\s+/)[0]}` : `Handed to ${handedOnName.split(/\s+/)[0]}`;
+  const handedWord = handedOnWord(item, team ? allItems ?? [] : null, team?.me ?? null);
   const shownWord = wants ?? backFrom ?? askedOut ?? handedWord ?? cellUnderTab(worded.word, tab, { fromPeople: !!waits || peopleWaitOnYou, asks: asksForYourWords(item) });
   // Out with a person, it is no agent's state, so it wears no agent mark and offers no try again.
   const status = shownWord === null ? undefined : askedOut && shownWord === askedOut ? { ...worded, word: shownWord, agent: false, title: undefined } : { ...worded, word: shownWord };
@@ -1204,7 +1200,7 @@ export function InboxBoard({ items, products, display, now, onOpenItem, stateOf,
           const cardWaits = e.card && e.card.state !== 'done' ? linkWords(e.card.blockedBy, team?.byId) : null;
           const stuckOn = e.item ? causeOf(e.item, allItems ?? []) : null;
           const waitWord = e.item
-            ? (team ? askedOutWord(allItems ?? [], team.me, e.item.id, (id: string) => team.byId.get(id)?.name ?? '', askSeen(team.state.seen)) : null) ?? waitWords(e.item, { items: allItems, cards: team?.state.cards ?? [], nameOf: (id: string) => team?.byId.get(id)?.name ?? 'Someone' })?.word ?? (stuckOn ? `Waits on ${stuckOn.title}` : undefined)
+            ? (team ? askedOutWord(allItems ?? [], team.me, e.item.id, (id: string) => team.byId.get(id)?.name ?? '', askSeen(team.state.seen)) : null) ?? handedOnWord(e.item, team ? allItems ?? [] : null, team?.me ?? null) ?? waitWords(e.item, { items: allItems, cards: team?.state.cards ?? [], nameOf: (id: string) => team?.byId.get(id)?.name ?? 'Someone' })?.word ?? (stuckOn ? `Waits on ${stuckOn.title}` : undefined)
             : cardWaits && `Waits on ${cardWaits}`;
           const messageProduct = e.message && e.item ? products.find((p) => p.slug === e.item!.product) : null;
           const onThem = messageProduct && iSpokeLast(e.item!, messageProduct, team?.me ?? null)

@@ -124,10 +124,13 @@ export function DocText({ product, src, text, mtime, folder = null, onSaved, onN
 
   // An editor reads its starting words only when it is made, which is when `extensions` changes.
   const content = useMemo(() => (collab ? null : mdToPmDoc(versions?.draft ?? text)), [extensions]);
+  const editable = !readOnly && !(live && !collab);
   const editor = useEditor({
     extensions,
     ...(content ? { content } : {}),
-    editable: !readOnly && !(live && !collab),
+    editable,
+    // Tiptap calls every editor a text box; one nobody may type in is read as a document.
+    editorProps: { attributes: { role: editable ? 'textbox' : 'document' } },
     autofocus: versions?.focus && !readOnly ? 'end' : false,
     onTransaction: ({ transaction }) => {
       if (transaction.docChanged && isTypedHere(transaction)) touched.current = true;
