@@ -48,7 +48,7 @@ function build({ items = [], team = [video, growth], teammatesOn = true } = {}) 
     {
       home: '/nonexistent-home-with-no-discovered-accounts', storeRoot: dir, claudeBin: '/nonexistent/claude', claudeFound: true,
       maxConcurrentSessions: 3, authProfiles: ['default'], autonomousProducts: ['shop'],
-      ...(teammatesOn ? { alphaTeammates: true } : {}),
+      ...(teammatesOn ? {} : { alphaTeammates: false }),
     },
     {
       listItems: () => items, listProducts: () => [product], getProduct: () => product, isDue: () => true,
