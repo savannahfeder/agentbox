@@ -530,7 +530,10 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     },
   });
 
-  ipcMain.handle('zero:refresh-usage', async (event, { engine = DEFAULT_ENGINE, ask = false }: { engine?: string; ask?: boolean } = {}) => {
+  // The cloud's look at the same account can be the newer reading after a reset.
+  supervisor.onCloudReading = (profile, reading) => usage.adopt({ ...reading, profile });
+
+  ipcMain.handle('zero:refresh-usage',async (event, { engine = DEFAULT_ENGINE, ask = false }: { engine?: string; ask?: boolean } = {}) => {
     if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) throw Error('Usage refresh is only available in the main app window.');
     // Codex asks OpenAI only when the person pressed Refresh (`ask`); opening
     // the page reads what this computer already has.

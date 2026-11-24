@@ -1,4 +1,5 @@
 import { currentActivity } from './agent-activity.mts';
+import type { UsageLimit } from '../shared/usage.mts';
 import { workerGitBrief, withWorkerGitBrief } from './worker-git.mts';
 import { handedCommitsNote } from './handed-commits.mts';
 import { harnessFor, supportsHarnessOperation } from './harnesses.mts';
@@ -1341,6 +1342,8 @@ export class Supervisor {
   declare cloudServerWatch: Pick<CloudServerWatch, 'down' | 'up'>;
   declare sessions: Map<string, WorkerSession>;
   declare onChange: (() => void) | null;
+  /** A cloud reading of a login signed in here, for the sidebar's usage (main/ipc.mts). */
+  declare onCloudReading?: ((profile: string, reading: { limits: UsageLimit[]; at: number }) => void) | null;
   /** A run about to start, so its thread's files kept in the cloud start coming back. Never holds the start. */
   declare onStarting?: ((item: WorkItem) => void) | null;
   declare onRecovered: ((news: RecoveryNews) => void) | null;
@@ -2079,7 +2082,8 @@ export class Supervisor {
 
   // When this login's limit lifts, or null when it is not at one: its own
   // filed limit, or the cloud's reading of the same account. A reading taken
-  // before the person picked this account is theirs to overrule.
+  // before the person picked this account is theirs to overrule, and so is one
+  // older than this Mac's own reading with room.
   _limitedUntil(profile: string, now = Date.now()): number | null {
     const key = this._accountKey(DEFAULT_ENGINE, profile);
     const t = this._profileTrouble?.[key];
@@ -2090,6 +2094,8 @@ export class Supervisor {
     const r = this._cloudLoginOf(profile);
     const picked = (this._accountChosenAt ?? 0) > 0 && this.config.activeAccount?.[DEFAULT_ENGINE] === profile;
     if (!r || (picked && !((r.readAt ?? 0) > this._accountChosenAt!))) return null;
+    const here = this._usageSeen?.[profile];
+    if (here && here.at > (r.readAt ?? 0) && here.limits.every((l) => (l?.percent ?? 0) < 100)) return null;
     const full = (r.limits ?? []).map((l) => l as { percent?: number; resetsAt?: number })
       .filter((l) => (l.percent ?? 0) >= 100 && (l.resetsAt ?? 0) > now).map((l) => l.resetsAt!);
     if (full.length) return Math.max(...full);
@@ -7128,6 +7134,7 @@ export class Supervisor {
     for (const c of this._cloudAccounts()) {
       const limits = c.limits as { percent?: number | null }[] | undefined;
       if (c.engine !== DEFAULT_ENGINE || !c.profile || !limits?.length || !c.readAt) continue;
+      try { this.onCloudReading?.(c.profile as string, { limits: limits as UsageLimit[], at: c.readAt as number }); } catch (e) { console.warn('zero: could not show the cloud reading:', (e as Error).message); }
       if (this.noteUsageReading(c.profile as string, { at: c.readAt as number, limits }, { onlyLimit: true })) cleared = true;
     }
     return cleared;
