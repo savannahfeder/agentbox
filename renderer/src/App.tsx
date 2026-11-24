@@ -151,6 +151,7 @@ import { TeammatesContext } from './teammates/row-lead';
 import { ChatsContext, ChatsFrame, LAST_CHAT_KEY, type ChatsValue } from './teammates/ChatsColumn';
 import { queuedTeammateRun, threadsItOpened } from './teammates/chat-lines';
 import { teammateIdOf } from '../../shared/teammates.mts';
+import { placeWithoutGoneMate } from './teammates/mate-place';
 import { faceSeed } from '../../shared/teammate-face.mts';
 import { asksWho } from '../../shared/auto-route.mts';
 import { RoomBoard } from './team/rooms/RoomBoard';
@@ -3998,6 +3999,9 @@ export default function App() {
   const filesForPalette = useFilesList(modal === 'palette');
   // Today lists approvals as decisions.
   const filesForToday = useFilesList(teamMode && todayOn);
+  const mateIdsRead = snap ? (teammatesUi.live ? teammatesUi.list.map((t) => t.id) : []) : null;
+  const placeAfterMates = placeWithoutGoneMate(chatsPlace, mateIdsRead);
+  useEffect(() => { if (placeAfterMates !== chatsPlace) setChatsPlace(placeAfterMates); }, [placeAfterMates, chatsPlace]);
   // With teammates on, Groups is Chats: your AI teammates, people and groups
   // in one list, and the sidebar's row opens the chat you had open last.
   const openChatsPlace = (key: string) => {
@@ -4010,7 +4014,7 @@ export default function App() {
     setChatsPlace(key);
   };
   const chatsValue: ChatsValue | null = teammatesUi.live || teamMode ? {
-    teammates: teammatesUi.list, groups: roomsUi.live ? roomsUi.groups : [], now,
+    teammates: teammatesUi.list, matesOn: teammatesUi.live, groups: roomsUi.live ? roomsUi.groups : [], now,
     onTeammate: (id) => (homeLayout === 'chats' ? openChatsPlace(`mate:${id}`) : teammatesUi.go(id)), onNew: teammatesUi.onNew,
     onGroup: (key) => {
       const one = homeLayout === 'chats' ? directs.find((d) => `direct:${d.item.id}` === key && d.people.length === 1) : null;

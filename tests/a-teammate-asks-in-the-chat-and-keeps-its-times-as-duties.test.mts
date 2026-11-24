@@ -13,6 +13,7 @@ import path from 'node:path';
 import { appHome } from '../main/store/home.mts';
 import { loadStore } from '../main/store-modules.mts';
 import { Teammates } from '../main/teammates.mts';
+import { STARTERS } from '../shared/teammates.mts';
 
 describe('a teammate setting itself up', () => {
   let team; let store; let dir; let product; let core;
@@ -56,7 +57,14 @@ describe('a teammate setting itself up', () => {
   it('is told that every time it wakes on its own is a duty, and its job promises no other', () => {
     const t = team.describe({ text: 'Find trends worth a post' }).teammate;
     const run = asRun(t);
-    expect(team.briefFor({ id: run.id, labels: run.labels })).toMatch(/each time you wake on your own is a duty, and your job promises no time your duties do not hold/);
+    expect(team.briefFor({ id: run.id, labels: run.labels })).toMatch(/each time you wake on your own is a duty, and your job names no day or time/);
+  });
+
+  // Power testers (w-db46e3fcfd) changed a teammate's schedule on its page and
+  // its job still said "every Monday at 09:00 UTC", and a starter's said
+  // "every weekday morning" under a schedule moved to Mondays.
+  it('and no starter writes a day or a time into its job, which the schedule holds', () => {
+    for (const s of STARTERS) expect(s.job, s.starter).not.toMatch(/\b(every|each) (week)?day|morning|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday|\d{1,2}(:\d{2})? ?(am|pm|utc)\b/i);
   });
 });
 
