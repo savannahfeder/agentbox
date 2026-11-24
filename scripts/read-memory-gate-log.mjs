@@ -17,7 +17,8 @@ import path from 'node:path';
 
 const LIGHT_LETTERS = new Set(['l', 'c']);
 const isLight = (o) => LIGHT_LETTERS.has(o);
-const measured = (list) => (list ?? []).filter((o) => o !== '?');
+// `H` is a chain that came out heavy: it is counted below, and is no reading of the command itself.
+const measured = (list) => (list ?? []).filter((o) => o !== '?' && o !== 'H');
 
 /** Where the app keeps its own files, on either platform, newest first. */
 export function likelyUserDirs(home = os.homedir()) {
@@ -122,7 +123,7 @@ export function summariseProvenance(raw) {
   const out = {
     keys: { total: 0, lightToday: 0, lightOnChainEvidenceOnly: 0 },
     programs: { total: 0, lendsLightToday: 0, wouldStopLending: 0, names: [] },
-    letters: { l: 0, c: 0, m: 0, h: 0, '?': 0 },
+    letters: { l: 0, c: 0, H: 0, m: 0, h: 0, '?': 0 },
     carriesProvenance: false,
   };
   const keys = new Map(Array.isArray(raw?.keys) ? raw.keys : []);
@@ -195,7 +196,7 @@ function printProvenance(s) {
     console.log(`let the app run on it and come back.`);
   }
   console.log(`letters across every record: ${Object.entries(s.letters).map(([k, v]) => `${k}=${v}`).join(' ')}`);
-  console.log(`  l is a run measured on its own; c is one measured only inside a chain.`);
+  console.log(`  l is a run measured on its own; c is one seen only inside a chain that came out light, H inside one that came out heavy.`);
   console.log(`\ncommand keys: ${s.keys.total}`);
   console.log(`  classified light today: ${s.keys.lightToday}`);
   console.log(`  of those, resting ONLY on chain-learned runs: ${s.keys.lightOnChainEvidenceOnly}`);
