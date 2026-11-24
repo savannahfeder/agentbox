@@ -59,7 +59,8 @@
   :root:root .gt-rail-nav.workspace-navigation > .ws-sec::before { content: ''; position: absolute; left: 6px; width: 16px; top: 50%; height: 1px; background: var(--line-strong); opacity: 0; transition: opacity .06s; }
   :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .ws-sec { pointer-events: none; background: none; }
   :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .ws-sec > * { opacity: 0; transition: opacity .06s; }
-  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation > .ws-sec::before { opacity: 1; }
+  /* A folded Workspace has no icons under the line. */
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation > .ws-sec[aria-expanded="true"]::before { opacity: 1; }
 
   /* Recent gives way before the foot does in a short window, and is not drawn at all while the sidebar is closed. */
   :root:root .gt-rail-nav.workspace-navigation .ws-recent { display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0; overflow: hidden; transition: opacity .14s .08s; }

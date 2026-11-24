@@ -181,12 +181,35 @@ describe('the update card and the closed sidebar, after her notes', () => {
   });
   it('keeps Workspace’s icons while closed, after a short line where their heading is', () => {
     expect(css).not.toMatch(/\.workspace-collapsed[^{]*:is\(\.gt-rail-groups, \.workspace-places\) \{[^}]*visibility: hidden/);
-    expect(css).toContain(`:root:root .workspace-collapsed .gt-rail-nav.workspace-navigation > .ws-sec::before { opacity: 1; }`);
+    expect(css).toContain(`:root:root .workspace-collapsed .gt-rail-nav.workspace-navigation > .ws-sec[aria-expanded="true"]::before { opacity: 1; }`);
     expect(css).toMatch(/> \.ws-sec::before \{ content: ''; position: absolute; left: 6px; width: 16px; top: 50%; height: 1px; background: var\(--line-strong\);/);
   });
   it('gives the line the heading’s own height, so no icon moves when the sidebar opens', () => {
     const sec = css.match(/\.gt-rail-nav\.workspace-navigation \.ws-sec \{([^}]*)\}/)?.[1] ?? '';
     expect(sec).toMatch(/height: 20px; margin-top: 12px;/);
     for (const rule of css.matchAll(/\.workspace-collapsed[^{]*\.ws-sec[^{]*\{([^}]*)\}/g)) expect(rule[1]).not.toMatch(/height|margin|padding/);
+  });
+});
+
+// "if I have the workspace closed, it still has the hairline here". The short
+// line stands in for the Workspace heading while the sidebar is closed. With
+// Workspace folded its icons are gone, so the line stood over nothing.
+describe('the short line, with Workspace folded', () => {
+  const css = strip(read('renderer/src/sidebar.css'));
+  it('is drawn only over icons: a folded Workspace has no line in the closed sidebar', () => {
+    expect(css).toContain(':root:root .workspace-collapsed .gt-rail-nav.workspace-navigation > .ws-sec[aria-expanded="true"]::before { opacity: 1; }');
+    // No rule lights the line whatever the heading's state.
+    expect(css).not.toMatch(/> \.ws-sec::before \{ opacity: 1; \}/);
+  });
+  it('still marks a folded heading as folded, which is what the rule reads', () => {
+    const html = (folded) => {
+      globalThis.localStorage = { getItem: (k) => (k === 'agentbox.sidebarFolds' && folded ? '["workspace"]' : null), setItem() {} };
+      try { return renderToStaticMarkup(createElement(WorkspaceNavigation, { view: 'inbox', collapsed: true, rail: true, onView() {}, onSearch() {}, onCompose() {}, onFiles() {}, onConnections() {} })); }
+      finally { delete globalThis.localStorage; }
+    };
+    expect(html(true)).toMatch(/class="ws-sec" aria-expanded="false"/);
+    expect(html(true)).not.toContain('data-tab="files"');
+    expect(html(false)).toMatch(/class="ws-sec" aria-expanded="true"/);
+    expect(html(false)).toContain('data-tab="files"');
   });
 });
