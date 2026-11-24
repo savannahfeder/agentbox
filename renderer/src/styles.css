@@ -4196,6 +4196,10 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
 .palette-k .palette-query svg { width: 18px; height: 18px; flex: none; color: var(--text-faint); }
 .palette-k .palette-input { flex: 1; min-width: 0; width: auto; border: none; padding: 0; font-size: 17px; caret-color: var(--accent); }
 .palette-k .palette-input::placeholder { color: var(--agent-ink); }
+/* Words scrolled out of the bar fade at that edge rather than being cut mid-letter. */
+.palette-k .palette-input.clip-start { mask-image: linear-gradient(to right, transparent, #000 32px); }
+.palette-k .palette-input.clip-end { mask-image: linear-gradient(to left, transparent, #000 32px); }
+.palette-k .palette-input.clip-start.clip-end { mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent); }
 .palette-k .palette-esc { flex: none; cursor: pointer; line-height: 1; }
 .palette-k .palette-esc:hover { color: var(--text); }
 .palette-k .palette-ai-ask {

@@ -476,6 +476,13 @@ export function offersAgent(query: string, threadsFound: number, phone = false):
   return phone || threadsFound === 0;
 }
 
+/** Which ends of the search bar hide words, as classes that fade them. */
+export function clippedEnds(scrollLeft: number, clientWidth: number, scrollWidth: number): string {
+  const start = scrollLeft > 1;
+  const end = scrollLeft + clientWidth < scrollWidth - 1;
+  return `${start ? ' clip-start' : ''}${end ? ' clip-end' : ''}`;
+}
+
 const quoted = (query: string) => { const q = query.trim(); return q.length > 48 ? `“${q.slice(0, 47)}…”` : `“${q}”`; };
 
 /** The row that searches with AI, in each of its states. */
@@ -582,6 +589,10 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findByDescri
   const byKey = useRef(false);
 
   useEffect(() => inputRef.current?.focus(), []);
+  const [clipped, setClipped] = useState('');
+  const measureClip = () => { const el = inputRef.current; if (el) setClipped(clippedEnds(el.scrollLeft, el.clientWidth, el.scrollWidth)); };
+  // The caret scrolls the text after the value lands, so measure on the next frame.
+  useEffect(() => { const f = requestAnimationFrame(measureClip); return () => cancelAnimationFrame(f); }, [query]);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => escapeClosesThePalette(window, () => closeRef.current()), []);
@@ -685,9 +696,11 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findByDescri
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.6" /><path d="M10.4 10.4L14 14" /></svg>
           <input
             ref={inputRef}
-            className="palette-input"
+            className={`palette-input${clipped}`}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onScroll={measureClip}
+            onSelect={measureClip}
             placeholder={phone ? 'Search' : findThreads ? 'Search threads or type a command…' : 'Type a command…'}
             enterKeyHint="go"
             onKeyDown={(e) => {
