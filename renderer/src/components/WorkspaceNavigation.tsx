@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { SettingsIcon } from './SettingsIcon';
 import type { TeamState, View } from '../types';
 import { Face } from '../team/people';
@@ -10,7 +10,7 @@ import { changeLines, closedHere, readMoveClosed, readUpdateClosed, writeMoveClo
 import { AccountMenu } from '../team/account-menu';
 import type { Invisible } from '../team/rooms/GoInvisible';
 import { chord } from '../this-keyboard';
-import { pointerMoved } from '../sidebar-shrinks';
+import { crossedIn, followPointer, pointerMoved, pointerTrail } from '../sidebar-shrinks';
 import { actsOnPress } from '../press';
 import { foldedSet, toggleFold } from '../teammates/chat-lines';
 
@@ -143,9 +143,17 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   const inboxLit = !homePage && !page && !onGroupsPage && !onTeammatesPage && !filesPage && !connectionsPage && !tasksPage && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view);
   // A pointer passing over on its way somewhere else does not open it.
   const hoverAt = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navBox = useRef<HTMLElement>(null);
+  const cameIn = useRef(false);
+  const [pointer] = useState(pointerTrail);
+  useEffect(() => (rail ? followPointer(window, pointer) : undefined), [rail, pointer]);
   const hover = rail && onHover ? {
-    onMouseMove: (e: { movementX: number; movementY: number }) => { if (hoverAt.current || !pointerMoved(e)) return; hoverAt.current = setTimeout(() => onHover(true), 140); },
-    onMouseLeave: () => { if (hoverAt.current) clearTimeout(hoverAt.current); hoverAt.current = null; onHover(false); },
+    onMouseMove: (e: { movementX: number; movementY: number }) => {
+      if (hoverAt.current || !pointerMoved(e)) return;
+      cameIn.current ||= !!navBox.current && crossedIn(pointer.before(), navBox.current.getBoundingClientRect());
+      if (cameIn.current) hoverAt.current = setTimeout(() => onHover(true), 140);
+    },
+    onMouseLeave: () => { if (hoverAt.current) clearTimeout(hoverAt.current); hoverAt.current = null; cameIn.current = false; onHover(false); },
   } : {};
   const me = team?.signedIn ? team.me : null;
   // Your account menu has Settings in it, so the foot does not say it twice.
@@ -197,7 +205,7 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
     onPointerDown: (e: { target: EventTarget }) => { const b = e.target instanceof Element ? e.target.closest('button') : null; if (b) b.dataset.clicked = ''; },
     onBlur: (e: { target: EventTarget }) => { if (e.target instanceof HTMLElement) delete e.target.dataset.clicked; },
   };
-  return <aside className={`workspace-navigation${rail ? ' gt-rail-nav' : ''}`} aria-label="Workspace" {...hover} {...clicked}>
+  return <aside ref={navBox} className={`workspace-navigation${rail ? ' gt-rail-nav' : ''}`} aria-label="Workspace" {...hover} {...clicked}>
     <div className="th-team" title={collapsed ? undefined : teamName}>
       {mark}<span className="th-team-name">{teamName}</span>
       {rail && onCompose && <button type="button" className="ws-new" aria-label="New thread" title="New thread (N)" onClick={onCompose}>

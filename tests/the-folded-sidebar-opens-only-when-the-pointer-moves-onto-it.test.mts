@@ -24,11 +24,11 @@ describe('a pointer that moved', () => {
 
 describe('the folded sidebar', () => {
   it('opens on a pointer that moved over it, never on one it appeared under', () => {
-    expect(nav).toMatch(/onMouseMove: \(e: \{ movementX: number; movementY: number \}\) => \{ if \(hoverAt\.current \|\| !pointerMoved\(e\)\) return;/);
+    expect(nav).toMatch(/onMouseMove: \(e: \{ movementX: number; movementY: number \}\) => \{\s+if \(hoverAt\.current \|\| !pointerMoved\(e\)\) return;/);
     expect(nav).not.toMatch(/onMouseEnter: \(\) => \{ hoverAt\.current = setTimeout/);
   });
   it('still waits a moment, and still closes when the pointer leaves', () => {
     expect(nav).toMatch(/hoverAt\.current = setTimeout\(\(\) => onHover\(true\), 140\)/);
-    expect(nav).toMatch(/onMouseLeave: \(\) => \{ if \(hoverAt\.current\) clearTimeout\(hoverAt\.current\); hoverAt\.current = null; onHover\(false\); \}/);
+    expect(nav).toMatch(/onMouseLeave: \(\) => \{ if \(hoverAt\.current\) clearTimeout\(hoverAt\.current\); hoverAt\.current = null; (cameIn\.current = false; )?onHover\(false\); \}/);
   });
 });
