@@ -70,7 +70,7 @@ import { readKeyFrom } from './cloud/key-source.mts';
 import { keySource } from '../shared/cloud-key-sources.mts';
 import { threadsKeysFree } from '../shared/cloud-needs.mts';
 import { fileToSend } from '../shared/cloud-sent-files.mts';
-import { cloudLoginState, mayRunOn, startCloudSignIn, renewCloudCodexLogin, sweepRetiredLogins, forgetOldCloudTokens, listCloudLogins, removeCloudLogin, newCloudAccountKey, lookAtCloudLogin, cloudLimits, markCloudLogin, cloudLoginInUse, cloudAccountsFrom, CLOUD_ACCOUNT_ENV } from './cloud/logins.mts';
+import { cloudLoginState, mayRunOn, startCloudSignIn, renewCloudCodexLogin, sweepRetiredLogins, forgetOldCloudTokens, listCloudLogins, removeCloudLogin, newCloudAccountKey, lookAtCloudLogin, cloudLimits, markCloudLogin, liftCloudLimit, cloudLoginInUse, cloudAccountsFrom, CLOUD_ACCOUNT_ENV } from './cloud/logins.mts';
 import type { CloudLimitReading } from './cloud/logins.mts';
 import type { TickInput } from './teammates.mts';
 import { execFileSync } from 'node:child_process';
@@ -2499,6 +2499,13 @@ export class Supervisor {
     }
     out.missing = only.size;
     this._saveState();
+    // A thread held by the cloud account's limit is asked about at once: a
+    // reading with room ends the limit (`lookAtCloudLogins`) and starts it.
+    try {
+      if (out.queued && this._cloudInUseState(DEFAULT_ENGINE) === 'limited') {
+        this.lookAtCloudLogins({ force: true }).catch((e) => console.warn('zero: could not look at the cloud sign-ins:', (e as Error).message));
+      }
+    } catch (e) { console.warn('zero: could not read the cloud account in use:', (e as Error).message); }
     return out;
   }
 
@@ -6644,6 +6651,7 @@ export class Supervisor {
     const trouble = this._profileTrouble?.[key];
     const limits = reading?.limits ?? [];
     if (limits.length) (this._usageSeen ??= {})[profile || 'default'] = { limits, at: reading!.at ?? 0 };
+    if (limits.length && !onlyLimit) this._liftCloudLimitOf(profile || 'default', limits, reading!.at ?? 0);
     if (!trouble || !limits.length) return false;
     if ((reading!.at ?? 0) < (trouble.at ?? trouble.since ?? 0)) return false;
     const proven = (!onlyLimit && ['signed-out', 'org-blocked', 'unknown'].includes(trouble.cause as string))
@@ -6659,6 +6667,20 @@ export class Supervisor {
       this._lastFastExit = null;
     }
     this._saveState();
+    this.onChange?.();
+    this.wake?.();
+    return true;
+  }
+
+  // The cloud runs on this same subscription, so a reading here with room ends
+  // its limit too (main/cloud/logins.mts `liftCloudLimit`).
+  _liftCloudLimitOf(profile: string, limits: readonly { percent?: number | null }[], at: number) {
+    if (!limits.every((l) => (l?.percent ?? 0) < 100)) return false;
+    let rec: ReturnType<Supervisor['_cloudLoginOf']>;
+    try { rec = this._cloudLoginOf(profile); } catch { return false; }
+    if (!rec?.limitedUntil || !liftCloudLimit(DEFAULT_ENGINE, rec.key, rec.id, { limits, readAt: at }, { home: this.config.home })) return false;
+    this._cloudConfigAt = 0;
+    this._cloudInUseSeen?.delete(DEFAULT_ENGINE);
     this.onChange?.();
     this.wake?.();
     return true;
@@ -7070,18 +7092,24 @@ export class Supervisor {
       .filter((r) => !r.broken && (force || !r.readAt || now - r.readAt > 10 * 60_000));
     if (!due.length) return;
     this._cloudLooking = true;
+    let lifted = false;
     try {
       const { transport, storage } = await this._cloudClients();
       for (const r of due) {
-        await lookAtCloudLogin({ transport, storage, key: r.key, home: this.config.home }).catch(() => {
+        if (await lookAtCloudLogin({ transport, storage, key: r.key, home: this.config.home }).catch(() => {
           markCloudLogin(DEFAULT_ENGINE, r.key, r.id, { lookFailedAt: Date.now(), lookError: 'The cloud could not be reached.' }, { home: this.config.home });
-        });
+        }) === 'lifted') lifted = true;
         this.onChange?.();
       }
     } catch (e) {
       console.warn('zero: could not look at the cloud sign-ins:', (e as Error).message);
     } finally {
       this._cloudLooking = false;
+    }
+    if (lifted) {
+      this._cloudConfigAt = 0;
+      this._cloudInUseSeen?.delete(DEFAULT_ENGINE);
+      this.wake?.();
     }
     try { this._noteCloudReadings(); } catch (e) { console.warn('zero: could not read the cloud sign-ins for a limit:', (e as Error).message); }
     if (this._cloudLookAgain) {
