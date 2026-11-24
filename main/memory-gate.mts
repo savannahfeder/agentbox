@@ -124,12 +124,15 @@ export const DEFAULTS: GateSettings = {
  * for a fault that was not there. A queue behind heavier work and a computer that
  * is genuinely short are different things to be told.
  */
-export function refusal(waitedMs: number, pressure: Pressure = 'normal'): string {
+export function refusal(waitedMs: number, pressure: Pressure = 'normal', forRoom = false): string {
   const minutes = Math.max(1, Math.round(waitedMs / 60_000));
   const held = `${NAME} held this command for ${minutes} minute${minutes === 1 ? '' : 's'}`;
-  const why = pressure === 'normal'
-    ? `${held} behind heavier work that has not finished, and it still cannot start it.`
-    : `This computer is short of memory, so ${held} while heavier work ran, and it still cannot start it.`;
+  // A third reason since the gate asks for room: the computer is not short, and nothing heavier need be running.
+  const why = pressure !== 'normal'
+    ? `This computer is short of memory, so ${held} while heavier work ran, and it still cannot start it.`
+    : forRoom
+      ? `${NAME} is using all the memory it may on this computer, so it ${held.slice(NAME.length + 1)}, and it still cannot start it.`
+      : `${held} behind heavier work that has not finished, and it still cannot start it.`;
   return `${why} Do not retry it straight away. Carry on with anything that does not need it, `
     + 'or end your turn and say what you are waiting for.';
 }
@@ -161,6 +164,10 @@ export interface WaitingCommand {
   session: string | null;
   background: boolean;
   cls: Verdict;
+  /** What it took here before, in MB: 0 for a light one, null when nothing has measured it. */
+  needMb: number | null;
+  /** It was held for want of room, which its refusal then says. */
+  forRoom: boolean;
   arrived: number;
   replies: GateReply[];
 }
@@ -179,6 +186,11 @@ export interface RunningCommand {
   shared: number | null;
   waitedMs: number;
   pressureAt: Pressure;
+  needMb: number | null;
+  /** The room it started in, once the commands already running had theirs; null when the gate had not been told. */
+  roomMb: number | null;
+  /** What it had taken when the room was last read, which that reading already has in it. */
+  atRoom: number;
 }
 
 export interface MemoryGateOptions extends Partial<GateSettings> {
@@ -196,6 +208,8 @@ export class MemoryGate {
   declare history: CommandHistory;
   declare clock: () => number;
   declare pressure: Pressure;
+  declare room: number | null;
+  declare roomAt: number | null;
   declare running: Map<string, RunningCommand>;
   declare waiting: Map<string, WaitingCommand>;
 
@@ -204,6 +218,8 @@ export class MemoryGate {
     this.history = history;
     this.clock = clock;
     this.pressure = 'normal';
+    this.room = null;
+    this.roomAt = null;
     this.running = new Map();
     this.waiting = new Map();
   }
@@ -211,6 +227,20 @@ export class MemoryGate {
   setPressure(p: Pressure) {
     if (p === this.pressure) return;
     this.pressure = p;
+    this._pump();
+  }
+
+  /**
+   * How many MB Agentbox has left on this computer by the reading taken at
+   * `at`, negative when it is over, or null when there is no reading to go by
+   * (main/memory-allowance.mts). The same reading told twice changes nothing.
+   */
+  setRoom(mb: number | null | undefined, at: number = this.clock()) {
+    const room = typeof mb === 'number' && Number.isFinite(mb) ? Math.round(mb) : null;
+    if (room === this.room && (room === null || at === this.roomAt)) return;
+    this.room = room;
+    this.roomAt = room === null ? null : at;
+    for (const r of this.running.values()) r.atRoom = r.peakMb ?? 0;
     this._pump();
   }
 
@@ -228,6 +258,7 @@ export class MemoryGate {
     if (this.running.has(id)) { reply({ allow: true, cls: this.running.get(id)!.cls }); return; }
     const already = this.waiting.get(id);
     if (already) { already.replies.push(reply); return; }
+    const cls = this.history.classify(req.command);
     this.waiting.set(id, {
       id,
       item: req.item ?? null,
@@ -237,7 +268,9 @@ export class MemoryGate {
       urgent: req.urgent === true,
       session: req.session ?? null,
       background: !!req.background,
-      cls: this.history.classify(req.command),
+      cls,
+      needMb: cls === 'light' ? 0 : this.history.usualMb(req.command),
+      forRoom: false,
       arrived: this.clock(),
       replies: [reply],
     });
@@ -319,7 +352,7 @@ export class MemoryGate {
         this.waiting.delete(w.id);
         for (const r of w.replies) {
           r({
-            reason: refusal(now - w.arrived, this.pressure),
+            reason: refusal(now - w.arrived, this.pressure, w.forRoom),
             allow: false,
             cls: w.cls,
             waitedMs: now - w.arrived,
@@ -331,6 +364,10 @@ export class MemoryGate {
     if (this.pressure === 'critical') return;
     let slotsUsed = 0;
     let lightUsed = 0;
+    // The room left once each command already running has what it is expected
+    // to take: the more of what it took before and what it has reached, less
+    // what the reading already had of it.
+    let room = this.room;
     const sharedGroups = new Set<number>();
     for (const r of this.running.values()) {
       if (this._holdsSlot(r, now)) {
@@ -338,24 +375,43 @@ export class MemoryGate {
           if (sharedGroups.has(r.shared)) continue;
           sharedGroups.add(r.shared);
         }
+        if (room !== null) room -= Math.max(r.needMb ?? this.heavyMb, r.peakMb ?? 0) - r.atRoom;
         slotsUsed++;
       } else if (r.cls === 'light') lightUsed++;
     }
     let blocked = false;
+    // One ahead is waiting for room: a command of known size does not pass it.
+    let noRoom = false;
     for (const w of this._ordered(now)) {
-      if (w.urgent) { this._admit(w, now); slotsUsed++; continue; }
+      if (w.urgent) {
+        this._admit(w, now, room);
+        if (room !== null) room -= w.needMb ?? this.heavyMb;
+        slotsUsed++;
+        continue;
+      }
       if (w.cls === 'light') {
-        if (lightUsed < this.lightLane) { this._admit(w, now); lightUsed++; }
+        if (lightUsed < this.lightLane) { this._admit(w, now, room); lightUsed++; }
         continue;
       }
       if (blocked) continue;
       if (this.pressure === 'tight' || slotsUsed >= this.slots) { blocked = true; continue; }
-      this._admit(w, now);
+      if (room !== null) {
+        // A command nothing has measured is taken for one just heavy.
+        const need = w.needMb ?? this.heavyMb;
+        const fits = !noRoom && need <= room;
+        // What does not fit goes one at a time, when nothing else holds a
+        // slot: a command of known size while any room is left, and one
+        // nothing has measured even with none, since it is not known to be big.
+        const alone = slotsUsed === 0 && (w.needMb === null || (!noRoom && room > 0));
+        if (!fits && !alone) { w.forRoom = true; noRoom = true; continue; }
+        this._admit(w, now, room);
+        room -= need;
+      } else this._admit(w, now, null);
       slotsUsed++;
     }
   }
 
-  _admit(w: WaitingCommand, now: number) {
+  _admit(w: WaitingCommand, now: number, room: number | null) {
     this.waiting.delete(w.id);
     this.running.set(w.id, {
       id: w.id, item: w.item, product: w.product, command: w.command, cls: w.cls,
@@ -365,6 +421,7 @@ export class MemoryGate {
       // full slots can hold a command back, so the wait is evidence about
       // `slots`; under `tight` nothing heavy starts whatever the count is.
       waitedMs: now - w.arrived, pressureAt: this.pressure,
+      needMb: w.needMb, roomMb: room, atRoom: 0,
     });
     for (const r of w.replies) r({ allow: true, cls: w.cls });
   }
