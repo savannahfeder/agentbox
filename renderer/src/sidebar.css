@@ -47,18 +47,19 @@
   :root:root .gt-rail-nav.workspace-navigation .workspace-tabs { gap: 2px; margin-top: 0; }
   :root:root .gt-rail-nav.workspace-navigation .workspace-find + .workspace-tabs { margin-top: 12px; }
   :root:root .gt-rail-nav.workspace-navigation .workspace-tabs + .workspace-tabs { margin-top: 2px; }
-  /* With its heading gone, Workspace would be three icons after a gap. */
-  :root:root .gt-rail-nav.workspace-navigation :is(.gt-rail-groups, .workspace-places) { transition: opacity .14s .08s; }
-  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation :is(.gt-rail-groups, .workspace-places) { visibility: hidden; opacity: 0; transition: opacity .06s, visibility 0s .06s; }
   :root:root .gt-rail-nav.workspace-navigation .workspace-running { font-size: 11.5px; font-weight: 400; line-height: 16px; letter-spacing: .02em; color: var(--text-dim); }
   /* Closed, the Inbox's number is the dot on its icon. */
   :root:root .gt-rail-nav.workspace-navigation .workspace-tab.has-count::after { top: 4px; left: 18px; width: 5px; height: 5px; }
 
-  /* A section's name folds its rows. Closed, it keeps its height, so no icon under it moves when the sidebar opens. */
-  :root:root .gt-rail-nav.workspace-navigation .ws-sec { align-self: flex-start; height: 24px; margin-top: 16px; padding: 0 6px; gap: 4px; border-radius: var(--radius); font-size: 12px; font-weight: 500; line-height: 14px; color: var(--text-faint); cursor: default; transition: opacity .14s .08s; }
-  :root:root .gt-rail-nav.workspace-navigation .ws-sec > svg { flex: none; width: 7px; height: 7px; opacity: .75; transition: transform .12s; }
+  /* A section's name folds its rows. Closed, a short line stands in its place at its height, so no icon under it moves when the sidebar opens. */
+  :root:root .gt-rail-nav.workspace-navigation .ws-sec { position: relative; align-self: flex-start; height: 20px; margin-top: 12px; padding: 0 6px; gap: 4px; border-radius: var(--radius); font-size: 12px; font-weight: 500; line-height: 14px; color: var(--text-faint); cursor: default; }
+  :root:root .gt-rail-nav.workspace-navigation .ws-sec > * { transition: opacity .14s .08s; }
+  :root:root .gt-rail-nav.workspace-navigation .ws-sec > svg { flex: none; width: 7px; height: 7px; opacity: .75; transition: transform .12s, opacity .14s .08s; }
   :root:root .gt-rail-nav.workspace-navigation .ws-sec[aria-expanded="false"] > svg { transform: rotate(-90deg); }
-  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .ws-sec { opacity: 0; pointer-events: none; transition: opacity .06s; }
+  :root:root .gt-rail-nav.workspace-navigation > .ws-sec::before { content: ''; position: absolute; left: 6px; width: 16px; top: 50%; height: 1px; background: var(--line-strong); opacity: 0; transition: opacity .06s; }
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .ws-sec { pointer-events: none; background: none; }
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .ws-sec > * { opacity: 0; transition: opacity .06s; }
+  :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation > .ws-sec::before { opacity: 1; }
 
   /* Recent gives way before the foot does in a short window, and is not drawn at all while the sidebar is closed. */
   :root:root .gt-rail-nav.workspace-navigation .ws-recent { display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0; overflow: hidden; transition: opacity .14s .08s; }
@@ -77,6 +78,8 @@
   :root:root .gt-rail-nav.workspace-navigation .workspace-bottom { position: relative; flex: none; padding-top: 16px; }
   :root:root .gt-rail-nav.workspace-navigation .workspace-utilities { gap: 2px; padding-bottom: 0; }
   :root:root .gt-rail-nav.workspace-navigation .sb-update-slot { padding-bottom: 0; margin-bottom: 6px; }
+  :root:root .gt-rail:not(.workspace-collapsed) .gt-rail-nav.workspace-navigation .sb-update-slot > .sb-update-row { margin: 0 12px 12px; }
+  :root:root .gt-rail-nav.workspace-navigation .sb-update-rise { padding-bottom: 52px; }
   :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .sb-update-slot { margin-bottom: 0; }
   /* Closed, the update row is one more icon in the foot's column. Open, it is the card's button (threads/pages.css). */
   :root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .sb-update-slot > .sb-update-row { width: 100%; height: 30px; padding: 0 6px; border-radius: var(--radius); color: inherit; }

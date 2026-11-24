@@ -156,13 +156,37 @@ describe('the second pass on its finish', () => {
     expect(css).toContain('--sidebar-w: 210px;');
     expect(strip(read('renderer/src/workspace-navigation.css'))).toContain('.app.workspace-layout.workspace-settings { --workspace-width: 202px; }');
   });
-  it('draws no Workspace icons while closed, so nothing stands after a gap', () => {
-    expect(css).toMatch(/\.workspace-collapsed \.gt-rail-nav\.workspace-navigation :is\(\.gt-rail-groups, \.workspace-places\) \{[^}]*visibility: hidden/);
-  });
   it('sets the update row in the foot’s own icon column', () => {
     expect(css).toContain(':root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .sb-update-slot { margin-bottom: 0; }');
     expect(css).toContain(':root:root .workspace-collapsed .gt-rail-nav.workspace-navigation .sb-update-slot > .sb-update-row { width: 100%; height: 30px; padding: 0 6px;');
     // Open, it stays the card's own button, inside the sidebar's width.
     expect(css).not.toMatch(/\.sb-update-slot > \.sb-update-row, \.ws-recent-row\) \{\s*width: 100%/);
+  });
+});
+
+// The owner's pin on the update card, 2026-11-24: "weird spacing/padding here".
+// Measured in the app: the button stood 21 points under the card's words and 3
+// off its bottom edge, against 12 at its sides. And on the closed sidebar she
+// liked Workspace kept after a short line. Drawn at its own height the line let
+// the icons under it slide 16 points as the sidebar opened, which put a press
+// aimed at Connections on the Workspace heading.
+describe('the update card and the closed sidebar, after her notes', () => {
+  const css = strip(read('renderer/src/sidebar.css'));
+  const P = ':root:root .gt-rail-nav.workspace-navigation';
+  it('stands the card’s button 12 points off its bottom edge, as it is off its sides', () => {
+    expect(css).toContain(':root:root .gt-rail:not(.workspace-collapsed) .gt-rail-nav.workspace-navigation .sb-update-slot > .sb-update-row { margin: 0 12px 12px; }');
+    expect(css).toContain(`${P} .sb-update-rise { padding-bottom: 52px; }`);
+    // The side margins it is matched to.
+    expect(strip(read('renderer/src/threads/pages.css'))).toContain('width: calc(100% - 24px); height: 30px;');
+  });
+  it('keeps Workspace’s icons while closed, after a short line where their heading is', () => {
+    expect(css).not.toMatch(/\.workspace-collapsed[^{]*:is\(\.gt-rail-groups, \.workspace-places\) \{[^}]*visibility: hidden/);
+    expect(css).toContain(`:root:root .workspace-collapsed .gt-rail-nav.workspace-navigation > .ws-sec::before { opacity: 1; }`);
+    expect(css).toMatch(/> \.ws-sec::before \{ content: ''; position: absolute; left: 6px; width: 16px; top: 50%; height: 1px; background: var\(--line-strong\);/);
+  });
+  it('gives the line the heading’s own height, so no icon moves when the sidebar opens', () => {
+    const sec = css.match(/\.gt-rail-nav\.workspace-navigation \.ws-sec \{([^}]*)\}/)?.[1] ?? '';
+    expect(sec).toMatch(/height: 20px; margin-top: 12px;/);
+    for (const rule of css.matchAll(/\.workspace-collapsed[^{]*\.ws-sec[^{]*\{([^}]*)\}/g)) expect(rule[1]).not.toMatch(/height|margin|padding/);
   });
 });
