@@ -244,6 +244,8 @@ describe('what it says and writes down', () => {
     const said = replies.get('a')![0];
     expect(said.allow === false && said.reason).toBe(refusal(20 * 60_000, 'normal', true));
     expect(refusal(20 * 60_000, 'normal', true)).toMatch(/is using all the memory it may on this computer/);
+    // And the one thing the agent can do about it.
+    expect(refusal(20 * 60_000, 'normal', true)).toMatch(/Stopping programs you started and no longer need \(test browsers, dev servers\) makes room\./);
     expect(refusal(20 * 60_000, 'normal', true)).not.toMatch(/short of memory|heavier work/);
     // The two it said before are as they were.
     expect(refusal(60_000, 'normal')).toMatch(/behind heavier work that has not finished/);

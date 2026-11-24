@@ -141,7 +141,8 @@ export function refusal(waitedMs: number, pressure: Pressure = 'normal', forRoom
   const why = pressure !== 'normal'
     ? `This computer is short of memory, so ${held} while heavier work ran, and it still cannot start it.`
     : forRoom
-      ? `${NAME} is using all the memory it may on this computer, so it ${held.slice(NAME.length + 1)}, and it still cannot start it.`
+      ? `${NAME} is using all the memory it may on this computer, so it ${held.slice(NAME.length + 1)}, and it still cannot start it. `
+        + 'Stopping programs you started and no longer need (test browsers, dev servers) makes room.'
       : `${held} behind heavier work that has not finished, and it still cannot start it.`;
   return `${why} Do not retry it straight away. Carry on with anything that does not need it, `
     + 'or end your turn and say what you are waiting for.';
