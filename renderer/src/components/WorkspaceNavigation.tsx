@@ -10,7 +10,7 @@ import { changeLines, closedHere, readMoveClosed, readUpdateClosed, writeMoveClo
 import { AccountMenu } from '../team/account-menu';
 import type { Invisible } from '../team/rooms/GoInvisible';
 import { chord } from '../this-keyboard';
-import { crossedIn, followPointer, pointerMoved, pointerTrail } from '../sidebar-shrinks';
+import { CLOSES_AFTER_MS, OPENS_AFTER_MS, crossedIn, followPointer, pointerMoved, pointerTrail } from '../sidebar-shrinks';
 import { actsOnPress } from '../press';
 import { foldedSet, toggleFold } from '../teammates/chat-lines';
 
@@ -143,17 +143,25 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   const inboxLit = !homePage && !page && !onGroupsPage && !onTeammatesPage && !filesPage && !connectionsPage && !tasksPage && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view);
   // A pointer passing over on its way somewhere else does not open it.
   const hoverAt = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leaveAt = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navBox = useRef<HTMLElement>(null);
   const cameIn = useRef(false);
   const [pointer] = useState(pointerTrail);
   useEffect(() => (rail ? followPointer(window, pointer) : undefined), [rail, pointer]);
   const hover = rail && onHover ? {
     onMouseMove: (e: { movementX: number; movementY: number }) => {
+      if (leaveAt.current) { clearTimeout(leaveAt.current); leaveAt.current = null; }
       if (hoverAt.current || !pointerMoved(e)) return;
       cameIn.current ||= !!navBox.current && crossedIn(pointer.before(), navBox.current.getBoundingClientRect());
-      if (cameIn.current) hoverAt.current = setTimeout(() => onHover(true), 140);
+      if (cameIn.current) hoverAt.current = setTimeout(() => onHover(true), OPENS_AFTER_MS);
     },
-    onMouseLeave: () => { if (hoverAt.current) clearTimeout(hoverAt.current); hoverAt.current = null; cameIn.current = false; onHover(false); },
+    onMouseLeave: () => {
+      if (hoverAt.current) clearTimeout(hoverAt.current);
+      hoverAt.current = null;
+      cameIn.current = false;
+      if (leaveAt.current) clearTimeout(leaveAt.current);
+      leaveAt.current = setTimeout(() => { leaveAt.current = null; onHover(false); }, CLOSES_AFTER_MS);
+    },
   } : {};
   const me = team?.signedIn ? team.me : null;
   // Your account menu has Settings in it, so the foot does not say it twice.

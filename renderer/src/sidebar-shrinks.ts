@@ -10,6 +10,10 @@ export const sidebarFolded = ({ phone, shrinks, pointedAt }: { phone: boolean; s
 /** A sidebar drawn under a resting pointer is told the pointer entered it; only one that moved opens it. */
 export const pointerMoved = (e: { movementX: number; movementY: number }) => e.movementX !== 0 || e.movementY !== 0;
 
+/** How long the pointer rests on the closed sidebar before it opens, and how long after leaving before it closes. */
+export const OPENS_AFTER_MS = 140;
+export const CLOSES_AFTER_MS = 300;
+
 type At = { x: number; y: number };
 type Box = { left: number; top: number; right: number; bottom: number };
 const OUT_OF_THE_WINDOW: At = { x: -Infinity, y: -Infinity };
