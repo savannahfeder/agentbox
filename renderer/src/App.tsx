@@ -78,7 +78,8 @@ import { ImportAgents } from './components/ImportAgents';
 import { importedLine } from './agent-import-card';
 import { whenLabel } from './components/When';
 import { RepeatFocus } from './components/RepeatFocus';
-import { Palette } from './components/Palette';
+import { Palette, type DescribedAnswer } from './components/Palette';
+import { aboutThread } from '../../shared/find-by-description.mts';
 import { CloudOffAsk } from './components/CloudOffAsk';
 import { Standing, STANDING } from './components/Standing';
 import { Settings } from './components/Settings';
@@ -205,7 +206,7 @@ import { NO_FILTER, filterBox, harnessOf, isFiltering, type BoxFilter as BoxFilt
 import { URGENT_PRIORITY, itemPriority, shownPriority, moveProduct, placeScore, placedScore } from '../../shared/rank.mts';
 import { rankProducts } from './project-priority';
 import { threadsMade, approvableFiled, doItHereWrites, answerAllWrites, RUN_IT } from './threads-made';
-import { waitingCounts } from './threads-made';
+import { waitingCounts, stateWord } from './threads-made';
 import { closeAsk, closeAskOwnsKey, unshippedAsk } from './close-asks-first';
 import { notShipped, shipItAsk } from '../../shared/not-shipped.mts';
 import { wasBeforeClose } from '../../shared/reopen-as-it-was.mts';
@@ -3404,6 +3405,33 @@ export default function App() {
     })),
     ];
   }, [repeats, items, agentList, searchContext, snap?.products, search, closeSearch, markSeen, weekCards, team, openTeammateCard, stateOfMine, focused?.id]);
+  // A thread described in a sentence, found by a small AI (shared/find-by-description.mts).
+  const askAiToFind = useMemo(() => api.findByDescription(), []);
+  const findByDescription = useCallback(async (description: string): Promise<DescribedAnswer> => {
+    if (!askAiToFind) return { ok: false, error: 'This copy of the app cannot search with AI yet.' };
+    const projectOf = (slug: string) => snap?.products.find((p) => p.slug === slug)?.name ?? slug;
+    const candidates = items.map((i) => ({
+      key: `${i.product}/${i.id}`, product: i.product, title: threadSearchDetails(i, searchContext).title,
+      about: aboutThread(i), where: stateWord(stateOfMine(i) ?? (i.status === 'done' ? 'done' : null)) || 'Open',
+      at: i.updatedAt ?? i.createdAt, project: projectOf(i.product),
+    }));
+    const answer = await askAiToFind({ description, candidates });
+    if (!answer.ok) return answer;
+    const byKey = new Map(items.map((i) => [`${i.product}/${i.id}`, i]));
+    const now = Date.now();
+    return {
+      ok: true,
+      rows: answer.picks.flatMap((p) => {
+        const item = byKey.get(p.key);
+        return item ? [{
+          id: `thread-${item.product}-${item.id}`,
+          label: threadSearchDetails(item, searchContext).title,
+          ...threadResult(item, { state: stateOfMine(item), summary: p.why, project: projectOf(item.product), now }),
+          run: () => { setModal(null); if (search !== null) closeSearch(); setFocused(item); markSeen(item); },
+        }] : [];
+      }),
+    };
+  }, [askAiToFind, items, searchContext, snap?.products, stateOfMine, search, closeSearch, markSeen]);
   // J AND K FROM AN OPEN THREAD OR AN OPEN TEAMMATE CARD (w-fb16bcaeba): open
   // the next stop, whoever's it is. Yours opens as your thread, theirs as
   // their card, exactly as a click on its row would.
@@ -8799,6 +8827,7 @@ export default function App() {
         findThreads={findThreads}
         findChats={findChats}
         findInside={insideForPalette}
+        findByDescription={askAiToFind ? findByDescription : undefined}
         onSearchFor={searchFor}
         itemCommands={(() => {
           // A chat covers the list, so nothing here may act on a row behind it.

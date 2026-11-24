@@ -15,7 +15,7 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky, releaseCanvas } from '../home/sky';
-import { PRO_PITCH, bringInBehind, proFreeDays, proOffer, cloudShowcase, heldPress, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, bringInBehind, chatFrom, chatOpened, chatReplyLabel, proFreeDays, proOffer, cloudShowcase, heldPress, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type SetupPlan, type SetupStep } from '../setup-split';
 import { ENGINE_CHOSEN, writeLastEngine } from '../engines';
 import { startProTrial } from '../pro-trial';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
@@ -52,6 +52,21 @@ function Row({ face, name, sub, end, on, onClick }: { face: ReactNode; name: Rea
     </div>
   );
 }
+/** A recent chat opened beside the list: where it came from, what you asked, and the agent's last reply. */
+function ChatOpen({ chat, onClose }: { chat: SessionThread; onClose: () => void }) {
+  const { asked, said: reply } = chatOpened(chat);
+  return (
+    <div className="ss-chat-open" role="dialog" aria-label={chat.title} onClick={onClose}>
+      <div className="ss-chat-card" onClick={(e) => e.stopPropagation()}>
+        <header><EngineLogo engine={chat.source === 'codex' ? 'codex' : 'claude'} size={15} /><span title={chat.folder}>{chatFrom(chat, { whole: true })} · {said(chat.when)}</span><button type="button" onClick={onClose}>esc</button></header>
+        <h3>{chat.title}</h3>
+        {asked && <p className="ss-chat-you"><span>You</span>{asked}</p>}
+        {reply && <p className="ss-chat-said"><span>{chatReplyLabel(chat.source)}</span>{reply}</p>}
+      </div>
+    </div>
+  );
+}
+
 const Check = ({ on }: { on: boolean }) => <span className={`ss-check${on ? ' ss-on' : ''}`}>{on && <Tick />}</span>;
 
 /** A sky drawn small on a strip, the way the window wears it; Match my system draws the pair it switches between. */
@@ -222,6 +237,7 @@ export function SetupSplit(p: SetupSplitProps) {
     next();
   }, [ticked.length, p, next]);
   const [browsing, setBrowsing] = useState(false);
+  const [openChat, setOpenChat] = useState<string | null>(null);
   const takeFolder = useCallback(async (folder: string) => {
     setBrowsing(false);
     setBusy(true);
@@ -248,6 +264,7 @@ export function SetupSplit(p: SetupSplitProps) {
     const onKey = (e: KeyboardEvent) => {
       // The folder picker hears its own keys.
       if (browsing) return;
+      if (e.key === 'Escape' && openChat) { e.preventDefault(); setOpenChat(null); return; }
       // Enter held on the screen before this one must not answer this one too.
       if (heldPress(e)) { e.preventDefault(); e.stopPropagation(); return; }
       const where = typingInSetup(e.target as Element | null);
@@ -284,6 +301,7 @@ export function SetupSplit(p: SetupSplitProps) {
 
   // A step that draws no button of its own must not keep the last step's Enter.
   primary.current = step === 'account' ? () => accountPrimary.current?.() : () => {};
+  const opened = p.chats.find((t) => t.id === openChat) ?? null;
   choose.current = null;
   let head: [string, string] = ['', ''];
   let body: ReactNode = null;
@@ -295,10 +313,11 @@ export function SetupSplit(p: SetupSplitProps) {
     </> : <>
       <div className="ss-list ss-chats">
         {p.chats.map((t) => (
-          <div key={t.id} className={`ss-row ss-press ss-chat${p.ticks.has(t.id) ? ' ss-on' : ''}`} role="button" onClick={() => p.onToggle(t.id)}>
-            <span className="ss-name">{t.title}</span>
+          <div key={t.id} className={`ss-row ss-press ss-chat${openChat === t.id ? ' ss-on' : ''}`} role="button" aria-expanded={openChat === t.id} onClick={() => setOpenChat((was) => (was === t.id ? null : t.id))}>
+            <span className="ss-ai"><EngineLogo engine={t.source === 'codex' ? 'codex' : 'claude'} size={17} /></span>
+            <span className="ss-text"><span className="ss-name">{t.title}</span><span className="ss-sub">{chatFrom(t)}</span></span>
             <span className="ss-meta">{said(t.when)}</span>
-            <Check on={p.ticks.has(t.id)} />
+            <span className="ss-tick" role="checkbox" aria-checked={p.ticks.has(t.id)} aria-label={`Add ${t.title}`} onClick={(e) => { e.stopPropagation(); p.onToggle(t.id); }}><Check on={p.ticks.has(t.id)} /></span>
           </div>
         ))}
       </div>
@@ -411,6 +430,7 @@ export function SetupSplit(p: SetupSplitProps) {
     document.body,
   )}
   {/* Above the app in the right panel as well as the steps. */}
+  {step === 'chats' && !done.chats && opened && createPortal(<ChatOpen chat={opened} onClose={() => setOpenChat(null)} />, document.body)}
   {browsing && createPortal(<div className="ss-picker"><FolderPicker startIn={null} onPick={(f: string) => void takeFolder(f)} onClose={() => setBrowsing(false)} /></div>, document.body)}
   </>;
 }

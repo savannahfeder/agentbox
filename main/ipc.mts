@@ -91,6 +91,8 @@ import { machineryPath } from './store/home.mts';
 import { EVENT_NAMES } from '../shared/analytics-events.mts';
 import { appFinder } from './everything-found.mts';
 import { openedOf } from '../shared/opened-lately.mts';
+import { askSmallModel } from './row-label.mts';
+import { findByDescription, FIND_BUDGET_MS, type FindCandidate } from '../shared/find-by-description.mts';
 import { appFilesPlace } from './files-place.mts';
 import { Name } from '../shared/product-name.mjs';
 import { ghToken, setUpGit, startGhLogin } from './github-browser-sign-in.mts';
@@ -2799,6 +2801,20 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     catch (err) { return { ok: false, error: String((err as Error)?.message ?? err), lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 }, threads: [] }; }
   });
   ipcMain.handle('zero:warm-find-in-threads', () => { finderNow().warm().catch(() => {}); return true; });
+  // A thread found from a description, by a small model on an account with room.
+  // A project tied to one account never goes in the prompt: the walk across
+  // accounts would show its threads to another (`_askSmall`).
+  ipcMain.handle('zero:find-by-description', async (_e, { description, candidates }: { description?: unknown; candidates?: unknown } = {}) => {
+    const all = (Array.isArray(candidates) ? candidates : []).filter((c): c is FindCandidate => !!c && typeof c.key === 'string' && typeof c.product === 'string')
+      .filter((c) => !supervisor._projectProfile(c.product));
+    const until = Date.now() + FIND_BUDGET_MS;
+    const ask = (prompt: string) => supervisor._askSmall((opts) => {
+      const left = until - Date.now();
+      return left < 2000 ? '' : askSmallModel(prompt, (t) => t.trim(), { ...opts, timeoutMs: left });
+    });
+    try { return await findByDescription({ description: String(description ?? '').slice(0, 400), candidates: all, ask, outOfTime: () => until - Date.now() < 2000 }); }
+    catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  });
   const cloudHome = () => ({ home: supervisor.config.home || os.homedir() });
   let keeperMade: FilesKeeper | null = null;
   const keeperNow = (): FilesKeeper | null => (!config.accountRoot ? null : keeperMade ??= filesKeeper({
