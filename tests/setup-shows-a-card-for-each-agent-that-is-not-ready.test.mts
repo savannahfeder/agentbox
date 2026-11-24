@@ -59,6 +59,13 @@ describe('a card', () => {
     expect(agentCard(r, { phase: 'updating' })).toEqual({ ready: false, sub: 'Updating…', act: null });
     expect(agentCard(r, { phase: 'ready' })).toEqual({ ready: true, sub: null, act: null });
   });
+  it('says what to run when Agentbox cannot update that copy itself, and offers to look again', () => {
+    // Measured on the real updater against an npm Claude Code: it answers
+    // "This installation must be updated using its own installer.", which says nothing to do.
+    expect(agentCard({ engine: 'claude', found: true, signedIn: false, tooOld: true }, { phase: 'manual', error: 'Run claude update in a terminal' }))
+      .toEqual({ ready: false, sub: 'Run claude update in a terminal', act: 'Check again' });
+    expect(fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8')).toContain('own installer');
+  });
   it('says why it stopped and offers to try again', () => {
     expect(agentCard({ engine: 'claude', found: true, signedIn: false }, { phase: 'failed', error: 'The sign-in was closed before it finished.' }))
       .toEqual({ ready: false, sub: 'The sign-in was closed before it finished.', act: 'Try again' });

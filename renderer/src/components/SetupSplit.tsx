@@ -212,6 +212,9 @@ export function SetupSplit(p: SetupSplitProps) {
   }, [payState, next]);
 
   // ---- The agents' cards. Nothing runs until a card's button is pressed.
+  // The updater only updates a copy from Claude Code's own installer; any other says "its own installer", which says nothing to do.
+  const stoppedUpdate = (engine: 'claude' | 'codex', message: string | null | undefined): AgentPress & { via: 'update' } =>
+    /own installer/.test(message ?? '') ? { phase: 'manual', error: `Run ${engine} update in a terminal`, via: 'update' } : { phase: 'failed', error: message ?? null, via: 'update' };
   const [cards, setCards] = useState<readonly AgentReading[]>(p.readings ?? []);
   const [presses, setPresses] = useState<Partial<Record<'claude' | 'codex', AgentPress & { via: 'setup' | 'update' }>>>({});
   const pressing = (['claude', 'codex'] as const).filter((e) => ['checking', 'installing', 'signing-in', 'updating'].includes(presses[e]?.phase ?? ''));
@@ -224,14 +227,15 @@ export function SetupSplit(p: SetupSplitProps) {
   }, []);
   const pressCard = useCallback(async (engine: 'claude' | 'codex', act: string) => {
     if (act === 'Open again') { void api.engineSetup('again', engine).catch(() => null); return; }
+    if (act === 'Check again') { pressOn(engine, { phase: 'checking', via: 'update' }); await readAgain(engine); pressOn(engine, null); return; }
     const update = act === 'Update' || (act === 'Try again' && presses[engine]?.via === 'update');
     if (update) {
       pressOn(engine, { phase: 'updating', via: 'update' });
       try {
         const u = await api.agentUpdate(engine, 'start');
         if (u.state === 'current') { await readAgain(engine); pressOn(engine, null); }
-        else if (u.state !== 'running') pressOn(engine, { phase: 'failed', error: u.message ?? null, via: 'update' });
-      } catch (e) { pressOn(engine, { phase: 'failed', error: (e as Error)?.message ?? null, via: 'update' }); }
+        else if (u.state !== 'running') pressOn(engine, stoppedUpdate(engine, u.message));
+      } catch (e) { pressOn(engine, stoppedUpdate(engine, (e as Error)?.message)); }
       return;
     }
     pressOn(engine, { phase: 'checking', via: 'setup' });
@@ -247,7 +251,7 @@ export function SetupSplit(p: SetupSplitProps) {
         if (via === 'update') {
           const u = await api.agentUpdate(engine, 'status').catch(() => null);
           if (u?.state === 'current') { await readAgain(engine); pressOn(engine, null); }
-          else if (u?.state === 'failed') pressOn(engine, { phase: 'failed', error: u.message ?? null, via });
+          else if (u?.state === 'failed') pressOn(engine, stoppedUpdate(engine, u.message));
         } else {
           const s = await api.engineSetup('status', engine).catch(() => null);
           if (!s) continue;

@@ -152,7 +152,7 @@ export const heldPress =(e: { key: string; repeat?: boolean }): boolean => e.key
 
 /** What the ready check said about one agent. */
 export interface AgentReading { engine: string; found?: boolean; signedIn?: boolean; certain?: boolean; tooOld?: boolean; version?: string }
-/** What a press on its card is doing: setup's own phases, plus `updating`. */
+/** What a press on its card is doing: setup's own phases, plus `updating`, and `manual` for an update only a terminal can do. */
 export interface AgentPress { phase: string; error?: string | null }
 
 /** One agent's card on the agents step: whether it is ready, the line under its name, and its one button. */
@@ -164,6 +164,7 @@ export function agentCard(r: AgentReading, press: AgentPress | null = null): { r
   if (press?.phase === 'updating') return not('Updating…', null);
   if (press?.phase === 'signing-in') return not('Finish in your browser', 'Open again');
   if (press?.phase === 'failed') return not(press.error || 'It did not finish', 'Try again');
+  if (press?.phase === 'manual') return not(press.error || 'Update it in a terminal', 'Check again');
   if (r.tooOld) return not(r.version ? `Version ${r.version} is too old` : 'Too old to run threads', 'Update');
   if (!r.found) return not('Not on this computer', 'Install');
   if (r.signedIn) return { ready: true, sub: null, act: null };
