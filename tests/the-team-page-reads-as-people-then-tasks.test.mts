@@ -17,7 +17,7 @@ describe('the Team page', () => {
     const nav = read('renderer/src/components/WorkspaceNavigation.tsx');
     const team = nav.slice(nav.indexOf('data-tab="team"'), nav.indexOf('<span>Team</span>'));
     expect(team).not.toMatch(/M4\.5 10h15/);
-    expect(team).toMatch(/aria-hidden="true"/);
+    expect(team).toContain('<SidebarGlyph name="team" />');
   });
 });
 

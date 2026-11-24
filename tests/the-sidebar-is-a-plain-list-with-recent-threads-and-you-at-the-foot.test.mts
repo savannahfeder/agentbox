@@ -147,8 +147,9 @@ describe('what is left of your limit, in the sidebar', () => {
 describe('the second pass on its finish', () => {
   const css = strip(read('renderer/src/sidebar.css'));
   const P = ':root:root .gt-rail-nav.workspace-navigation';
-  it('draws every icon with a 1.2 point line, in the ink of its own word', () => {
-    expect(css).toContain('> svg { width: 18px; height: 18px; margin: -1px; stroke-width: 1.6px; color: inherit; }');
+  // The line is the drawing's own since the icons were redrawn at their true size.
+  it('draws every icon in the ink of its own word', () => {
+    expect(css).toContain('> svg { width: 16px; height: 16px; margin: 0; color: inherit; }');
     expect(css).not.toContain('stroke-width: 2.07px');
     expect(css).not.toMatch(/> svg \{[^}]*color: var\(--text-faint\)/);
   });
