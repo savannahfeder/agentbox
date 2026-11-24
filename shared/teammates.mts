@@ -125,9 +125,10 @@ export const CHAT_TAIL = 30;
 // this many hops, so two of them cannot keep each other running.
 export const MAX_HOPS = 8;
 
-// Teammates are an alpha feature (Settings, Alpha features): off unless switched on.
+// On unless turned off in Settings, General. The key keeps its alpha name so a
+// copy that turned them off stays off.
 export function teammatesOn(config: { alphaTeammates?: unknown } | null | undefined): boolean {
-  return config?.alphaTeammates === true;
+  return config?.alphaTeammates !== false;
 }
 export const HOP_LABEL_PREFIX = 'hop:';
 

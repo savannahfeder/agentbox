@@ -603,10 +603,10 @@ export function searchForEngineBin(config: SettingsConfig, engine: string) {
   return { ok: true, state };
 }
 
-// THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Teammates and Glass are off
-// unless someone turned them on; only a real `true` counts. Multiplayer is on
-// unless turned off: the first run offers a team, so it cannot wait behind a
-// switch. Rooms is on for someone on a team with Multiplayer on, unless they
+// THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Glass is off unless someone
+// turned it on; only a real `true` counts. Multiplayer is on unless turned off:
+// the first run offers a team, so it cannot wait behind a switch. AI teammates
+// left alpha and are on unless turned off too (shared/teammates.mts). Rooms is on for someone on a team with Multiplayer on, unless they
 // turned it off, since a team without it gets no Team page
 // (shared/rooms-on.mts); a caller that does not know about the team reads it
 // as no team.

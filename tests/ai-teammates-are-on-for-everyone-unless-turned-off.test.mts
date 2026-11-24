@@ -1,9 +1,11 @@
-// "Ship it, but keep it as a hidden alpha feature" (w-4bd7b5548b). Teammates
-// are a switch in Settings, Alpha features, off unless turned on. Off, nothing
-// of them runs or shows: no sidebar rows or pages (the snapshot carries none),
-// no tick that wakes them or offers one for repeated asks, no hint naming one
-// in a thread, no store calls from the screen, and no team tools offered to an
-// agent while there is no teammate to talk to.
+// AI teammates were an alpha switch, off unless turned on (w-4bd7b5548b), so a
+// new install and the demo copy had none: on the Nov 23 onboarding call the
+// founder went to show one and "it's not showing up in the demo environment".
+// Now they are on for everyone, and the one switch that turns them off is in
+// Settings, General. Off, nothing of them runs or shows: no sidebar rows or
+// pages (the snapshot carries none), no tick that wakes them or offers one for
+// repeated asks, no hint naming one in a thread, no store calls from the
+// screen, and no team tools offered to an agent while there is no teammate.
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -16,15 +18,21 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 const FELIX = { id: 't-felix00001', name: 'Felix', status: 'active' };
 
 describe('the switch', () => {
-  it('is off unless someone turned it on, and only a real true counts', () => {
-    expect(alphaFeatures({}).teammates).toBe(false);
-    expect(alphaFeatures({ alphaTeammates: 'yes' }).teammates).toBe(false);
+  it('is on unless someone turned it off, and only a real false turns it off', () => {
+    expect(alphaFeatures({}).teammates).toBe(true);
+    expect(teammatesOn(undefined)).toBe(true);
+    expect(alphaFeatures({ alphaTeammates: 'no' }).teammates).toBe(true);
     expect(alphaFeatures({ alphaTeammates: true }).teammates).toBe(true);
-    expect(teammatesOn(undefined)).toBe(false);
+    expect(alphaFeatures({ alphaTeammates: false }).teammates).toBe(false);
   });
 
-  it('sits in Settings, Alpha features, and the phone may set it too', () => {
-    expect(read('renderer/src/components/Settings.tsx')).toMatch(/<Switch label="Teammates" on=\{!!w\.alpha\?\.teammates\} onChange=\{\(v\) => setWorkspace\('alphaTeammates', v\)\} \/>/);
+  it('sits in Settings, General, not Alpha features, and the phone may set it too', () => {
+    const settings = read('renderer/src/components/Settings.tsx');
+    const general = settings.slice(settings.indexOf("pane === 'general' && ("), settings.indexOf("pane === 'claude' && enginePage"));
+    const alpha = settings.slice(settings.indexOf("pane === 'alpha' && ("), settings.indexOf("pane === 'general' && ("));
+    expect(general).toMatch(/<Switch label="AI teammates" on=\{!!w\.alpha\?\.teammates\} onChange=\{\(v\) => setWorkspace\('alphaTeammates', v\)\} \/>/);
+    expect(alpha).not.toMatch(/alphaTeammates/);
+    expect(read('renderer/src/settings-search.ts')).toMatch(/page: 'general', label: 'AI teammates'/);
     expect(read('main/settings.mts')).toMatch(/case 'alphaTeammates':\n\s+saveConfig\(config, \{ alphaTeammates: !!value \}\);/);
     expect(read('shared/phone-settings.mts')).toMatch(/alphaTeammates: bool,/);
   });
@@ -40,23 +48,23 @@ describe('with the switch off', () => {
   it('nothing wakes a teammate or offers one, and it does when on', async () => {
     let ticks = 0;
     const teammates = { tick: async () => { ticks += 1; return []; }, list: () => [FELIX], noteTrouble() {} };
-    await make({}, teammates).serveTeammates();
+    await make({ alphaTeammates: false }, teammates).serveTeammates();
     expect(ticks).toBe(0);
-    await make({ alphaTeammates: true }, teammates).serveTeammates();
+    await make({}, teammates).serveTeammates();
     expect(ticks).toBe(1);
   });
 
   it('a thread naming a teammate gets no hint to hand it over', () => {
     const thread = { id: 'w-1', product: 'p', labels: ['founder'] };
     const teammates = { list: () => [FELIX] };
-    expect(make({}, teammates).namedThreadsBlock(thread, { slug: 'p' }, ['@Felix take this'])).toBe('');
-    expect(make({ alphaTeammates: true }, teammates).namedThreadsBlock(thread, { slug: 'p' }, ['@Felix take this'])).toMatch(/team_pass/);
+    expect(make({ alphaTeammates: false }, teammates).namedThreadsBlock(thread, { slug: 'p' }, ['@Felix take this'])).toBe('');
+    expect(make({}, teammates).namedThreadsBlock(thread, { slug: 'p' }, ['@Felix take this'])).toMatch(/team_pass/);
   });
 
   it('the screen gets no teammates and its calls are refused', () => {
     const ipc = read('main/ipc.mts');
     expect(ipc).toMatch(/teammates: alpha\.teammates \? \(\(\) => \{ try \{ return store\.teammatesView\(items, now\); \}/);
-    expect(ipc).toMatch(/if \(!alphaFeatures\(config\)\.teammates\) return \{ ok: false, error: 'Teammates are an alpha feature\. Turn them on in Settings, Alpha features\.' \};/);
+    expect(ipc).toMatch(/if \(!alphaFeatures\(config\)\.teammates\) return \{ ok: false, error: 'AI teammates are turned off\. Turn them on in Settings, General\.' \};/);
   });
 });
 

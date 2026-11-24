@@ -2407,9 +2407,6 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
               <Row label="Rooms" desc="See the people you work with and their agents, with a chat beside them. Needs a team sign-in.">
                 <Switch label="Rooms" on={!!w.alpha?.rooms} onChange={(v) => setWorkspace('alphaRooms', v)} />
               </Row>
-              <Row label="Teammates" desc="Agents with a standing job that work on their own, talk in one team chat and reach you only when they need you.">
-                <Switch label="Teammates" on={!!w.alpha?.teammates} onChange={(v) => setWorkspace('alphaTeammates', v)} />
-              </Row>
               <Row label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in.">
                 <Switch label="Multiplayer" on={!!w.alpha?.multiplayer} onChange={(v) => setWorkspace('alphaMultiplayer', v)} />
               </Row>
@@ -2433,6 +2430,11 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
             <Group id="sidebar" label="Sidebar">
               <Row label="Shrink the sidebar to icons">
                 <Switch label="Shrink the sidebar to icons" on={sidebarShrinks} onChange={setSidebarShrinks} />
+              </Row>
+            </Group>
+            <Group id="teammates" label="AI teammates">
+              <Row label="AI teammates" desc="Agents with a standing job that work on their own, talk in one team chat and reach you only when they need you.">
+                <Switch label="AI teammates" on={!!w.alpha?.teammates} onChange={(v) => setWorkspace('alphaTeammates', v)} />
               </Row>
             </Group>
             {/* THE CORNER TAG (w-dafae58a23). The tag itself only hides for a
@@ -2944,6 +2946,7 @@ function WebComputerPane({ pane, web, onWorkspace, onProject, onOpenProject }: {
         <Group id="privacy" label={`What ${NAME} sends`}>
           {toggle('Counts and crash reports', 'diagnostics', w.diagnostics, `That ${NAME} was opened, that a task was opened, that a reply was sent, and a report when something breaks. Never your code, your prompts, your keys or your paths, and never a title.`)}
         </Group>
+        <Group id="teammates" label="AI teammates">{toggle('AI teammates', 'alphaTeammates', !!w.alpha?.teammates, 'Agents with a standing job that work on their own, talk in one team chat and reach you only when they need you.')}</Group>
         <Group id="adhd">{toggle('ADHD mode', 'adhdMode', w.adhdMode)}</Group>
         <Group id="updates" label="Updates"><Row label={`${NAME} ${s.version}`} /></Group>
       </Page>

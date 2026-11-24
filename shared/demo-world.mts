@@ -15,6 +15,9 @@
 // multiplayer launch film, which the people on an onboarding call have seen.
 
 import { envName, nameSlug } from './product-name.mjs';
+import { STARTERS, HOP_LABEL_PREFIX, WORK_LABEL_PREFIX, teammateLabel } from './teammates.mts';
+import { AGENT_WHY } from './auto-route.mts';
+import type { Routed } from './work-items.mts';
 
 /**
  * The mark a demo copy carries, so it can tell what it is. Set in the child's
@@ -71,10 +74,11 @@ export const DEMO_PRODUCTS = [
 
 /* ------------------------------ your threads ------------------------------ */
 
-// Six things wait on you when the copy opens: four threads an agent has
-// answered, each with a picture of the work and options under it, and two from
-// teammates (`demoMessages`). The two Claude Code threads are newest, so they
-// sit on top: a call shows the inbox first and teammates second.
+// Eight things wait on you when the copy opens: four threads an agent has
+// answered, each with a picture of the work and options under it, two from
+// teammates (`demoMessages`), one your AI teammate answered, and one where Auto
+// offers to make another. The two Claude Code threads are newest, so they sit
+// on top: a call shows the inbox first and teammates second.
 //
 // EACH IS SHAPED LIKE A REAL THREAD: your ask, then the agent's answer, its
 // summary (`problem` and `progress`, drawn as Context and Done) and its short
@@ -103,10 +107,135 @@ interface DemoRow {
   doneAt?: number;
   /** A task asked for in a chat: its label naming the chat, and only the chat's people see it. */
   askedIn?: { slug: string; id: string; people: string[] };
+  /** Your AI teammate's run. `round`: one it started on its own schedule, so no words of yours open it. */
+  teammate?: { round?: boolean };
+  /** Where Auto sent it (shared/auto-route.mts). */
+  routed?: Routed;
+}
+
+/* ---------------------------- your AI teammate ---------------------------- */
+
+// Made from the Quality lead starter, as setup would make it, so a call can
+// show what Auto does: a thread it gave this teammate, and on another thread
+// an offer to make a second one.
+const QUALITY = STARTERS.find((s) => s.starter === 'quality')!;
+export const DEMO_AI_TEAMMATE = {
+  id: 't-5a17ed0c41',
+  starter: QUALITY.starter,
+  name: QUALITY.name,
+  role: QUALITY.role,
+  voice: QUALITY.voice,
+  job: QUALITY.job,
+  goal: QUALITY.goal,
+  counted: QUALITY.counted,
+  asksFirst: QUALITY.asksFirst,
+  works: QUALITY.works,
+  product: 'shuttle',
+};
+const ROUND_ID = 'w-a7c0e1d930';
+const SLEEP_ID = 'w-a8d15f2c47';
+const SUPPORT_ID = 'w-a9e26b3d58';
+
+/** What the teammate wrote in the team chat. */
+export function demoTeammateChat(now: number): { text: string; at: number; run?: string }[] {
+  return [
+    { at: now - 3 * HR, run: ROUND_ID, text: "Today's round is done. The 212 tests pass, and a 12 GB move on a slow connection finished with every file and date. Nothing broken." },
+    { at: now - 40 * MIN, run: SLEEP_ID, text: 'A move survives the laptop sleeping, except when a file is renamed while it sleeps. That one is copied twice. Waiting on Jamie for who fixes it.' },
+  ];
 }
 
 function lines(now: number): DemoRow[] {
   return [
+    {
+      product: 'shuttle',
+      id: SLEEP_ID,
+      engine: 'claude',
+      priority: 7,
+      at: now - 1.4 * HR,
+      answeredAt: now - 40 * MIN,
+      teammate: {},
+      routed: { to: `mate:${DEMO_AI_TEAMMATE.id}`, why: 'Testing moves end to end is its job.', at: now - 1.4 * HR + 20_000, by: 'auto' },
+      ask: 'Check that a big move survives the laptop going to sleep halfway through.',
+      label: 'A move survives sleep',
+      problem: 'You wanted to know whether a big move survives the laptop going to sleep halfway through, before the launch email goes out.',
+      progress: [
+        'Moved a 40 GB test Dropbox and slept the laptop three times',
+        'Each move picked up where it stopped, no file lost',
+        'A file renamed during sleep arrived twice, once per name',
+      ],
+      result: [
+        '**A move survives sleep, except one case. Fix it before the launch email?**',
+        '',
+        'designs/a-move-survives-sleep.png',
+        '',
+        'I moved a 40 GB test Dropbox and put the laptop to sleep three times. Each time the move picked up where it stopped and no file was lost.',
+        '',
+        'One case fails. A file renamed in Dropbox while the laptop slept arrived twice, once under each name. It happened 3 times in 3 tries. The fix is in the sync engine, which is Theo\'s this week.',
+        '',
+        '## Options',
+        '1. Hand it to Theo to fix before the launch (recommended)',
+        '2. Ship as it is and note it for next week',
+      ].join('\n'),
+    },
+    {
+      product: 'website',
+      id: SUPPORT_ID,
+      engine: 'claude',
+      priority: 7,
+      at: now - 2.2 * HR,
+      answeredAt: now - 1.9 * HR,
+      routed: {
+        to: 'agent', why: AGENT_WHY, at: now - 2.2 * HR + 20_000, by: 'auto',
+        offer: {
+          role: 'Support lead',
+          why: 'Trial teams ask how moves work every week. A support lead would answer them the same day and learn what they get stuck on.',
+          gains: [
+            'Learns how you answer from every reply you approve',
+            'Keeps a list of what trial teams get stuck on',
+            'Answers new questions daily, and asks before promising',
+          ],
+        },
+      },
+      ask: 'A trial team asked whether their Dropbox sharing links still work after the move. Draft a reply.',
+      label: 'Do sharing links survive a move?',
+      problem: 'A trial team asked whether their Dropbox sharing links keep working after a move. You wanted a reply drafted.',
+      progress: [
+        'Read how Shuttle moves shared folders',
+        'Checked what happens to an old Dropbox link',
+        'Drafted a reply in plain words',
+      ],
+      result: [
+        '**The reply is drafted. Send it?**',
+        '',
+        'designs/sharing-links-reply.png',
+        '',
+        'It says plainly that the old Dropbox links stop working. Each folder is shared again in Google Drive with the same people, so nobody loses access, and they get a list of every old link beside its new one.',
+        '',
+        '## Options',
+        '1. Send it (recommended)',
+        '2. Change it first',
+      ].join('\n'),
+    },
+    {
+      product: 'shuttle',
+      id: ROUND_ID,
+      engine: 'claude',
+      priority: 5,
+      at: now - 3.3 * HR,
+      answeredAt: now - 3 * HR,
+      status: 'done',
+      doneAt: now - 3 * HR + 30_000,
+      teammate: { round: true },
+      ask: "Today's round",
+      label: "Today's round",
+      problem: 'The Quality lead\'s morning round, which runs the tests and uses the main flows the way a user would.',
+      progress: [
+        'Ran the project\'s 212 tests, all pass',
+        'Moved a 12 GB Dropbox on a slow connection',
+        'Every file and date arrived. Nothing to file',
+      ],
+      result: "Today's round is done. The 212 tests pass, and a 12 GB move on a slow connection finished with every file and date. Nothing broken.",
+    },
     {
       product: 'shuttle',
       id: 'w-f0c7e31b52',
@@ -323,13 +452,17 @@ export function demoLedgerLines(now: number = Date.now()): Record<string, DemoLe
     const answered = Math.round(row.answeredAt);
     const out = byProduct[row.product];
     // Seen by the team: a thread made before the copy signed in is otherwise yours alone.
-    const seen = row.askedIn ? { labels: ['founder', `asked-in:${row.askedIn.slug}/${row.askedIn.id}`], visibility: 'people', visibleTo: row.askedIn.people } : { labels: ['founder'], visibility: 'team' };
+    const mate = row.teammate ? [teammateLabel(DEMO_AI_TEAMMATE.id), `${HOP_LABEL_PREFIX}0`, `${WORK_LABEL_PREFIX}${row.id}`] : [];
+    const seen = row.askedIn ? { labels: ['founder', `asked-in:${row.askedIn.slug}/${row.askedIn.id}`], visibility: 'people', visibleTo: row.askedIn.people } : { labels: ['founder', ...mate], visibility: 'team' };
     out.push({ id: row.id, ts: at, source: 'system', patch: { title: row.ask, kind: 'directive', priority: row.priority, status: 'open', ...seen } });
-    out.push({ id: row.id, ts: at + 1, source: 'founder', patch: { title: row.ask, body: row.ask, engine: row.engine } });
+    if (row.teammate?.round) out.push({ id: row.id, ts: at + 1, source: 'system', patch: { engine: row.engine } });
+    else out.push({ id: row.id, ts: at + 1, source: 'founder', patch: { title: row.ask, body: row.ask, engine: row.engine } });
     out.push({ id: row.id, ts: at + 2, source: 'agent', patch: { label: row.label } });
+    if (row.routed) out.push({ id: row.id, ts: Math.round(row.routed.at), source: 'system', patch: { routed: row.routed } });
     out.push({ id: row.id, ts: answered - 1, source: 'agent', patch: { problem: row.problem, progress: row.progress.join('\n') } });
     out.push({ id: row.id, ts: answered, source: 'agent', patch: { result: row.result } });
-    if (row.status === 'done') out.push({ id: row.id, ts: Math.round(row.doneAt ?? answered + 1), source: 'founder', patch: { status: 'done' } });
+    // A teammate closes its own round; you close what you asked for.
+    if (row.status === 'done') out.push({ id: row.id, ts: Math.round(row.doneAt ?? answered + 1), source: row.teammate?.round ? 'agent' : 'founder', patch: { status: 'done' } });
   }
 
   return byProduct;
