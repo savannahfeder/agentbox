@@ -1212,15 +1212,16 @@ export class Store {
 
   // A CLOUD RUN'S WORK KEPT ON A BRANCH OF ITS OWN, because laying it into the
   // task folder would have undone work done there (main/cloud/run.mts
-  // `park`). Said as a note; the row waits for her, and loses `ship`, so the
-  // folder never ships without the run's work.
-  cloudWorkKeptAside(slug: string, id: string, note: string) {
+  // `park`). Said as a note; the row loses `ship`, so the folder never ships
+  // without the run's work, and waits for her unless its agent has been handed
+  // the branch (`waits: false`).
+  cloudWorkKeptAside(slug: string, id: string, note: string, { waits = true }: { waits?: boolean } = {}) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     const labels = this.readItem(slug, id)?.labels ?? [];
     const kept = labels.filter((l) => l !== 'ship');
     workItemsDisk.updateWorkItem(dir, id, { note, ...(kept.length !== labels.length ? { labels: kept } : {}) }, { source: 'system' });
-    return workItemsDisk.updateWorkItem(dir, id, { status: 'blocked' }, { source: 'system' });
+    return workItemsDisk.updateWorkItem(dir, id, { status: waits ? 'blocked' : 'open' }, { source: 'system' });
   }
 
   // A CLOSED ROW WHOSE WORK NEVER REACHED MAIN, put back in front of the
