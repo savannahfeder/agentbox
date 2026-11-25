@@ -143,6 +143,12 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   const [intent] = useState(hoverIntent);
   const [pointer] = useState(pointerTrail);
   useEffect(() => (rail ? followPointer(window, pointer) : undefined), [rail, pointer]);
+  // Shrunk with the pointer on it: it opens again only once the pointer leaves and comes back.
+  useEffect(() => {
+    if (keptOpen) return;
+    intent.left();
+    if (hoverAt.current) { clearTimeout(hoverAt.current); hoverAt.current = null; }
+  }, [keptOpen, intent]);
   const hover = rail && onHover ? {
     onMouseMove: (e: { movementX: number; movementY: number; clientX: number; clientY: number; timeStamp: number }) => {
       if (leaveAt.current) { clearTimeout(leaveAt.current); leaveAt.current = null; }

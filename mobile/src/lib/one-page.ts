@@ -3,8 +3,9 @@
 // Context on top, then its newest answer under its bold line, with what came
 // before behind a fold. The rules are the web app's own.
 import {
-  appWrote, drawnWhole, earlierCount, earlierThan, foldKey, foldedKeys, newestAnswer, pageTitle, spotIn, splitHeadline, standsAt, stepIn, toggleFold,
+  appWrote, drawnWhole, earlierCount, earlierThan, foldKey, foldedKeys, newestAnswer, pageTitle, spotIn, splitHeadline, standsAt, stepIn, toggleFold, workingContext,
 } from '../../../renderer/src/one-thing-at-a-time';
+import { isCause } from '../../../shared/causes.mts';
 import type { ItemOutcome } from '../../../renderer/src/item-thread';
 import type { AgentEvent, WorkItem } from '../../../renderer/src/types';
 
@@ -27,7 +28,8 @@ export interface PageOf {
   from: number;
 }
 
-export function pageOf(item: WorkItem, events: AgentEvent[], outcome: ItemOutcome | null, after: readonly unknown[], earlierOpen: boolean): PageOf {
+/** `working`: an agent is on the thread now, and the repeat it runs for, as the desktop's QueueSummary is given them. */
+export function pageOf(item: WorkItem, events: AgentEvent[], outcome: ItemOutcome | null, after: readonly unknown[], earlierOpen: boolean, working: { running: boolean; repeats: string | null } = { running: false, repeats: null }): PageOf {
   const byApp = appWrote(outcome, item.wrote);
   const lead = byApp ? null : outcome;
   const newest = newestAnswer(events, lead);
@@ -46,7 +48,8 @@ export function pageOf(item: WorkItem, events: AgentEvent[], outcome: ItemOutcom
     const { headline, rest } = splitHeadline(newest.text);
     answer = { at: newest.at, headline: headline && !sameLine(headline, title) ? headline : null, rest };
   }
-  return { title, context: item.problem ?? null, answer, appNote: byApp && outcome ? outcome.text : null, toggle, from: Math.max(from, 0) };
+  const context = item.problem || (working.running ? workingContext(isCause(item) ? '' : item.body ?? item.title ?? '', title, working.repeats) : null);
+  return { title, context, answer, appNote: byApp && outcome ? outcome.text : null, toggle, from: Math.max(from, 0) };
 }
 
 type Keyed = { product: string; id: string };

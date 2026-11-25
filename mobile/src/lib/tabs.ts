@@ -9,7 +9,9 @@
 import {
   belongsInInbox, belongsInProgress, hiddenUntil, inProgressTab, isProposal, notStarted, rowTitle, stillAsksYou, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd,
 } from '../../../renderer/src/list-rules';
-import { backWords, boardColumns, DEFAULT_DISPLAY, keeps, sentAt, sorted, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
+import { backWords, boardColumns, DEFAULT_DISPLAY, handedOnWord, keeps, sentAt, sorted, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
+import { waitWords } from '../../../shared/thread-waits.mts';
+import { openedLately } from '../../../shared/opened-lately.mts';
 import { searchThreads } from '../../../renderer/src/threads/search';
 import { parseQuery, splitHits } from '../../../renderer/src/search';
 import { stamp } from '../../../renderer/src/format';
@@ -31,7 +33,7 @@ export const TABS: { id: TabId; label: string }[] = [
 ];
 
 // `projectOrder` is your running order of projects (phoneProjectOrder), never the list's own order.
-type View = Pick<ReturnType<typeof phoneView>, 'items' | 'running' | 'products'> & Partial<Pick<ReturnType<typeof phoneView>, 'queued' | 'stranded'>> & { projectOrder?: string[] };
+type View = Pick<ReturnType<typeof phoneView>, 'items' | 'running' | 'products'> & Partial<Pick<ReturnType<typeof phoneView>, 'queued' | 'settingUp' | 'stranded'>> & { projectOrder?: string[] };
 
 /** Each computer's running order of projects (the desktop's `supervisor.productOrder`), from its newest settings copy. */
 export function phoneProjectOrder(rows: readonly { device: string; settings?: { workspace?: { productOrder?: unknown } } | null }[]): string[] {
@@ -117,8 +119,10 @@ export const rowTime = (i: WorkItem): number => (i.status === 'done' ? i.wrote?.
 
 export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const items: WorkItem[] = view.items;
-  const live = new Set(view.running.map((r: { itemId: string }) => r.itemId));
-  const queued = new Set(view.queued ?? []);
+  // A thread whose folder is being made reads as a run (live-line.ts), not as Queued.
+  const settingUp = new Set(view.settingUp ?? []);
+  const live = new Set([...view.running.map((r: { itemId: string }) => r.itemId), ...settingUp]);
+  const queued = new Set((view.queued ?? []).filter((id: string) => !settingUp.has(id)));
   const inCloud = new Set(view.running.filter((r: { where?: string }) => r.where === 'cloud').map((r: { itemId: string }) => r.itemId));
   const byId = new Map(items.map((i) => [i.id, i]));
   const waitingOn = (i: WorkItem) => waitsThatCanEnd(i, byId);
@@ -212,7 +216,11 @@ export function phoneBoard(view: View, tabs: Record<TabId, Row[]>, display: Disp
   // Your own board says what the tab says (Pages.tsx `InboxBoard`).
   return columns.map((c) => ({
     ...c, label: c.state === 'waiting' ? 'Needs you' : c.label,
-    rows: c.rows.map((e) => ({ ...e, queued: c.state === 'running' && !!e.item && queued.has(e.item.id), agent: (e.item && agentOf.get(e.item.id)) ?? null })),
+    rows: c.rows.map((e) => ({
+      ...e, queued: c.state === 'running' && !!e.item && queued.has(e.item.id), agent: (e.item && agentOf.get(e.item.id)) ?? null,
+      // What the card waits on, where the running mark goes (Pages.tsx `waitWord`); the phone knows no people by id.
+      wait: e.item ? handedOnWord(e.item, null, null) ?? waitWords(e.item, { items: view.items, nameOf: () => 'Someone' })?.word ?? null : null,
+    })),
   }));
 }
 
@@ -231,12 +239,15 @@ export interface Hit {
 }
 
 /** Every thread in every tab, closed ones too, as the site's search finds them (App.tsx `hits`). */
-export function phoneSearch(view: View, query: string, now = Date.now(), tabs?: Record<TabId, Row[]>): Hit[] {
+/** `openedAt`: when this phone last opened each thread, by `product/id` (lib/unread.ts), so what you opened lately leads. */
+export function phoneSearch(view: View, query: string, now = Date.now(), tabs?: Record<TabId, Row[]>, openedAt: Readonly<Record<string, number>> = {}): Hit[] {
   const items: WorkItem[] = view.items;
+  // The desktop keys what it opened by thread id.
+  const byId = Object.fromEntries(Object.entries(openedAt).map(([key, at]) => [key.slice(key.lastIndexOf('/') + 1), at]));
   const asks = new Map(Object.values(tabs ?? {}).flat().map((r) => [r.key, r.toApprove]));
   const { terms, phrase } = parseQuery(query);
   const runs = (text: string) => (terms.length ? splitHits(text, terms, phrase) : [{ text, hit: false }]);
-  return searchThreads(items, query, { products: view.products, people: [], me: null }).map(({ item, summary }: { item: WorkItem; summary: string }) => {
+  return searchThreads(items, query, { products: view.products, people: [], me: null }, { opened: openedLately(byId, now), now }).map(({ item, summary }: { item: WorkItem; summary: string }) => {
     const p = item.priority ?? 5;
     return {
       key: `${item.product}/${item.id}`, id: item.id, product: item.product,

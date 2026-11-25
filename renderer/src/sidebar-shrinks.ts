@@ -92,6 +92,14 @@ export function toggleSidebarShrinks(): boolean {
   return next;
 }
 
+/** The button and ⌘\. The button is inside the sidebar, so a press that shrinks
+ *  it also lets go of the pointer, or it would stay open until the pointer left. */
+export function pressKeepOpen(letGoOfThePointer: () => void): boolean {
+  const folds = toggleSidebarShrinks();
+  if (folds) letGoOfThePointer();
+  return folds;
+}
+
 export function useSidebarShrinks(): boolean {
   return useSyncExternalStore((fn) => { heard.add(fn); return () => heard.delete(fn); }, read);
 }

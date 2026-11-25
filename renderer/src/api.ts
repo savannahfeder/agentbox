@@ -1659,6 +1659,7 @@ export const api = {
         engine, phase: r.phase ?? 'idle', error: r.error ?? null, log: r.log ?? '',
         found: !!r.found, signedIn: !!r.signedIn, certain: r.certain !== false,
         bin: r.bin ?? null, already: !!r.already,
+        ...(r.tooOld ? { tooOld: true } : {}), ...(r.version ? { version: r.version } : {}),
       };
     } catch (e) {
       return { ...assumeReady, phase: 'failed', found: false, signedIn: false, certain: false, error: String((e as Error)?.message ?? e) };

@@ -107,7 +107,7 @@ export function TeamPage() {
         </>
       ) : (
         <>
-          <T style={{ fontSize: 15.5, fontFamily: font.medium, marginTop: 28 }}>Start your team</T>
+          <T style={{ fontSize: 15.5, fontFamily: font.medium, marginTop: 28 }}>{PRO_FOR_INVITES}</T>
           <Aside>Start it on your computer, in Settings, Team. Waiting for an invite instead? Ask a teammate to invite {me?.email}. It shows up here within a few seconds.</Aside>
         </>
       )}

@@ -8,6 +8,7 @@ import { Image } from 'expo-image';
 import { Linking, Pressable, ScrollView, Text, View, type TextStyle } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { isImagePath, referencedFiles } from '../../../renderer/src/referenced-files';
+import { shownName } from '../../../shared/artifact-marks.mts';
 import { pictureSource, shapeOfDrawn } from '../lib/files';
 import { inlineSpans, messageBlocks, type Block, type MentionKind, type Span } from '../lib/markdown';
 import { hasPictureMenu, PictureMenu } from '../../modules/picture-menu';
@@ -127,7 +128,7 @@ function Picture({ src, alt }: { src: string; alt: string }) {
   if (uri === null || broken) {
     return (
       <View style={{ alignSelf: 'flex-start', borderWidth: 1, borderRadius: corner.small, borderStyle: 'dashed', borderColor: color.line, paddingVertical: 2, paddingHorizontal: 8 }}>
-        <T style={{ fontFamily: font.mono, fontSize: 12.5, lineHeight: 18, color: color.faint }}>missing image: {src}</T>
+        <T style={{ fontFamily: font.mono, fontSize: 12.5, lineHeight: 18, color: color.faint }}>missing image: {shownName(src)}</T>
       </View>
     );
   }

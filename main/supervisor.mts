@@ -9127,7 +9127,9 @@ export class Supervisor {
     const runId = s.cloud && s.cwd ? readMarker(this._cloudPlace(s.cwd, product, itemId))?.runId : null;
     let movable = false;
     try { movable = !s.cloud && this._movableNow().has(itemId); } catch { /* said as not movable */ }
-    return { since: s.turnStartedAt ?? s.startedAt, where: s.cloud ? 'cloud' : 'mac', ...(runId ? { runId } : {}), ...(movable ? { movable } : {}), doing: currentActivity(s).map((a) => ({ label: a.label, startedAt: a.startedAt })) };
+    let memoryHeld = false;
+    try { memoryHeld = (this._memoryGate?.gate?.snapshot?.().waiting ?? []).some((w) => w.item === itemId); } catch { /* said as not held */ }
+    return { since: s.turnStartedAt ?? s.startedAt, where: s.cloud ? 'cloud' : 'mac', ...(runId ? { runId } : {}), ...(movable ? { movable } : {}), ...(memoryHeld ? { memoryHeld } : {}), doing: currentActivity(s).map((a) => ({ label: a.label, startedAt: a.startedAt })) };
   }
 
   // The phone asks for each running thread on every pass, so one read serves a few seconds.

@@ -25,6 +25,9 @@ export interface EngineSetupState {
   /** Only on a `ready` question: whether the tool is on the Mac at all. */
   found?: boolean;
   signedIn?: boolean;
+  /** Only on a `ready` question: older than a thread can run on, and its version when it said. */
+  tooOld?: boolean;
+  version?: string;
   /** Where the tool is, once something has looked for it. */
   bin?: string | null;
   /** Whether it was on the computer before this setup started. */
