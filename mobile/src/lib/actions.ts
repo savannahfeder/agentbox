@@ -219,7 +219,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       // App.tsx `retag`'s toast.
       return { steps: [{ door: 'threadEdit', payload: { ...on, patch: { priority: press.value } } }], toast: `Priority: ${priorityLabelOf(priorityIdOf(press.value)).toLowerCase()}` };
     case 'reopen':
-      return { steps: [{ door: 'reopen', payload: on }], toast: `${waits ? 'Reopens when your computer is back' : 'Reopened'}: ${named}` };
+      return { steps: [{ door: 'reopen', payload: { ...on, done: true } }], toast: `${waits ? 'Reopens when your computer is back' : 'Reopened'}: ${named}` };
     case 'try-again':
       return { steps: [{ door: 'resumeItems', payload: { ids: [item.id] } }], toast: waits ? 'Up next once your computer is back.' : tryAgainWords({ resumed: 1 }) };
     case 'resume':

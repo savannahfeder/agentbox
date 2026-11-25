@@ -952,7 +952,10 @@ const ROUTES: Record<string, (c: RouteCommand) => Route> = {
   'run-now': (c) => ['zero:run-now', { product: c.project, id: c.item }],
   'move-to-cloud': (c) => ['zero:move-to-cloud', { ids: [c.item] }],
   'send-now': (c) => ['zero:send-now', { product: c.project, id: c.item }],
-  reopen: (c) => ['zero:reopen', { product: c.project, id: c.item }],
+  // As the window's Reopen on a done thread (App.tsx `reopenDone`): the reply it already heard does not run again.
+  reopen: (c) => (c.payload.done === true
+    ? ['zero:answer', { product: c.project, id: c.item, status: 'open', reopen: true }]
+    : ['zero:reopen', { product: c.project, id: c.item }]),
   schedule: (c) => ['zero:schedule', { product: c.project, id: c.item, runAt: c.payload.runAt }],
   approve: (c) => ['zero:approve', { id: c.payload.approval, allow: c.payload.allow === true, ...(typeof c.payload.note === 'string' ? { note: c.payload.note } : {}), card: c.payload.card }],
   new: (c) => ['zero:compose', { product: c.project, title: c.payload.title ?? '', body: c.payload.body ?? '', fromPhone: c.id, ...phoneChoices('new', c.payload) }],

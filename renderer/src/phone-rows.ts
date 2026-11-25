@@ -446,7 +446,8 @@ export function commandFor(channel: string, p: PhoneAsk, aliases: Aliases = {}):
   if (channel === REQUEST_CHANNELS.snooze && Number.isFinite(p.snoozedUntil) && p.snoozedUntil! >= 0) return on(p.id, 'snooze', { until: p.snoozedUntil });
   if (channel === REQUEST_CHANNELS.schedule && Number.isFinite(p.runAt) && p.runAt! >= 0) return on(p.id, 'schedule', { runAt: p.runAt });
   const plain: Record<string, string> = { [REQUEST_CHANNELS.stopSession]: 'stop', [REQUEST_CHANNELS.runNow]: 'run-now', [REQUEST_CHANNELS.sendNow]: 'send-now', [REQUEST_CHANNELS.reopen]: 'reopen', [REQUEST_CHANNELS.moveToCloud]: 'move-to-cloud' };
-  if (plain[channel] && p.id) return on(p.id, plain[channel], {});
+  // `done`: Reopen on a finished thread, which starts nothing; without it a reopen is Send back to agent.
+  if (plain[channel] && p.id) return on(p.id, plain[channel], channel === REQUEST_CHANNELS.reopen && p.done === true ? { done: true } : {});
   if (channel === REQUEST_CHANNELS.compose && (String(p.title ?? '').trim() || String(p.body ?? '').trim())) {
     return on(null, 'new', { title: String(p.title ?? ''), body: String(p.body ?? ''), ...phoneChoices('new', p) });
   }
