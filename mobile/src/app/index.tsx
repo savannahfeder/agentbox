@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { backWords, emptyTabWords, readDisplay, rowPriorityId, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { InboxComposer } from '../ui/NewThreadForm';
-import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsScale, tabsTighten, type Row, type TabId } from '../lib/tabs';
+import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, repeatsKept, shownTabs, TAB_GAP, TABS, tabsScale, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
 import { agentChoices, type Harness } from '../lib/agent-filter';
 import { EverythingPlace } from '../ui/Everything';
@@ -250,12 +250,12 @@ function FilteredEmpty({ tab, hidden, clear }: { tab: TabId; hidden: number; cle
 }
 
 /** The board: a column a swipe, each scrolling on its own (phone.css `.th-board`). */
-function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phoneBoard>; foot: number; inset?: number }) {
+function Board({ columns, repeats, foot, inset = 12 }: { columns: ReturnType<typeof phoneBoard>; repeats: PhoneRepeat[]; foot: number; inset?: number }) {
   const { width } = useWindowDimensions();
   const c0 = useCloud();
   const room = c0.approvalRoom;
   // Later's column leads with the repeating tasks, as the Later list does.
-  const repeatsIn = (state: string) => (state === 'scheduled' ? c0.repeats : []);
+  const repeatsIn = (state: string) => (state === 'scheduled' ? repeats : []);
   const col = Math.round((width - inset * 2) * 0.86);
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={col + 12} decelerationRate="fast"
@@ -376,8 +376,9 @@ export default function Threads() {
     .map((q) => ({ ...q, thread: questionThread(q.question, c.view.items) }))
     .filter((q) => !q.thread || !inNeedsYou.has(`${q.thread.product}/${q.thread.id}`));
   const openMention = (m: MentionRowData) => openGroup(m.roomId);
-  const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0), files: 0 };
-  const repeatsShown = tab === 'snoozed' && c.repeats.length > 0;
+  const repeats = repeatsKept(c.repeats, display);
+  const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0), files: 0 };
+  const repeatsShown = tab === 'snoozed' && repeats.length > 0;
   const mentionsShown = tab === 'inbox' && (mentions.length > 0 || asks.length > 0);
   const hidden = shown.whole[tab] - shown.rows[tab].length;
   const foot = footRoom(inset);
@@ -405,8 +406,9 @@ export default function Threads() {
     const wholeBoard = !drawnBoard ? null : onEverything
       ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, unfiltered, c.now).filter((col) => col.state !== 'waiting')
       : phoneBoard(c.view, c.tabs, unfiltered, c.now);
-    const above = mentionsShown ? mentions.length + asks.length : repeatsShown ? c.repeats.length : 0;
-    return filterCount({ rows: shown.rows[tab], whole: c.tabs[tab], mineOnly: onEverything, above, board: drawnBoard, wholeBoard });
+    const above = mentionsShown ? mentions.length + asks.length : repeatsShown ? repeats.length : 0;
+    const aboveWhole = tab === 'snoozed' ? repeatsKept(c.repeats, unfiltered).length : above;
+    return filterCount({ rows: shown.rows[tab], whole: c.tabs[tab], mineOnly: onEverything, above, aboveWhole, board: drawnBoard, wholeBoard });
   };
   // A permission card sits over the corner the pen is in, so the pen moves up to the bar (8fa6c548).
   const penUp = c.view.approvals.length > 0;
@@ -445,7 +447,7 @@ export default function Threads() {
       renderItem={({ item, index }) => <ThreadRow row={item} first={index === 0 && !repeatsShown && !mentionsShown} unread={c.unread(item.item)} mate={mateOf(item.item, c.team)} />}
       refreshControl={<RefreshControl tintColor={color.dim} refreshing={pulling} onRefresh={async () => { setPulling(true); await c.refresh(); setPulling(false); }} />}
       keyboardShouldPersistTaps="handled"
-      ListHeaderComponent={repeatsShown ? <RepeatRows repeats={c.repeats} items={c.view.items} now={c.now} />
+      ListHeaderComponent={repeatsShown ? <RepeatRows repeats={repeats} items={c.view.items} now={c.now} />
         : mentionsShown ? <View>
           {asks.map((q, i) => <QuestionRow key={q.question.id} mate={q.mate} text={q.question.text ?? ''} at={q.question.ts} first={i === 0} now={c.now} open={() => (q.thread ? router.push({ pathname: '/thread/[product]/[id]', params: q.thread }) : router.push({ pathname: '/teammate/[id]', params: { id: q.mate.id } }))} />)}
           {mentions.map((m, i) => <MentionRow key={m.id} m={m} first={i === 0 && !asks.length} now={c.now} open={() => openMention(m)} />)}
@@ -477,8 +479,8 @@ export default function Threads() {
       </>} below={board ? undefined : <Tabs on={onEverything ? 'everything' : tab} counts={counts} pick={setPlace} team={teamMode} />} />
       <StatusNotice message={notice?.message} next={notice?.next} />
       {onEverything
-        ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
-        : board ? <Board columns={board} foot={foot} /> : list}
+        ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} repeats={repeats} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
+        : board ? <Board columns={board} repeats={repeats} foot={foot} /> : list}
       {picked && (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: foot, paddingTop: 8, paddingHorizontal: size.inset, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: color.bg, borderTopWidth: 1, borderTopColor: color.line }}>
           <T style={{ flex: 1, fontSize: 14, color: color.dim }}>{picked.size ? `${picked.size} selected` : 'Tap threads to select them'}</T>
