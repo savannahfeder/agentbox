@@ -19,7 +19,7 @@ import { color, corner, font } from './theme';
 type Page = 'menu' | 'priority' | 'rename' | 'move';
 
 export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = false, pinned, onPin, onUnread, onLater, onBack, onRunNow, onMoveToCloud, onReport, closed = false,
-  tryAgain = false, onTryAgain, restart = false, onRestart, resume = null, onResume, reopen = false, onReopen, priority = null, onPriority, name = null, onRename,
+  tryAgain = false, onTryAgain, sendBack = false, onSendBack, restart = false, onRestart, resume = null, onResume, reopen = false, onReopen, priority = null, onPriority, name = null, onRename,
   projects = [], onMove, place = null, onPlace, repeats = false, onEndRepeat }: {
   open: boolean; close: () => void; now: number;
   /** Closed already: the lists never put it in Later, so Later is not offered. Done is the bar's, as on the desktop (`splitDone`). */
@@ -41,6 +41,8 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
   /** Report what an agent wrote here (App Review 1.2). */
   onReport?: () => void;
   tryAgain?: boolean; onTryAgain?: () => void;
+  /** Blocked with no agent on it: the desktop's command bar row for a stuck thread. */
+  sendBack?: boolean; onSendBack?: () => void;
   restart?: boolean; onRestart?: () => void;
   resume?: 'done' | null; onResume?: () => void;
   reopen?: boolean; onReopen?: () => void;
@@ -117,6 +119,7 @@ export function ThreadMenu({ open, close, now, laterNow, runNow, moveToCloud = f
       </>}
       {moveToCloud && <SheetRow label="Move to cloud" aside="On your computer now" onPress={() => { done(); onMoveToCloud?.(); }} />}
       {tryAgain && <SheetRow label="Try again" onPress={act(onTryAgain)} />}
+      {sendBack && <SheetRow label="Send back to agent" onPress={act(onSendBack)} />}
       {restart && <SheetRow label="Restart the agent (it stopped)" onPress={act(onRestart)} />}
       {resume && <SheetRow label="Resume this agent (reopen and carry on)" onPress={act(onResume)} />}
       {reopen && <SheetRow label="Reopen" aside="Back in your inbox" onPress={act(onReopen)} />}

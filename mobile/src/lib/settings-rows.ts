@@ -4,7 +4,7 @@
 import { ROOMS_SEARCH_ROWS, roomsPageShown } from './rooms-settings';
 
 const ROWS = [
-  'general/Your account', 'general/Counts and crash reports',
+  'general/Your account', 'general/Use AI teammates', 'general/Counts and crash reports',
   'appearance/Theme',
   'phone/Use it on your phone',
   'alpha/Rooms',

@@ -22,6 +22,7 @@ import { ChatsPlace, TeammateMark, teammatesWaiting } from '../ui/Teammates';
 import { Face } from '../ui/Groups';
 import { mentionRows } from '../../../renderer/src/team/rooms/room-rules';
 import { mateOf, questionThread, questionsForYou } from '../lib/teammates';
+import { mentionRowWords } from '../lib/mention-row';
 import type { RoomMention as MentionRowData, Teammate, WorkItem } from '../../../renderer/src/types';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
@@ -74,7 +75,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
           {row.title}{aside ? <Text style={{ color: color.faint }}>{`  ${aside}`}</Text> : null}
         </T>
         {/* Pinned, faint after the title as the desktop draws it (pages.css `.th-pin`); a closed thread keeps no pin. */}
-        {row.item?.pinned && row.item.status !== 'done' && <View accessibilityLabel="Pinned" style={{ marginLeft: 8 }}><Pin /></View>}
+        {row.item?.pinned && row.item.status !== 'done' && <View accessibilityLabel="Pinned" style={{ marginLeft: 8 }}><Pin filled tint={color.dim} /></View>}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
         {/* Sent from the phone and not yet taken: the web app's status word (status-word.ts). */}
@@ -93,6 +94,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
 /** A message in a group that names you, at the top of Needs you until you read the group past it (team/rooms/MentionRows.tsx). */
 function MentionRow({ m, first, now, open }: { m: MentionRowData; first: boolean; now: number; open: () => void }) {
   const small = { fontSize: 11, lineHeight: 20, color: color.faint };
+  const words = mentionRowWords(m);
   return (
     <Pressable onPress={open} accessibilityLabel={`${m.byName || 'Someone'} mentioned you in ${m.roomName}, unread`}
       style={({ pressed }) => ({ minHeight: 64, paddingTop: 14, paddingBottom: 14, paddingLeft: size.inset, paddingRight: 12, backgroundColor: pressed ? color.fill : 'transparent' })}>
@@ -101,8 +103,8 @@ function MentionRow({ m, first, now, open }: { m: MentionRowData; first: boolean
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Face name={m.byName || 'Someone'} size={20} />
         <T numberOfLines={2} style={{ flexShrink: 1, fontSize: 16, lineHeight: 21.6, letterSpacing: -0.16 }}>
-          <Text style={{ fontFamily: font.medium }}>{`${m.byName || 'Someone'}  `}</Text>
-          <Text style={{ color: color.dim }}>{m.body}</Text>
+          <Text style={{ fontFamily: font.medium }}>{`${words.who}  `}</Text>
+          <Text style={{ color: color.dim }}>{words.says}</Text>
         </T>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
@@ -284,9 +286,12 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
           {c.rows.map((e) => (
             <Pressable key={e.key} onPress={() => e.item && open(e.item.product, e.item.id)}
               style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
-              <T numberOfLines={3} style={{ fontSize: 14, lineHeight: 20, marginBottom: 14 }}>{e.title}</T>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 }}>
+                <T numberOfLines={3} style={{ flexShrink: 1, fontSize: 14, lineHeight: 20 }}>{e.title}</T>
+                {e.item?.pinned && e.item.status !== 'done' && <View accessibilityLabel="Pinned" style={{ marginLeft: 8, marginTop: 3 }}><Pin filled tint={color.dim} /></View>}
+              </View>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {e.queued ? <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
+                {e.wait ? <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, color: color.dim, marginRight: 8 }}>{e.wait}</T> : e.queued ? <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
                 {rowPriorityId(e.priority) && <View style={{ marginRight: 8 }}><PriorityBars level={barsFor(e.priority!)} /></View>}
                 {e.agent && <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>{e.agent}</T>}
                 <T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.55, textTransform: 'uppercase', color: color.faint }}>{e.project}</T>

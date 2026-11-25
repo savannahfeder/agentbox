@@ -189,8 +189,9 @@ describe('setting up a plan', () => {
     const none = machine({ found: false });
     const c = createEngineSetup({ ...quick, find: none.find, spawn: none.spawn });
     expect(await c.readiness('claude')).toEqual({ engine: 'claude', found: false, signedIn: false, certain: true });
+    // Claude Code is also asked its version (an old one cannot run a thread), which installs and signs in nothing.
     for (const m of [signedOut, ready, none]) {
-      expect(m.calls.every((x) => x.args.join(' ').match(/status/))).toBe(true);
+      expect(m.calls.every((x) => x.args.join(' ').match(/status|^--version$/))).toBe(true);
     }
   });
 

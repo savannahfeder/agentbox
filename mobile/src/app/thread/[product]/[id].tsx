@@ -11,7 +11,7 @@ import Svg, { Rect } from 'react-native-svg';
 import { isImageName } from '../../../../../renderer/src/attachments';
 import { type CloseOption } from '../../../../../renderer/src/close-asks-first';
 import { foldedReply } from '../../../../../renderer/src/folded-reply';
-import { closesTheTask, discardsTheChange, type ParsedOption } from '../../../../../renderer/src/format';
+import { closesTheTask, discardsTheChange, repeatsLine, type ParsedOption } from '../../../../../renderer/src/format';
 import { discardAsk } from '../../../../../renderer/src/discard-asks-first';
 import { MODE_WORDS } from '../../../../../renderer/src/modes';
 import { priorityLabelOf, priorityValueOf } from '../../../../../renderer/src/priority';
@@ -90,7 +90,7 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name 
     ]}>
       {(!e.same || e.resumed) && (
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginBottom: 3, flexWrap: 'wrap' }}>
-          <T style={yours ? { fontSize: 14, lineHeight: 22.4, fontFamily: font.semibold } : { fontSize: 14, lineHeight: 22.4, color: color.dim }}>{yours ? 'You' : name ?? 'The agent'}</T>
+          <T style={yours ? { fontSize: 14, lineHeight: 22.4, fontFamily: font.semibold } : { fontSize: 14, lineHeight: 22.4, color: color.dim }}>{yours ? 'You' : e.from ?? name ?? 'The agent'}</T>
           <T style={{ fontSize: 12.5, lineHeight: 20, color: e.refused ? REFUSED : e.pending ? color.dim : color.faint, flexShrink: 1 }} numberOfLines={2}>
             {e.refused ? `Not sent: ${e.refused}` : e.pending ? (e.sent ? 'Sent' : e.cloud ? 'Working in Agentbox Cloud' : e.toCloud ? 'Waiting for Agentbox Cloud' : e.scheduled ? `Scheduled for ${dayClock(e.scheduled)}` : 'Waiting for your computer') : when(e.at)}
           </T>
@@ -108,7 +108,10 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name 
             {!!words.trim() && <Selectable style={{ fontSize: 17, lineHeight: 26.35, fontFamily: font.medium }}>{words}</Selectable>}
             <SentFiles text={e.text ?? ''} product={product} />
           </>
-        ) : <Markdown text={e.text ?? ''} dir={dir} files={files} />}
+        ) : <>
+          <Markdown text={e.text ?? ''} dir={dir} files={files} />
+          {!!e.asked && <T style={{ fontSize: 16, lineHeight: 25.6, marginTop: 8, color: color.dim }}>{e.asked}</T>}
+        </>}
       </View>
     </View>
   );
@@ -116,10 +119,8 @@ function Said({ e, starts, ends, product, dir, files, sendNow, openOrigin, name 
 
 const StopMark = () => <Svg width={9} height={9} viewBox="0 0 12 12"><Rect x={1.5} y={1.5} width={9} height={9} fill={color.dim} /></Svg>;
 
-function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0, showChoices, onTyped }: {
+function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0, showChoices }: {
   thread: Thread; offers: Offers; busy: boolean; setBusy: (on: boolean) => void; stop: () => void; setError: (m: string | null) => void;
-  /** Whether the box holds anything to send, for the page's links that would send without it. */
-  onTyped?: (typed: boolean) => void;
   /** With the choices folded, how many there are and the way back to them (OneThingAtATime.tsx `ChoicesShow`). */
   foldedChoices?: number; showChoices?: () => void;
 }) {
@@ -139,7 +140,6 @@ function Dock({ thread, offers, busy, setBusy, stop, setError, foldedChoices = 0
   const [stopping, setStopping] = useState(false);
   useEffect(() => { if (!offers.stop) setStopping(false); }, [offers.stop]);
   const ready = !!draft.text.trim() || draft.files.length > 0;
-  useEffect(() => { onTyped?.(ready); }, [ready]);
   const priority = picked.priority ?? priorityValueOf(shownLevel(item));
   const agents = useComputerAgents();
   const codex = { codexModels: agents.codexModels, codexDefault: agents.codexDefault };
@@ -316,7 +316,6 @@ export default function ThreadScreen() {
   const [discarding, setDiscarding] = useState<ParsedOption | null>(null);
   // Send now was pressed and her Mac has not taken her words yet.
   const [cutting, setCutting] = useState(false);
-  const [typed, setTyped] = useState(false);
   // What came before the newest answer, opened from its fold (lib/one-page.ts).
   const [earlierOpen, setEarlierOpen] = useState(false);
   const [contextWhole, setContextWhole] = useState(false);
@@ -373,7 +372,9 @@ export default function ThreadScreen() {
   }
   const item = thread.item;
   const mate = mateOf(item, c.team);
-  const page = pageOf(item, thread.events, thread.outcome, thread.after, earlierOpen);
+  const runsFor = ruleFor(item, c.repeats);
+  const repeat = runsFor ? c.repeats.find((r) => r.product === runsFor.product && r.id === runsFor.id) : null;
+  const page = pageOf(item, thread.events, thread.outcome, thread.after, earlierOpen, { running: !!thread.running, repeats: repeat ? repeatsLine(repeat) : null });
   if (placedOn.current !== `${product}/${id}`) {
     placedOn.current = `${product}/${id}`;
     resting.current = !page.answer && !thread.outcome && page.from === 0;
@@ -439,8 +440,6 @@ export default function ThreadScreen() {
   const openOrigin = () => { if (thread.parent) openThread(thread.parent); };
   const below = [
     ...(offers.back ? [{ label: offers.back.label, dim: offers.back.dim, onPress: () => void press({ kind: 'later', until: 0 }) }] : []),
-    // Sending back with words typed is Send; this link would leave them behind.
-    ...(offers.sendBack && !typed ? [{ label: 'send back to agent', onPress: () => void press({ kind: 'send-back' }) }] : []),
     // The desktop's stopped bar ends "try again →" (Focus.tsx `stalled-bar`).
     ...(live?.state === 'stalled' && (offers.tryAgain || offers.restart)
       ? [{ label: 'try again', onPress: () => void press({ kind: offers.tryAgain ? 'try-again' : 'restart' }) }] : []),
@@ -593,7 +592,7 @@ export default function ThreadScreen() {
         )}
         {mate && <ThreadQuestions item={item} />}
         <Dock thread={thread} offers={offers} busy={busy} setBusy={setBusy} setError={setError} stop={() => void press({ kind: 'stop' })}
-          foldedChoices={thread.options.length > 0 && !asking && choicesFolded ? thread.options.length : 0} showChoices={foldChoices} onTyped={setTyped} />
+          foldedChoices={thread.options.length > 0 && !asking && choicesFolded ? thread.options.length : 0} showChoices={foldChoices} />
       </KeyboardAvoidingView>
       <ThreadMenu open={menu} close={() => setMenu(false)} now={c.now} laterNow={offers.laterNow} runNow={offers.runNow} moveToCloud={offers.moveToCloud}
         onLater={(until, label) => void press({ kind: 'later', until, label, running: !!thread.running }, item, back)}
@@ -604,6 +603,7 @@ export default function ThreadScreen() {
         onPin={(pin) => void press({ kind: 'pin', pinned: pin })}
         onUnread={() => { c.markUnseen(item); back(); }}
         tryAgain={offers.tryAgain} onTryAgain={() => void press({ kind: 'try-again' })}
+        sendBack={offers.sendBack} onSendBack={() => void press({ kind: 'send-back' })}
         restart={offers.restart} onRestart={() => void press({ kind: 'restart' })}
         resume={offers.resume} onResume={() => void press({ kind: 'resume' })}
         reopen={offers.reopen} onReopen={() => void press({ kind: 'reopen' })}

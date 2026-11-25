@@ -2155,6 +2155,7 @@ export interface AddedAccount { ok: boolean; command?: string; home?: string; er
 export interface EngineSetupAnswer {
   ok: boolean; error?: string; phase?: EngineSetupState['phase']; log?: string;
   found?: boolean; signedIn?: boolean; certain?: boolean; bin?: string | null; already?: boolean;
+  tooOld?: boolean; version?: string;
 }
 
 

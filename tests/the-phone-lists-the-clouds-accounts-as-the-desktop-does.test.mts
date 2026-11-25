@@ -85,15 +85,15 @@ describe('the Claude Code and Codex pages on the phone', () => {
       { engine: 'claude', key: 'b', name: 'cloud@example.com', state: 'ready', plan: 'Pro', limits, readAt: 3 },
       { engine: 'codex', key: 'c', name: null, state: 'ready' },
     ]);
-    expect(cloudOnlyAccounts(w, 'claude')).toEqual([{ name: 'cloud@example.com', desc: 'Pro · Cloud', usage: { at: 3, limits: [expect.objectContaining({ percent: 40 })] } }]);
-    expect(cloudOnlyAccounts(w, 'codex')).toEqual([{ name: 'Codex account', desc: 'Cloud', usage: null }]);
+    expect(cloudOnlyAccounts(w, 'claude')).toEqual([{ name: 'cloud@example.com', desc: 'Pro · Cloud', usage: { at: 3, limits: [expect.objectContaining({ percent: 40 })] }, inUse: false }]);
+    expect(cloudOnlyAccounts(w, 'codex')).toEqual([{ name: 'Codex account', desc: 'Cloud', usage: null, inUse: false }]);
     expect(cloudOnlyAccounts({ cloud: null }, 'claude')).toEqual([]);
   });
 
   it('drops the Cloud tag from an account whose cloud sign-in stopped', () => {
     const w = ws([{ engine: 'claude', key: 'a', name: 'me@example.com', profile: 'default', state: 'broken' }, { engine: 'claude', key: 'b', name: 'x@example.com', state: 'broken', plan: 'Pro' }]);
     expect(placesOf(w, 'claude', 'default')).toEqual(['Local']);
-    expect(cloudOnlyAccounts(w, 'claude')).toEqual([{ name: 'x@example.com', desc: 'Pro', usage: null }]);
+    expect(cloudOnlyAccounts(w, 'claude')).toEqual([{ name: 'x@example.com', desc: 'Pro', usage: null, inUse: false }]);
   });
 
   it('tags this computer\'s accounts Local, and Cloud as well when the cloud has it', () => {

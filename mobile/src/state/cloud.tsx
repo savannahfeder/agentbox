@@ -451,7 +451,7 @@ function useCloudState() {
     dismissToast: () => setToast(null), signedInWith, signOut, preview: PREVIEW,
     notice: mine, noticeRead, agreed, answerNotice, leaveNotice, withdrawNotice: () => answerNotice(false),
     alerts, turnOnAlerts, turnOffAlerts,
-    connect, markSeen, markUnseen, unread, sendFeedback, version: APP_VERSION, build: BUILD,
+    connect, markSeen, markUnseen, unread, openedAt: seen.at, sendFeedback, version: APP_VERSION, build: BUILD,
     // The one map of her files' links, filled in place; `signedAt` moves when it does.
     links: links.current, signedAt,
   };
