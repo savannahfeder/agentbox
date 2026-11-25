@@ -9,7 +9,8 @@
 import {
   belongsInInbox, belongsInProgress, hiddenUntil, inProgressTab, isProposal, notStarted, rowTitle, stillAsksYou, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd,
 } from '../../../renderer/src/list-rules';
-import { backWords, boardColumns, DEFAULT_DISPLAY, keeps, sentAt, sorted, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
+import { backWords, boardColumns, DEFAULT_DISPLAY, handedOnWord, keeps, sentAt, sorted, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
+import { waitWords } from '../../../shared/thread-waits.mts';
 import { searchThreads } from '../../../renderer/src/threads/search';
 import { parseQuery, splitHits } from '../../../renderer/src/search';
 import { stamp } from '../../../renderer/src/format';
@@ -207,7 +208,11 @@ export function phoneBoard(view: View, tabs: Record<TabId, Row[]>, display: Disp
   // Your own board says what the tab says (Pages.tsx `InboxBoard`).
   return columns.map((c) => ({
     ...c, label: c.state === 'waiting' ? 'Needs you' : c.label,
-    rows: c.rows.map((e) => ({ ...e, queued: c.state === 'running' && !!e.item && queued.has(e.item.id), agent: (e.item && agentOf.get(e.item.id)) ?? null })),
+    rows: c.rows.map((e) => ({
+      ...e, queued: c.state === 'running' && !!e.item && queued.has(e.item.id), agent: (e.item && agentOf.get(e.item.id)) ?? null,
+      // What the card waits on, where the running mark goes (Pages.tsx `waitWord`); the phone knows no people by id.
+      wait: e.item ? handedOnWord(e.item, null, null) ?? waitWords(e.item, { items: view.items, nameOf: () => 'Someone' })?.word ?? null : null,
+    })),
   }));
 }
 

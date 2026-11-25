@@ -286,9 +286,12 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
           {c.rows.map((e) => (
             <Pressable key={e.key} onPress={() => e.item && open(e.item.product, e.item.id)}
               style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
-              <T numberOfLines={3} style={{ fontSize: 14, lineHeight: 20, marginBottom: 14 }}>{e.title}</T>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 }}>
+                <T numberOfLines={3} style={{ flexShrink: 1, fontSize: 14, lineHeight: 20 }}>{e.title}</T>
+                {e.item?.pinned && e.item.status !== 'done' && <View accessibilityLabel="Pinned" style={{ marginLeft: 8, marginTop: 3 }}><Pin filled tint={color.dim} /></View>}
+              </View>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {e.queued ? <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
+                {e.wait ? <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, color: color.dim, marginRight: 8 }}>{e.wait}</T> : e.queued ? <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
                 {rowPriorityId(e.priority) && <View style={{ marginRight: 8 }}><PriorityBars level={barsFor(e.priority!)} /></View>}
                 {e.agent && <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>{e.agent}</T>}
                 <T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.55, textTransform: 'uppercase', color: color.faint }}>{e.project}</T>
