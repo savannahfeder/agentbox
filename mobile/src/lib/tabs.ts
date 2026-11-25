@@ -33,7 +33,7 @@ export const TABS: { id: TabId; label: string }[] = [
 ];
 
 // `projectOrder` is your running order of projects (phoneProjectOrder), never the list's own order.
-type View = Pick<ReturnType<typeof phoneView>, 'items' | 'running' | 'products'> & Partial<Pick<ReturnType<typeof phoneView>, 'queued' | 'stranded'>> & { projectOrder?: string[] };
+type View = Pick<ReturnType<typeof phoneView>, 'items' | 'running' | 'products'> & Partial<Pick<ReturnType<typeof phoneView>, 'queued' | 'settingUp' | 'stranded'>> & { projectOrder?: string[] };
 
 /** Each computer's running order of projects (the desktop's `supervisor.productOrder`), from its newest settings copy. */
 export function phoneProjectOrder(rows: readonly { device: string; settings?: { workspace?: { productOrder?: unknown } } | null }[]): string[] {
@@ -119,8 +119,10 @@ export const rowTime = (i: WorkItem): number => (i.status === 'done' ? i.wrote?.
 
 export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const items: WorkItem[] = view.items;
-  const live = new Set(view.running.map((r: { itemId: string }) => r.itemId));
-  const queued = new Set(view.queued ?? []);
+  // A thread whose folder is being made reads as a run (live-line.ts), not as Queued.
+  const settingUp = new Set(view.settingUp ?? []);
+  const live = new Set([...view.running.map((r: { itemId: string }) => r.itemId), ...settingUp]);
+  const queued = new Set((view.queued ?? []).filter((id: string) => !settingUp.has(id)));
   const inCloud = new Set(view.running.filter((r: { where?: string }) => r.where === 'cloud').map((r: { itemId: string }) => r.itemId));
   const byId = new Map(items.map((i) => [i.id, i]));
   const waitingOn = (i: WorkItem) => waitsThatCanEnd(i, byId);

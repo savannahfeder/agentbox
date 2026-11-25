@@ -17,7 +17,7 @@ import type { RunningSession, WorkItem } from '../../../renderer/src/types';
 
 export interface Session { startedAt: number; activity?: { id: string; label: string; detail: string; startedAt?: number }[]; helpers?: number; engine?: string; where?: string; movable?: boolean }
 // What the computer said of the thread when nothing runs on it (phone-rows.ts `waitFacts`), so waiting reads Queued.
-type Waits = Pick<LiveFacts, 'queued' | 'runNow' | 'signInNeeded' | 'atLimit' | 'paused' | 'stalled' | 'shipping' | 'asking'>;
+type Waits = Pick<LiveFacts, 'queued' | 'settingUp' | 'runNow' | 'signInNeeded' | 'atLimit' | 'paused' | 'stalled' | 'shipping' | 'asking'>;
 interface Facts extends Waits {
   session: Session | null; inProgress: boolean; now: number;
   /** Its computer leaves this project's threads ready for the cloud (phone-rows.ts `projects[].cloud`). */

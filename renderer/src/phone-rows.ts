@@ -4,7 +4,7 @@
 // one copy of every rule.
 
 import { REQUEST_CHANNELS } from '../../shared/bridge-map.mts';
-import { madeHere, phoneChoices, WAIT_STATES, type PhoneChange } from '../../shared/phone-snapshot.mts';
+import { madeHere, phoneChoices, WAIT_STATES, type PhoneChange, type PhoneWait } from '../../shared/phone-snapshot.mts';
 import { runOfClaim } from '../../shared/cloud-kit.mts';
 import { isCarried } from '../../shared/cloud-carry.mts';
 import { Name } from '../../shared/product-name.mjs';
@@ -159,7 +159,7 @@ export function phoneView(rows: PhoneRows, now = Date.now(), computers: readonly
   const taken = new Set<string>([...rows.threads.map((t) => t.item), ...rows.commands.filter((c) => c.kind === 'new').map((c) => madeHere(c.id))]);
   const used = new Set<string>();
   const running: RunningSession[] = [];
-  const waits = new Map<string, { state: string; tool?: string; until?: number }>();
+  const waits = new Map<string, PhoneWait>();
   // What each thread's last run changed, by `${product}/${id}` as the phone names them.
   const changes: Record<string, PhoneChange> = {};
   const threads =[...rows.threads].sort((a, b) => `${a.device}/${a.project}`.localeCompare(`${b.device}/${b.project}`));
@@ -213,8 +213,10 @@ export function phoneView(rows: PhoneRows, now = Date.now(), computers: readonly
   const signInNeeded: Record<string, string> = {};
   const atLimit: Record<string, { tool: string; until: number }> = {};
   let paused = false;
+  const settingUp: string[] = [];
   for (const [id, w] of waits) {
     if (w.state === 'queued' || w.state === 'next') queue(id);
+    if (w.settingUp === true) settingUp.push(id);
     if (w.state === 'next') runNow.push(id);
     if (w.state === 'stalled') stalled.push(id);
     if (w.state === 'shipping') shipping.push(id);
@@ -298,13 +300,13 @@ export function phoneView(rows: PhoneRows, now = Date.now(), computers: readonly
     const where = splitSlug(i.product);
     return !!where && !online.has(where.device) && !carried.has(i.product) && !live.has(`${i.product}/${i.id}`);
   }).map((i) => i.id);
-  return { now, products, items: [...items.values()], waiting, aliases, running, queued, runNow, stalled, shipping, signInNeeded, atLimit, paused, places, approvals, decided, cards, changes, stranded };
+  return { now, products, items: [...items.values()], waiting, aliases, running, queued, settingUp, runNow, stalled, shipping, signInNeeded, atLimit, paused, places, approvals, decided, cards, changes, stranded };
 }
 
 /** What one thread's live line is told of the computer's queue, off the view (the phone app's thread page). */
-export function waitFacts(view: Pick<ReturnType<typeof phoneView>, 'queued' | 'runNow' | 'stalled' | 'shipping' | 'signInNeeded' | 'atLimit' | 'paused' | 'approvals'>, id: string) {
+export function waitFacts(view: Pick<ReturnType<typeof phoneView>, 'queued' | 'settingUp' | 'runNow' | 'stalled' | 'shipping' | 'signInNeeded' | 'atLimit' | 'paused' | 'approvals'>, id: string) {
   return {
-    queued: view.queued, runNow: view.runNow, signInNeeded: view.signInNeeded, atLimit: view.atLimit, paused: view.paused,
+    queued: view.queued, settingUp: view.settingUp, runNow: view.runNow, signInNeeded: view.signInNeeded, atLimit: view.atLimit, paused: view.paused,
     stalled: view.stalled.includes(id), shipping: view.shipping.includes(id), asking: view.approvals.some((a) => a.item === id),
   };
 }
