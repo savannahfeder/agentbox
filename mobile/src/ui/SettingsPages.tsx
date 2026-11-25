@@ -472,7 +472,7 @@ function OutsideAgents() {
   const r = s.reading('workspace', 'outsideAgents', s.settings!.workspace.outsideAgents);
   return (
     <>
-      <Row first stack label="Show while they run" desc={`Claude Code started in a terminal, not from here. ${AGENT_SENTENCE[r.value as string] ?? ''}`} reading={r}
+      <Row first stack label="Show while they run" desc={`Claude Code and Codex, started in a terminal or the Codex app. ${AGENT_SENTENCE[r.value as string] ?? ''}`} reading={r}
         control={<Choice label="Show while they run" value={r.value as string} options={AGENT_OPTIONS} onChange={(v) => void s.change({ scope: 'workspace', key: 'outsideAgents', value: v })} />} />
       <SettingSwitch label="Bring in new chats" k="importNew" copy={!!s.settings!.workspace.importNew}
         desc="A Claude Code or Codex chat in one of your projects comes in after ten quiet minutes." />
