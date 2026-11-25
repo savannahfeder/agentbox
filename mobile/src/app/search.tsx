@@ -102,7 +102,7 @@ function SearchScreen() {
   };
   // "See all" is the whole list of threads, as it was before there were commands.
   const [all, setAll] = useState(false);
-  const hits = useMemo(() => phoneSearch(c.view, q, c.now, c.tabs), [c.view, q, c.now, c.tabs]);
+  const hits = useMemo(() => phoneSearch(c.view, q, c.now, c.tabs, c.openedAt), [c.view, q, c.now, c.tabs, c.openedAt]);
   const found = q.trim() ? hits : [];
   const commands = useMemo(() => commandsFor(q, phoneCommands({
     team: !!c.team || g.on,

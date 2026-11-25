@@ -11,6 +11,7 @@ import {
 } from '../../../renderer/src/list-rules';
 import { backWords, boardColumns, DEFAULT_DISPLAY, handedOnWord, keeps, sentAt, sorted, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { waitWords } from '../../../shared/thread-waits.mts';
+import { openedLately } from '../../../shared/opened-lately.mts';
 import { searchThreads } from '../../../renderer/src/threads/search';
 import { parseQuery, splitHits } from '../../../renderer/src/search';
 import { stamp } from '../../../renderer/src/format';
@@ -231,12 +232,15 @@ export interface Hit {
 }
 
 /** Every thread in every tab, closed ones too, as the site's search finds them (App.tsx `hits`). */
-export function phoneSearch(view: View, query: string, now = Date.now(), tabs?: Record<TabId, Row[]>): Hit[] {
+/** `openedAt`: when this phone last opened each thread, by `product/id` (lib/unread.ts), so what you opened lately leads. */
+export function phoneSearch(view: View, query: string, now = Date.now(), tabs?: Record<TabId, Row[]>, openedAt: Readonly<Record<string, number>> = {}): Hit[] {
   const items: WorkItem[] = view.items;
+  // The desktop keys what it opened by thread id.
+  const byId = Object.fromEntries(Object.entries(openedAt).map(([key, at]) => [key.slice(key.lastIndexOf('/') + 1), at]));
   const asks = new Map(Object.values(tabs ?? {}).flat().map((r) => [r.key, r.toApprove]));
   const { terms, phrase } = parseQuery(query);
   const runs = (text: string) => (terms.length ? splitHits(text, terms, phrase) : [{ text, hit: false }]);
-  return searchThreads(items, query, { products: view.products, people: [], me: null }).map(({ item, summary }: { item: WorkItem; summary: string }) => {
+  return searchThreads(items, query, { products: view.products, people: [], me: null }, { opened: openedLately(byId, now), now }).map(({ item, summary }: { item: WorkItem; summary: string }) => {
     const p = item.priority ?? 5;
     return {
       key: `${item.product}/${item.id}`, id: item.id, product: item.product,
