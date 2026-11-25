@@ -74,9 +74,9 @@ export const Repeat = ({ size = 14, tint = color.faint }: P) => (
 );
 
 /** A pinned thread (threads/ThreadMenu.tsx `PinMark`), square-headed like every shape here. */
-export const Pin = ({ size = 13, tint = color.faint }: P) => (
+export const Pin = ({ size = 13, tint = color.faint, filled = false }: P & { filled?: boolean }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M8 3h8l-1.5 6 3.5 3.5H6L9.5 9z" /><Path d="M12 12.5V21" />
+    <Path d="M8 3h8l-1.5 6 3.5 3.5H6L9.5 9z" fill={filled ? tint : 'none'} /><Path d="M12 12.5V21" />
   </Svg>
 );
 

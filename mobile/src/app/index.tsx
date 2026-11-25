@@ -75,7 +75,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
           {row.title}{aside ? <Text style={{ color: color.faint }}>{`  ${aside}`}</Text> : null}
         </T>
         {/* Pinned, faint after the title as the desktop draws it (pages.css `.th-pin`); a closed thread keeps no pin. */}
-        {row.item?.pinned && row.item.status !== 'done' && <View accessibilityLabel="Pinned" style={{ marginLeft: 8 }}><Pin /></View>}
+        {row.item?.pinned && row.item.status !== 'done' && <View accessibilityLabel="Pinned" style={{ marginLeft: 8 }}><Pin filled tint={color.dim} /></View>}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
         {/* Sent from the phone and not yet taken: the web app's status word (status-word.ts). */}
