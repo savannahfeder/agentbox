@@ -125,6 +125,69 @@ describe('the private push', () => {
     expect(r).toMatchObject({ pushed: false, why: expect.stringContaining('repository') });
   });
 
+  it('refuses a git folder holding a link, so an index swapped behind one is never read', () => {
+    const w = world();
+    put(path.join(w.at, 'unslop/SKILL.md'), 'two\n');
+    const store = path.join(w.task, 'idx');
+    fs.mkdirSync(store);
+    fs.renameSync(path.join(w.at, '.git/index'), path.join(store, 'live'));
+    fs.symlinkSync(path.join(store, 'live'), path.join(w.at, '.git/index'));
+    const r = pushPrivateFolder(w.task, { message: 'Linked', env, trusted: w.app });
+    expect(r).toMatchObject({ pushed: false, why: expect.stringContaining('a link at .git/index') });
+    expect(git(w.remote, 'show', 'main:unslop/SKILL.md')).toBe('one');
+  });
+
+  it('writes nothing outside the checkout when a folder in its git folder becomes a link after the copy', () => {
+    const w = world();
+    put(path.join(w.at, 'unslop/SKILL.md'), 'two\n');
+    const outside = path.join(w.dir, 'elsewhere');
+    fs.mkdirSync(outside);
+    put(path.join(w.at, '.git/refs/heads/authorized_keys'), 'planted\n');
+    const bin = path.join(w.dir, 'bin');
+    const once = path.join(w.dir, 'swapped-once');
+    put(path.join(bin, 'git'), [
+      '#!/bin/sh',
+      `if [ ! -f "${once}" ]; then`,
+      `  : > "${once}"`,
+      `  rm -rf "${path.join(w.at, '.git/refs/heads')}" && ln -s "${outside}" "${path.join(w.at, '.git/refs/heads')}"`,
+      'fi',
+      `exec "${realGit}" "$@"`,
+    ].join('\n') + '\n');
+    fs.chmodSync(path.join(bin, 'git'), 0o755);
+    pushPrivateFolder(w.task, { message: 'Swapped', env: { ...env, PATH: `${bin}:${env.PATH}` }, trusted: w.app });
+    expect(fs.readdirSync(outside)).toEqual([]);
+  });
+
+  it('does not fetch inside a repository that .gitmodules names and that appears after the check', () => {
+    const w = world();
+    put(path.join(w.at, 'unslop/SKILL.md'), 'two\n');
+    const ran = path.join(w.dir, 'planted-ran');
+    const planted = path.join(w.dir, 'planted.sh');
+    fs.writeFileSync(planted, `#!/bin/sh\necho "$0 $*" >> "${ran}"\nexit 1\n`, { mode: 0o755 });
+    put(path.join(w.at, '.gitmodules'), '[submodule "y"]\n\tpath = y\n\turl = ./y\n\tfetchRecurseSubmodules = true\n');
+    const ready = path.join(w.dir, 'ready');
+    git(w.dir, 'init', '-q', ready);
+    put(path.join(ready, 'f'), 'f\n');
+    git(ready, 'add', '-A');
+    git(ready, '-c', 'commit.gpgsign=false', 'commit', '-q', '-m', 's');
+    git(ready, 'remote', 'add', 'origin', ready);
+    git(ready, 'config', 'remote.origin.uploadpack', planted);
+    const bin = path.join(w.dir, 'bin');
+    const once = path.join(w.dir, 'planted-once');
+    put(path.join(bin, 'git'), [
+      '#!/bin/sh',
+      `if [ ! -f "${once}" ]; then`,
+      `  : > "${once}"`,
+      `  cp -R "${ready}" "${path.join(w.at, 'y')}"`,
+      'fi',
+      `exec "${realGit}" "$@"`,
+    ].join('\n') + '\n');
+    fs.chmodSync(path.join(bin, 'git'), 0o755);
+    const r = pushPrivateFolder(w.task, { message: 'Named', env: { ...env, PATH: `${bin}:${env.PATH}` }, trusted: w.app });
+    expect(fs.existsSync(ran) ? fs.readFileSync(ran, 'utf8') : '').toBe('');
+    expect(r.pushed).toBe(false);
+  });
+
   it('still pushes a checkout with no repository in it', () => {
     const w = world();
     put(path.join(w.at, 'unslop/SKILL.md'), 'two\n');
