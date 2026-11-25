@@ -18,6 +18,7 @@ import { PriorityBars, T, Wall } from '../ui/parts';
 import { SETTINGS_PAGES } from '../ui/SettingsPages';
 import { color, font, size } from '../ui/theme';
 import { StatusNotice } from '../ui/StatusNotice';
+import type { AgentMode } from '../../../renderer/src/types';
 
 const Glass = () => (
   <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={color.faint} strokeWidth={1.1} strokeLinecap="round"><Circle cx={10.8} cy={10.8} r={6.6} /><Path d="M15.6 15.6 20 20" /></Svg>
@@ -66,6 +67,7 @@ function computerFacts(s: SettingsState): ComputerFacts | null {
     cloud: w.cloud ? { mode: s.reading('workspace', 'cloudRuns', w.cloud.mode).value as CloudMode, whenOn: w.cloud.whenOn } : null,
     projects: inRunningOrder(projects, order),
     order,
+    outside: s.reading('workspace', 'outsideAgents', w.outsideAgents).value as AgentMode,
   };
 }
 
