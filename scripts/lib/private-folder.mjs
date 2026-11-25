@@ -91,6 +91,12 @@ function pushFrom(copy, { at, rel, gate, env, message, signIn }) {
     // A warning on stderr is not an answer: `answer` is what decides, `out` is what a refusal quotes.
     return { ok: r.status === 0, answer: `${r.stdout ?? ''}`.trim(), out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() };
   };
+  // Status goes into every repository the index lists and runs its settings,
+  // and the tree's `.git` files can appear after the check. The copy's index
+  // is out of a worker's reach, so it is what decides.
+  const listed = git(['ls-files', '--stage']);
+  if (!listed.ok) return { pushed: false, why: `git could not read ${rel}: ${listed.out}` };
+  if (/^160000 /m.test(listed.answer)) return { pushed: false, why: `${rel} was left as it is, because its index lists a repository of its own` };
   const status = git(['status', '--porcelain']);
   if (!status.ok) return { pushed: false, why: `git could not read ${rel}: ${status.out}` };
   if (status.answer) {
