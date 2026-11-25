@@ -5,6 +5,12 @@
 // copied a markdown file from outside the documents (reproduced 2026-11-19
 // with notes.md and notes-v2.md in a folder beside the store). read_document
 // already refused the same path.
+//
+// The same read went through a thread's own lines (2026-11-25): a teammate's
+// reply is written as the app's line with the text they typed, and a path it
+// names, whole or climbing out with "..", joined the file's versions. The next
+// write_document with versionOf that name read the outside file and saved it
+// as the newest version. Reproduced with a diary.md beside the store.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -71,5 +77,36 @@ describe('versionOf naming a file outside the documents', () => {
     put(path.join(other, 'notes-v2.md'), newer);
     await write({ versionOf: 'designs/w-other/../w-other/notes.md', content: older.replace('One.', 'Uno.') });
     expect(copiedIn().some((f) => f.includes(row.id))).toBe(true);
+  });
+});
+
+describe("a version a teammate's reply names outside the documents", () => {
+  const first = '# Diary\n\nOne.\n\nTwo.\n';
+  const reply = async (words: string) => {
+    const { updateWorkItem } = await import('../main/store/work-items.mts');
+    updateWorkItem(dir, row.id, { answer: `Sam replied to your message:\n\n> ${words}`, from: { teammate: 'p1', name: 'Sam' } }, { source: 'system' });
+  };
+  const secretFile = () => { const f = path.join(outside, 'diary.md'); put(f, '# Diary\n\nSECRET-LINE\n'); return f; };
+
+  it('copies none of it in when the reply gives its whole path', async () => {
+    await write({ path: 'notes/diary.md', title: 'Diary', content: first });
+    await reply(`see \`${secretFile()}\``);
+    await write({ versionOf: 'diary.md', content: first });
+    expect(copiedIn()).toEqual([]);
+  });
+
+  it('copies none of it in when the reply links to it climbing out of the documents', async () => {
+    await write({ path: 'notes/diary.md', title: 'Diary', content: first });
+    await reply(`see [diary](${path.relative(dir, secretFile()).split(path.sep).join('/')})`);
+    await write({ versionOf: 'diary.md', content: first });
+    expect(copiedIn()).toEqual([]);
+  });
+
+  it('still merges a version the reply names inside the documents', async () => {
+    await write({ path: 'notes/diary.md', title: 'Diary', content: first });
+    put(path.join(dir, 'shared/diary.md'), '# Diary\n\nSECRET-LINE\n');
+    await reply('see [diary](shared/diary.md)');
+    await write({ versionOf: 'diary.md', content: first });
+    expect(copiedIn().length).toBeGreaterThan(0);
   });
 });

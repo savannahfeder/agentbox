@@ -282,8 +282,15 @@ export function keepAsWritten(product: string | null | undefined, rel: string | 
   } catch { /* the document itself is saved; only the merge loses its base */ }
 }
 
+// Only inside the documents: a thread's lines can name any path, a teammate's
+// reply among them, and what is read here is saved as the newest version.
 const readVersion = (dir: string, v: { path: string }): string | null => {
-  try { return fs.readFileSync(path.isAbsolute(v.path) ? v.path : path.join(dir, v.path), 'utf8'); } catch { return null; }
+  try {
+    const root = fs.realpathSync(dir);
+    const file = fs.realpathSync(path.resolve(root, v.path));
+    if (!file.startsWith(root + path.sep)) return null;
+    return fs.readFileSync(file, 'utf8');
+  } catch { return null; }
 };
 
 /**
