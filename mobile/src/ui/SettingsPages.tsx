@@ -123,6 +123,9 @@ function General() {
       </Sheet>
       {w ? (
         <>
+          <Group label="AI teammates">
+            <SettingSwitch first label="Use AI teammates" desc="Agents with a standing job that work on their own, talk in one team chat and reach you only when they need you." k="alphaTeammates" copy={!!w.alpha.teammates} />
+          </Group>
           <Group label={`What ${NAME} sends`}>
             <SettingSwitch first label="Counts and crash reports" desc={`That ${NAME} was opened, that a task was opened, that a reply was sent, and a report when something breaks. Never your code, your prompts, your keys or your paths, and never a title.`} k="diagnostics" copy={w.diagnostics} />
           </Group>
@@ -499,7 +502,6 @@ function Alpha() {
   return (
     <Group>
       <SettingSwitch first label="Rooms" desc="See the people you work with and their agents, with a chat beside them. Needs a team sign-in." k="alphaRooms" copy={w.alpha.rooms} />
-      <SettingSwitch label="Teammates" desc="Agents with a standing job that work on their own, talk in one team chat and reach you only when they need you." k="alphaTeammates" copy={!!w.alpha.teammates} />
       <SettingSwitch label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in." k="alphaMultiplayer" copy={!!w.alpha.multiplayer} />
     </Group>
   );

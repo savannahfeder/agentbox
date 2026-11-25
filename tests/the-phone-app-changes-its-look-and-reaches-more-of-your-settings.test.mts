@@ -130,7 +130,7 @@ describe('the computer\'s switches the phone was missing', () => {
 
   it('are drawn on the pages the desktop keeps them on', () => {
     const pages = read('src/ui/SettingsPages.tsx');
-    expect(pages).toMatch(/label="Teammates"[^\n]*k="alphaTeammates"/);
+    expect(pages).toMatch(/label="Use AI teammates"[^\n]*k="alphaTeammates"/);
     expect(pages).toMatch(/label="Multiplayer"[^\n]*k="alphaMultiplayer"/);
     expect(pages).toMatch(/label="Bring in new chats"[^\n]*k="importNew"/);
   });
