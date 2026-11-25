@@ -167,6 +167,10 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   return { inbox: drawn(inbox, 'inbox'), progress: drawn(progress, 'progress'), snoozed: drawn(snoozed, 'snoozed'), done: drawn(done, 'done') };
 }
 
+/** The repeating tasks Later lists under View and filters: a project filter keeps only its projects' ones. */
+export const repeatsKept = <R extends { product: string }>(repeats: R[], display: Display): R[] =>
+  display.projects.length ? repeats.filter((r) => display.projects.includes(r.product)) : repeats;
+
 /** Each tab as View and filters leave it (App.tsx `displayedBox`), and how many it holds before them. */
 export function shownTabs(tabs: Record<TabId, Row[]>, display: Display, now: number, order: string[], agent: Harness | null = null) {
   const pick = (tab: TabId) => {
@@ -181,11 +185,12 @@ export function shownTabs(tabs: Record<TabId, Row[]>, display: Display, now: num
 
 /**
  * View and filters' "Showing N of M": what the screen draws against what it
- * would draw with no filter on. `above` is the rows drawn over the list that no
- * filter hides (mentions, questions, repeating tasks).
+ * would draw with no filter on. `above` is the rows drawn over the list
+ * (mentions, questions, repeating tasks), and `aboveWhole` how many of them
+ * there are with no filter on.
  */
-export function filterCount({ rows, whole, mineOnly = false, above = 0, board = null, wholeBoard = null }: {
-  rows: Pick<Row, 'item'>[]; whole: Pick<Row, 'item'>[]; mineOnly?: boolean; above?: number;
+export function filterCount({ rows, whole, mineOnly = false, above = 0, aboveWhole = above, board = null, wholeBoard = null }: {
+  rows: Pick<Row, 'item'>[]; whole: Pick<Row, 'item'>[]; mineOnly?: boolean; above?: number; aboveWhole?: number;
   board?: { rows: unknown[] }[] | null; wholeBoard?: { rows: unknown[] }[] | null;
 }) {
   if (board && wholeBoard) {
@@ -193,7 +198,7 @@ export function filterCount({ rows, whole, mineOnly = false, above = 0, board = 
     return { shown: cards(board), total: cards(wholeBoard) };
   }
   const counted = (list: Pick<Row, 'item'>[]) => (mineOnly ? list.filter((r) => !teammateIdOf(r.item)) : list).length;
-  return { shown: counted(rows) + above, total: counted(whole) + above };
+  return { shown: counted(rows) + above, total: counted(whole) + aboveWhole };
 }
 
 /** The board, column by column, as the site draws it (page-rules.ts `boardColumns`). */

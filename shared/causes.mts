@@ -35,6 +35,13 @@ export function isCause(item: unknown): boolean {
     && (row.wrote as { kind?: { source?: string } } | undefined)?.kind?.source !== 'agent';
 }
 
+/** An open cause about main being red, which the app clears itself once main's tests pass (main/main-went-red.mts). */
+export function aboutRedMain(row: CauseRow | null | undefined): boolean {
+  if (!isCause(row) || row!.status === 'done') return false;
+  const title = String(row!.title ?? '');
+  return /^main('s)?\b/i.test(title.trim()) && /\b(red|broken|failing)\b/i.test(title);
+}
+
 /** The threads still waiting on this cause, from every project. */
 export function waitingOn<T extends CauseRow>(cause: CauseRow, items: readonly T[] | null | undefined): T[] {
   return (items ?? []).filter((i) => i.id !== cause.id && i.status === 'blocked'
