@@ -22,6 +22,7 @@ import { ChatsPlace, TeammateMark, teammatesWaiting } from '../ui/Teammates';
 import { Face } from '../ui/Groups';
 import { mentionRows } from '../../../renderer/src/team/rooms/room-rules';
 import { mateOf, questionThread, questionsForYou } from '../lib/teammates';
+import { mentionRowWords } from '../lib/mention-row';
 import type { RoomMention as MentionRowData, Teammate, WorkItem } from '../../../renderer/src/types';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
@@ -93,6 +94,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
 /** A message in a group that names you, at the top of Needs you until you read the group past it (team/rooms/MentionRows.tsx). */
 function MentionRow({ m, first, now, open }: { m: MentionRowData; first: boolean; now: number; open: () => void }) {
   const small = { fontSize: 11, lineHeight: 20, color: color.faint };
+  const words = mentionRowWords(m);
   return (
     <Pressable onPress={open} accessibilityLabel={`${m.byName || 'Someone'} mentioned you in ${m.roomName}, unread`}
       style={({ pressed }) => ({ minHeight: 64, paddingTop: 14, paddingBottom: 14, paddingLeft: size.inset, paddingRight: 12, backgroundColor: pressed ? color.fill : 'transparent' })}>
@@ -101,8 +103,8 @@ function MentionRow({ m, first, now, open }: { m: MentionRowData; first: boolean
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Face name={m.byName || 'Someone'} size={20} />
         <T numberOfLines={2} style={{ flexShrink: 1, fontSize: 16, lineHeight: 21.6, letterSpacing: -0.16 }}>
-          <Text style={{ fontFamily: font.medium }}>{`${m.byName || 'Someone'}  `}</Text>
-          <Text style={{ color: color.dim }}>{m.body}</Text>
+          <Text style={{ fontFamily: font.medium }}>{`${words.who}  `}</Text>
+          <Text style={{ color: color.dim }}>{words.says}</Text>
         </T>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
