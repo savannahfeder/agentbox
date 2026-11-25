@@ -79,6 +79,13 @@ export interface CannotStart {
   tool: string;
 }
 
+/** The step a working run is on, unless the memory gate holds its command: then it waits, and says so. */
+export function heldStepWord(current: { label?: string } | undefined, memoryHeldMs: number | undefined): string {
+  if (memoryHeldMs == null) return current?.label || 'Thinking';
+  const command = /^Running (.+)$/.exec(current?.label ?? '')?.[1];
+  return command ? `Waiting for memory to run ${command}` : 'Waiting for memory';
+}
+
 /** The word for a queued row nothing will start yet: what it waits for, where one word says it. */
 export function cannotStartWord({ why }: CannotStart): string {
   return why === 'memory' ? 'Waiting for memory' : 'Not started';

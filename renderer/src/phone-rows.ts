@@ -23,7 +23,7 @@ export interface PhoneSnapshot {
   olderLines?: number;
   runs?: TraceSession[];
   approvals?: { id?: string; at?: number; tool?: string; card?: string | null; input?: Record<string, unknown> }[];
-  live?: { at: number; since?: number; where?: string; movable?: boolean; doing?: { label?: string; startedAt?: number }[] } | null;
+  live?: { at: number; since?: number; where?: string; movable?: boolean; memoryHeld?: boolean; doing?: { label?: string; startedAt?: number }[] } | null;
   wait?: { state: string; tool?: string; until?: number } | null;
   attached?: Attached;
   change?: PhoneChange;
@@ -192,6 +192,8 @@ export function phoneView(rows: PhoneRows, now = Date.now(), computers: readonly
         itemId: id, product: slug, startedAt: Number(live.since) || 0,
         ...(live.where === 'cloud' ? { where: 'cloud' } : {}),
         ...(live.movable === true ? { movable: true } : {}),
+        // The copy says only that the gate holds it; how long is not sent, so the copy does not change every pass.
+        ...(live.memoryHeld === true ? { memoryHeldMs: 0 } : {}),
         tail: [],
         activity: (Array.isArray(live.doing) ? live.doing : []).map((d: { label?: string; startedAt?: number } | null, i: number) => ({ id: `live-${i}`, label: String(d?.label ?? ''), detail: '', startedAt: Number(d?.startedAt) || 0 })),
       });
