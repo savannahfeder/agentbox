@@ -1224,6 +1224,20 @@ export class Store {
     return workItemsDisk.updateWorkItem(dir, id, { status: waits ? 'blocked' : 'open' }, { source: 'system' });
   }
 
+  /** Closes the open causes `which` picks, with a note saying why; the threads behind them carry on (`resumeFinishedWaits`). */
+  clearCauses(which: (row: ListedItem) => boolean, note: string, now = Date.now()): number {
+    let cleared = 0;
+    for (const row of this.listItems(now)) {
+      if (!which(row)) continue;
+      const dir = this.productDir(row.product);
+      if (!dir) continue;
+      this.modules.workItemsDisk.updateWorkItem(dir, row.id, { note }, { source: 'system', now });
+      this.modules.workItemsDisk.updateWorkItem(dir, row.id, { status: 'done' }, { source: 'system', now });
+      cleared++;
+    }
+    return cleared;
+  }
+
   // A CLOSED ROW WHOSE WORK NEVER REACHED MAIN, put back in front of the
   // person. Their close outranks the app's own writes, so it reopens the way
   // their Reopen does (`authorityOf` records that as the app's), then waits on
