@@ -108,6 +108,19 @@
 .setup-split .ss-price { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
 .setup-split .ss-price b { font-size: 17px; font-weight: 500; }
 .setup-split .ss-price small { font-size: 12px; color: var(--text-faint); }
+/* The agents step: a card for each agent, with the one button that gets it ready. */
+.setup-split .ss-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.setup-split .ss-tile { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; min-height: 188px; padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); border-radius: 12px; background: var(--ss-ground); box-shadow: 0 1px 2px rgba(30, 22, 36, .04); }
+.setup-split .ss-tile-logo { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--ss-ground);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); }
+.setup-split .ss-tile-name { margin-top: 14px; font-size: 15px; line-height: 20px; font-weight: 500; }
+.setup-split .ss-tile-sub { max-width: 100%; margin-top: 2px; font-size: 13px; line-height: 18px; color: var(--text-dim); overflow: hidden;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.setup-split .ss-tile-end { margin-top: auto; padding-top: 12px; box-sizing: border-box; display: flex; align-items: center; gap: 7px; height: 42px; font-size: 13.5px; color: var(--text-dim); }
+.setup-split .ss-tile-btn { height: 30px; padding: 0 12px; border: 1px solid color-mix(in srgb, var(--text) 18%, transparent); border-radius: 8px;
+  background: var(--ss-ground); font: inherit; font-size: 13.5px; color: var(--text); box-shadow: 0 1px 2px rgba(30, 22, 36, .06); cursor: pointer; }
+.setup-split .ss-tile-btn:hover { background: color-mix(in srgb, var(--text) 3%, var(--bg)); }
 /* The purchase page: what Pro brings in three lines, the price in one quiet line. */
 .setup-split .ss-perks { display: flex; flex-direction: column; gap: 14px; margin: 0 0 30px; }
 .setup-split .ss-perk { display: flex; align-items: center; gap: 12px; font-size: 16px; color: var(--text); }

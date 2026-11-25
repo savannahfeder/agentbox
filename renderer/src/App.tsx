@@ -1,7 +1,7 @@
 import { previewFocus } from './preview-focus';
 import { picturesNamedIn, warmPictures } from './components/FittedImg';
 import { PhoneStatus } from './components/PhoneStatus';
-import { sidebarFolded, toggleSidebarShrinks, useSidebarShrinks } from './sidebar-shrinks';
+import { pressKeepOpen, sidebarFolded, useSidebarShrinks } from './sidebar-shrinks';
 import { GlassBand } from './components/GlassBand';
 import { cloudChord, cloudOffAsks, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
 import { usePhoneBack, onCloudPhone, onPhone } from './phone-screen';
@@ -285,6 +285,7 @@ import { homeNeedsRows } from './home/home-needs';
 import { needsYouList, openNeedsEntry } from './threads/needs-you-list';
 import { SkyBackdrop } from './home/SkyBackdrop';
 import { InboxSky } from './home/InboxSky';
+import { EmptyScene } from './home/EmptyScene';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { setupLook } from './setup-split';
 import { startProTrial } from './pro-trial';
@@ -1004,6 +1005,7 @@ export default function App() {
   // The sidebar is narrow and wide only while pointed at; nothing pins it open.
   const [railOpen, setRailOpen] = useState(false);
   const sidebarShrinks = useSidebarShrinks();
+  const keepOpenPressed = () => pressKeepOpen(() => setRailOpen(false));
   // Resolved once at mount and applied before the first paint below, so the
   // window never flashes the other theme on the way in.
   // IT HOLDS THE PICK, NOT THE COLOUR. `match` is one of the three things this
@@ -6005,7 +6007,7 @@ export default function App() {
         setModal((m) => (m === 'palette' ? null : 'palette'));
         return;
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === '\\' && !onPhone()) { e.preventDefault(); toggleSidebarShrinks(); return; }
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\' && !onPhone()) { e.preventDefault(); keepOpenPressed(); return; }
       const toastsO = oIsTheToasts(e.key, toast, sentAt.current, Date.now(), lastToast.current);
       // A ROOM OWNS THE KEYBOARD WHILE IT IS OPEN, as Settings does: the list
       // behind it is not on the screen. Escape goes back to the threads and
@@ -7607,8 +7609,11 @@ export default function App() {
       follow: (n, card) => { changeFollows((was) => markTold(was, n)); openTeammateCard(card); },
     });
   };
-  const skyOnInbox = wearsInboxSky(sky) && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
+  const inboxPageUp = (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown && !evPick;
+  const skyOnInbox = wearsInboxSky(sky) && !homeShown && inboxPageUp;
+  // The light mountains have no strip over the list, so only the empty page wears them.
+  const mountainsOnEmpty = !!sky?.art.mountains && !skyOnInbox && !homeShown && inboxPageUp;
   // Team and Files wear the same sky over their header.
   const skyOnPlace = wearsInboxSky(sky) && !onPhone() && (chatsPlaceShown || filesShown);
   // A place is the whole page under the tabs; on the one-list home there are no cards.
@@ -7848,7 +7853,7 @@ export default function App() {
       <WorkspaceNavigation
         onPalette={() => setModal('palette')}
         recent={recentRows}
-        keptOpen={!sidebarShrinks} onKeepOpen={toggleSidebarShrinks}
+        keptOpen={!sidebarShrinks} onKeepOpen={keepOpenPressed}
         update={announcesUpdate(snap?.update, { closed: '' }) ? { installing: !!snap?.update?.installing, version: snap?.update?.newVersion, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
         onUpdate={() => { void api.updateInstall(); }}
         /* AND THE COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS
@@ -8451,7 +8456,7 @@ export default function App() {
                     // "Nothing needs you" is about you alone; with a teammate
                     // on the page the quiet line says it instead.
                     : view === 'inbox' && !withOthers
-                      ? <InboxClear slot={setClearSlot} first={firstTask(tour)} sky={skyOnInbox && sky ? sky.art : null} />
+                      ? <><InboxClear slot={setClearSlot} first={firstTask(tour)} sky={skyOnInbox && sky ? sky.art : null} />{mountainsOnEmpty && sky && <EmptyScene art={sky.home ?? sky.art} />}</>
                       : <EmptyTab view={view} starting={justSent} waiting={needsYouCount.inbox} />
                 ) : <List
                   lead={view === 'inbox' && search === null && (leadCount || sharedFileNews.length || followingNews.length)

@@ -90,8 +90,8 @@ describe('its key and its hint', () => {
   });
   it('is answered by the app wherever the keyboard is, and not on a phone', () => {
     const app = read('renderer/src/App.tsx');
-    expect(app).toContain("if ((e.metaKey || e.ctrlKey) && e.key === '\\\\' && !onPhone()) { e.preventDefault(); toggleSidebarShrinks(); return; }");
-    expect(app).toContain('keptOpen={!sidebarShrinks} onKeepOpen={toggleSidebarShrinks}');
+    expect(app).toContain("if ((e.metaKey || e.ctrlKey) && e.key === '\\\\' && !onPhone()) { e.preventDefault(); keepOpenPressed(); return; }");
+    expect(app).toContain('keptOpen={!sidebarShrinks} onKeepOpen={keepOpenPressed}');
   });
   it('is on the shortcuts page', () => {
     const row = SHORTCUTS.flatMap((g) => g.keys).find((k) => k.keys.includes('⌘\\'));
