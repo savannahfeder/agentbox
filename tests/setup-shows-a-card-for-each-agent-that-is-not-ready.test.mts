@@ -64,7 +64,7 @@ describe('a card', () => {
     // "This installation must be updated using its own installer.", which says nothing to do.
     expect(agentCard({ engine: 'claude', found: true, signedIn: false, tooOld: true }, { phase: 'manual', error: 'Run claude update in a terminal' }))
       .toEqual({ ready: false, sub: 'Run claude update in a terminal', act: 'Check again' });
-    expect(fs.readFileSync(new URL('../renderer/src/components/SetupSplit.tsx', import.meta.url), 'utf8')).toContain('own installer');
+    expect(fs.readFileSync(new URL('../renderer/src/components/AgentCards.tsx', import.meta.url), 'utf8')).toContain('own installer');
   });
   it('says why it stopped and offers to try again', () => {
     expect(agentCard({ engine: 'claude', found: true, signedIn: false }, { phase: 'failed', error: 'The sign-in was closed before it finished.' }))

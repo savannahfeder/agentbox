@@ -1,0 +1,14 @@
+/* An agent's card (AgentCards.tsx): in setup's agents step, and on the agent's Settings page. */
+.agent-tiles { --ss-ground: var(--bg); }
+:is(.setup-split, .agent-tiles) .ss-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+:is(.setup-split, .agent-tiles) .ss-tile { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; min-height: 188px; padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent); border-radius: 12px; background: var(--ss-ground); box-shadow: 0 1px 2px rgba(30, 22, 36, .04); }
+:is(.setup-split, .agent-tiles) .ss-tile-logo { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--ss-ground);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent); }
+:is(.setup-split, .agent-tiles) .ss-tile-name { margin-top: 14px; font-size: 15px; line-height: 20px; font-weight: 500; }
+:is(.setup-split, .agent-tiles) .ss-tile-sub { max-width: 100%; margin-top: 2px; font-size: 13px; line-height: 18px; color: var(--text-dim); overflow: hidden;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+:is(.setup-split, .agent-tiles) .ss-tile-end { margin-top: auto; padding-top: 12px; box-sizing: border-box; display: flex; align-items: center; gap: 7px; height: 42px; font-size: 13.5px; color: var(--text-dim); }
+:is(.setup-split, .agent-tiles) .ss-tile-btn { height: 30px; padding: 0 12px; border: 1px solid color-mix(in srgb, var(--text) 18%, transparent); border-radius: 8px;
+  background: var(--ss-ground); font: inherit; font-size: 13.5px; color: var(--text); box-shadow: 0 1px 2px rgba(30, 22, 36, .06); cursor: pointer; }
+:is(.setup-split, .agent-tiles) .ss-tile-btn:hover { background: color-mix(in srgb, var(--text) 3%, var(--bg)); }

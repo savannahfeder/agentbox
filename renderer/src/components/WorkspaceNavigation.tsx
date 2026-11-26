@@ -5,6 +5,7 @@ import { Name } from '../../../shared/product-name.mjs';
 import { SidebarGlyph } from './SidebarGlyph';
 import { AppMark } from './AppMark';
 import { SidebarMove, SidebarUpdate } from './SidebarUpdate';
+import { SidebarAgentSlot } from './AgentCards';
 import { changeLines, closedHere, readMoveClosed, readUpdateClosed, writeMoveClosed, writeUpdateClosed } from '../update-row';
 import { AccountMenu } from '../team/account-menu';
 import type { Invisible } from '../team/rooms/GoInvisible';
@@ -130,6 +131,8 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   const moveCard = showMove && !asRow;
   const moveView = showMove && move && onMove && <SidebarMove place={move.place} error={move.error ?? null}
     collapsed={collapsed} rail={rail} onMove={onMove} onClose={closeMove} />;
+  // An agent someone uses that is not ready gets the same place, when nothing else is in it.
+  const agentView = !showUpdate && !showMove && <SidebarAgentSlot collapsed={collapsed} rail={rail} />;
   const waiting = Number.isFinite(inboxCount) ? Math.max(0, Math.floor(inboxCount)) : 0;
   const waitingDescription = `${waiting} ${waiting === 1 ? 'thread' : 'threads'} waiting`;
   // ONE PAGE OF YOUR THREADS (approved 2026-10-01). In progress, Scheduled and
@@ -267,9 +270,11 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
           row inside it (SidebarUpdate.tsx). */}
       {updateCard && updateView}
       {moveCard && moveView}
+      {!asRow && agentView}
       <div className="workspace-utilities th-side-foot">
         {!updateCard && updateView}
         {!moveCard && moveView}
+        {asRow && agentView}
         {/* THE SIDEBAR NEVER SAYS WHICH PLAN YOU ARE ON (w-e217e577e5,
             2026-10-07, and this is a standing rule rather than one round's
             taste). A row reading "Claude · Max 20x" shipped here for a few
