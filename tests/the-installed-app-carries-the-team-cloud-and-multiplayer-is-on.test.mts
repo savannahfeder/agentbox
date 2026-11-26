@@ -1,4 +1,4 @@
-// MULTIPLAYER IS AN ALPHA FEATURE IN THE INSTALLED APP, AND THE PHONE SIGN-IN IS FOR EVERYONE.
+// THE INSTALLED APP CARRIES THE TEAM CLOUD, MULTIPLAYER IS ON, AND THE PHONE SIGN-IN IS FOR EVERYONE.
 //
 // Since 2026-10-06 an installed build never loaded the team cloud
 // (tests/the-installed-app-is-the-single-person-app), so nobody running the
@@ -10,14 +10,13 @@
 // So an installed build carries its own team cloud, baked in at release (never
 // a key read off the Mac or the environment). Settings › Phone signs in to it.
 // The team version itself (the sign-in page over the app, the Team page, the
-// teammates) shows only while Settings › Alpha features › Multiplayer is on;
-// a checkout keeps the team version unless it is switched off.
+// teammates) is on for everyone.
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadCloudConfig, teamConfigOnThisMac } from '../main/team/session.mts';
-import { alphaFeatures, setWorkspaceSetting } from '../main/settings.mts';
+import { alphaFeatures } from '../main/settings.mts';
 import { teamForWindow } from '../main/team/index.mts';
 
 const read = (rel) => fs.readFileSync(path.join(import.meta.dirname, '..', rel), 'utf8');
@@ -69,30 +68,18 @@ describe('the cloud an installed build signs in to', () => {
   });
 });
 
-describe('the Multiplayer switch', () => {
-  // 2026-11-09 (w-fbe5e95dea): the founder, on the new first run, "in the new
-  // versions it will be available so it's no longer just an alpha feature".
-  it('is on in an installed build until someone turns it off', () => {
-    expect(alphaFeatures({}, { packaged: true }).multiplayer).toBe(true);
-    expect(alphaFeatures({ alphaMultiplayer: false }, { packaged: true }).multiplayer).toBe(false);
-    expect(alphaFeatures({ alphaMultiplayer: 'no' }, { packaged: true }).multiplayer).toBe(true);
+describe('multiplayer', () => {
+  // 2026-11-09 (w-fbe5e95dea): "in the new versions it will be available so
+  // it's no longer just an alpha feature". On 2026-11-26 (w-11d0017da3) the
+  // switch went with the Alpha features page, so a saved off is not read.
+  it('is on in an installed build and a checkout, whatever was saved', () => {
+    for (const saved of [undefined, false, 'no']) {
+      expect(alphaFeatures({ alphaMultiplayer: saved }).multiplayer, String(saved)).toBe(true);
+    }
   });
 
-  it('is on in a checkout until someone turns it off', () => {
-    expect(alphaFeatures({}, { packaged: false }).multiplayer).toBe(true);
-    expect(alphaFeatures({ alphaMultiplayer: false }, { packaged: false }).multiplayer).toBe(false);
-  });
-
-  it('is saved to the config file', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mp-cfg-'));
-    const w = { config: { appDir: dir }, supervisor: { onChange() {} }, store: {} };
-    setWorkspaceSetting(w, { key: 'alphaMultiplayer', value: true });
-    expect(JSON.parse(fs.readFileSync(path.join(dir, 'zero.config.json'), 'utf8')).alphaMultiplayer).toBe(true);
-    expect(alphaFeatures(w.config, { packaged: true }).multiplayer).toBe(true);
-  });
-
-  it('has a switch on the Alpha features page', () => {
-    expect(read('renderer/src/components/Settings.tsx')).toMatch(/setWorkspace\('alphaMultiplayer'/);
+  it('has no switch in Settings', () => {
+    expect(read('renderer/src/components/Settings.tsx')).not.toMatch(/alphaMultiplayer/);
   });
 });
 

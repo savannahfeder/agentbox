@@ -212,8 +212,6 @@ export interface IpcDeps<W extends IpcWindow = IpcWindow> {
   froze?: FreezeCounter | null;
   /** The live relay's address, null when this cloud has none. */
   liveAt?: string | null;
-  /** Turns the window's glass on or off when the Alpha switch flips. */
-  glass?: (on: boolean) => void;
   /** The apps that can open a file (main/open-with.mts). */
   listApps?: (file: string) => Promise<AppThatOpens[]>;
 }
@@ -312,7 +310,7 @@ const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', '
 const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markDone', 'undoDone', 'later', 'markUnread', 'react', 'decide','edit', 'deleteMessage', 'putFile', 'putFileFrom', 'file', 'fileOnDisk', 'fileText', 'markFile', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute'] as const);
 type RoomOp = typeof ROOM_OPS extends Set<infer O> ? O : never;
 
-export function registerIpc<W extends IpcWindow>({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, froze = null, liveAt = null, glass = () => {}, listApps = (file) => appsThatOpen(file) }: IpcDeps<W>) {
+export function registerIpc<W extends IpcWindow>({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, froze = null, liveAt = null, listApps = (file) => appsThatOpen(file) }: IpcDeps<W>) {
   // The three Electron things, or a plain Node stand-in for them. There is no
   // default: a caller that forgets says so here rather than throwing eighty
   // lines further down on `ipcMain.handle` of undefined.
@@ -784,7 +782,6 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       // title-free activity of their private work. Null on a build with no
       // team cloud, which is the single-person app.
       team: team ? teamForWindow(team.state(), alpha.multiplayer) : null,
-      // Which alpha features are on (Settings, Alpha features).
       alpha,
       // TEAMMATES: who they are, what each is on, and the one team chat.
       teammates: alpha.teammates ? (() => { try { return store.teammatesView(items, now); } catch (err) { return { list: [], chat: [], runs: [], error: (err as Error).message }; } })() : null,
@@ -2574,10 +2571,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       // Before the save: once the switch is off, nothing leaves, not even this.
       if (countsTurnedOff(payload)) { analytics.track('counts_turned_off'); analytics.flush(); }
       setWorkspaceSetting({ config, supervisor, store }, payload ?? {});
-      if (payload?.key === 'alphaRooms' || payload?.key === 'alphaMultiplayer') team?.rooms?.tick().catch(() => {});
       if (cornerTagTurnedOff(payload)) analytics.track('tag_turned_off');
       if (payload?.key === 'filesInCloud' || payload?.key === 'filesOffAfterDays') filesPlaceNow().considerNow();
-      if (payload?.key === 'alphaGlass') glass(alphaFeatures(config).glass);
       push();
       return { ok: true, ...readSettings({ config, supervisor, store, onTeam: onTeamNow }) };
     } catch (err) {

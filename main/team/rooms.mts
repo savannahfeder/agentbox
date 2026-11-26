@@ -1,7 +1,7 @@
 // ROOMS ON THIS MAC (w-3d0fa23ffb, docs/team/ROOMS-PLAN.md): the rooms I am in,
 // each room's wall and chat, and the presence row this Mac publishes. Lives
-// inside the team service (main/team/index.mts) and only runs while Rooms is
-// switched on in Alpha features and someone is signed in.
+// inside the team service (main/team/index.mts) and only runs while someone is
+// signed in and on a team.
 import fs from 'node:fs';
 import path from 'node:path';
 import { wallCards, myPresence, displayNameOf, withoutHidden } from '../../shared/room-cards.mts';
