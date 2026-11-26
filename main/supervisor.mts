@@ -598,6 +598,14 @@ export interface HeldStart {
   account?: string | null;
 }
 
+/** A bounced ship's words for its agent, kept until the agent writes back after `at`. */
+export interface OwedShipFailure {
+  reply: string;
+  at: number;
+  /** Runs started carrying it. */
+  handed?: number;
+}
+
 export interface CompactionRecord {
   state: string;
   at?: number;
@@ -730,6 +738,7 @@ export interface SavedState {
   deliveryAttempts?: Record<string, number>;
   fruitless?: Record<string, FruitlessRecord>;
   heldStarts?: Record<string, HeldStart>;
+  owedShipFailures?: Record<string, OwedShipFailure>;
   filesForCloud?: Record<string, { paths: string[]; at: number }>;
   deadStarts?: Record<string, number[]>;
   carried?: Record<string, CarriedMark>;
@@ -1409,6 +1418,7 @@ export class Supervisor {
   declare _deliveryAttempts: Record<string, number>;
   declare _fruitless: Record<string, FruitlessRecord>;
   declare _heldStarts: Record<string, HeldStart>;
+  declare _owedShipFailures: Record<string, OwedShipFailure>;
   declare _deadStarts: Record<string, number[]>;
   // The login that last refused each thread's run, and when.
   declare _refusedOn: Record<string, { account: string; at: number }> | undefined;
@@ -1590,10 +1600,7 @@ export class Supervisor {
       // Not a second import while the thread's own relay is live: two racing
       // to lay in one run set its work aside as "changed on this Mac".
       liveSince: (item: ShipItem) => (this._cloudWorkOutstanding(item, { bring: !this.sessions.has(item.id) }) ? null : this.sessions.get(item.id)?.startedAt ?? null),
-      handBack: (item: ShipItem, reply: string) => {
-        const fresh = this.store.readItem?.(item.product, item.id) ?? item as WorkItem;
-        this.spawnWorker(fresh, { continuation: true, shipFailure: reply });
-      },
+      handBack: (item: ShipItem, reply: string) => this._handBackShipFailure(item, reply),
       afterShip: (shipped) => { this.onShipped(); this.watchMainsTests(shipped); this.reclaimShippedFolder(shipped); },
       memoryGate: () => this._memoryGate?.gate ?? null,
       shipScore: (item) => this.memoryGateScore(item.product, item.id) ?? 0,
@@ -1702,6 +1709,7 @@ export class Supervisor {
         if (held && held.tries == null) Object.assign(held, { tries: 0, next: (held.since ?? 0) + HELD_RETRY_MS[0] });
       }
       this._deadStarts = state.deadStarts ?? {};
+      this._owedShipFailures = state.owedShipFailures ?? {};
       // Rows handed to the cloud while asleep (`handedOver`), kept so a
       // restart cannot start one here that the cloud may be running.
       this._carried = state.carried && typeof state.carried === 'object' ? state.carried : {};
@@ -1758,6 +1766,7 @@ export class Supervisor {
       this.lastDigestTry = {};
       this._deliveryAttempts = {};
       this._fruitless = {};
+      this._owedShipFailures = {};
       this._profileTrouble = {};
       this._profileCooldown = {};
       this.productOrder = [];
@@ -7873,6 +7882,46 @@ export class Supervisor {
     if (tried) this._saveState();
   }
 
+  // A BOUNCED SHIP'S FAILURE IS OWED TO ITS AGENT UNTIL THE AGENT WRITES BACK.
+  // The start made at the bounce can be turned away like any other, and a
+  // turned-away reply goes back in the queue, but these words are not a reply,
+  // so nothing else would ever carry them.
+  _handBackShipFailure(item: ShipItem, reply: string) {
+    const fresh = this.store.readItem?.(item.product, item.id) ?? item as WorkItem;
+    const owed = { reply, at: Date.now() };
+    (this._owedShipFailures ??= {})[`${fresh.product}:${fresh.id}`] = owed;
+    this._handOver(fresh, owed);
+  }
+
+  _handOver(item: WorkItem, owed: OwedShipFailure) {
+    this.spawnWorker(item, { continuation: true, shipFailure: owed.reply });
+    if (this.sessions.has(item.id) || this._preparing?.has(item.id)) owed.handed = (owed.handed ?? 0) + 1;
+    this._saveState();
+  }
+
+  handOverOwedShipFailures(items: WorkItem[], now = Date.now()) {
+    const owed = this._owedShipFailures;
+    if (!owed || !Object.keys(owed).length) return;
+    const byKey = new Map(items.map((i) => [`${i.product}:${i.id}`, i]));
+    const productBySlug = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
+    const me = process.env.AGENTBOX_PERSON_ID || null;
+    let settled = false;
+    for (const [key, one] of Object.entries(owed)) {
+      const item = byKey.get(key);
+      // Three runs that ended without a word from the agent: the thread waits in Needs you.
+      if (!item || item.status === 'done' || (item.labels ?? []).includes(SHIP_LABEL) || (item.wrote?.result?.ts ?? 0) > one.at || (one.handed ?? 0) >= 3) {
+        delete owed[key];
+        settled = true;
+        continue;
+      }
+      if (this.sessions.has(item.id) || this._preparing?.has(item.id) || stoppedByHer(item) || this.claimHeldElsewhere(item)) continue;
+      if (!this.store.isDue(item, now) || !mayRunHere(item, productBySlug.get(item.product), me)) continue;
+      if (!this._roomFor(this._engineFor(item), item)) continue;
+      this._handOver(item, one);
+    }
+    if (settled) this._saveState();
+  }
+
   // Resume, Restart, Send Back and Run now are a person's word on the row, as
   // a reply is. `_heldFromStarting` cannot see them: none writes a field
   // `lastFounderWrite` counts, because a reopen is filed as the app's
@@ -8482,7 +8531,7 @@ export class Supervisor {
             const branch = n.branch!;
             this._onceSessionEnds(id, () => {
               const fresh = this.store.readItem?.(product, id) ?? row;
-              if (fresh.status !== 'done' && !stoppedByHer(fresh)) this.spawnWorker(fresh, { continuation: true, shipFailure: bringItTogether(branch) });
+              if (fresh.status !== 'done' && !stoppedByHer(fresh)) this._handBackShipFailure(fresh, bringItTogether(branch));
             });
           }
         } else this.store.noteItem?.(product, id, n.note);
@@ -9062,6 +9111,7 @@ export class Supervisor {
         deliveryAttempts: this._deliveryAttempts,
         fruitless: this._fruitless,
         heldStarts: this._heldStarts,
+        owedShipFailures: Object.fromEntries(Object.entries(this._owedShipFailures ?? {}).slice(-50)),
         filesForCloud: this._filesForCloudSaved(),
         // The starts a hold is counted from, pruned to the window they are
         // counted in. A restart in the middle of a storm used to reset the
@@ -9967,6 +10017,7 @@ export class Supervisor {
     try { this.resumeFinishedWaits(items); } catch (e) { console.warn('zero: could not resume a finished wait:', (e as Error).message); }
     try { this.closeCausesNothingWaitsOn(items, now); } catch (e) { console.warn('zero: could not close a cause nothing waits on:', (e as Error).message); }
     try { this.retryHeldThreads(items, now); } catch (e) { console.warn('zero: could not try a held thread again:', (e as Error).message); }
+    try { this.handOverOwedShipFailures(items, now); } catch (e) { console.warn('zero: could not hand a ship failure to its agent:', (e as Error).message); }
 
     // Rows she resumed by name that had no slot at the time. First call on the
     // next free slot, ahead of everything: she asked for these out loud, and a
