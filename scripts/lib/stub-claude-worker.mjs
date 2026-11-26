@@ -82,7 +82,8 @@ if (plan.receipts) {
   } catch { /* a receipt is never worth the run */ }
 }
 
-say({ type: 'system', subtype: 'init', session_id: sessionId, tools: [], model: 'stub' });
+// `slashCommands`: the commands and skills a real session would offer in its folder.
+say({ type: 'system', subtype: 'init', session_id: sessionId, tools: [], model: 'stub', ...(Array.isArray(plan.slashCommands) ? { slash_commands: plan.slashCommands } : {}) });
 
 // OUR OWN KILL, ANSWERED THE WAY THE REAL CLI ANSWERS IT. 143 and not a signal:
 // see the note at the top, and main/supervisor.mts `_kill`.

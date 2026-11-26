@@ -275,7 +275,7 @@ import { mentionRows } from './team/rooms/room-rules';
 import { notMarkedDone, useChatsMarkedDone } from './team/rooms/chats-marked-done';
 import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheLastToast, opensTheToast, saysWhereItWent, toastOpens, toastParts, type LastToast, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
-import { BROUGHT_IN, OUTSIDE_SAID } from './outside-agents';
+import { BROUGHT_IN, OUTSIDE_SAID, movesInWithCommand } from './outside-agents';
 import { movedLabel, movedSessions } from '../../shared/bring-in.mts';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
@@ -3747,15 +3747,16 @@ export default function App() {
     showToast(pin ? 'Pinned to the top of your list' : 'Unpinned');
   };
   // The thread a session was just brought in as, opened the moment it is in the list.
-  const [movedIn, setMovedIn] = useState<{ product: string; id: string; reply: boolean } | null>(null);
+  const [movedIn, setMovedIn] = useState<{ product: string; id: string; reply: boolean; send?: string } | null>(null);
   // R on one of those sessions is its Continue in Agentbox, and lands in the reply box.
-  const bringIn = useCallback(async (item: WorkItem, { reply = false } = {}) => {
+  // `send`: a command typed to the session, which its terminal cannot run, sent once it is here.
+  const bringIn = useCallback(async (item: WorkItem, { reply = false, send }: { reply?: boolean; send?: string } = {}) => {
     const agent = item.agent;
     if (!agent) return;
     const r = await api.bringInSession({ pid: agent.pid, engine: agent.engine, sessionId: agent.sessionId });
-    if (!r.ok) { showToast(r.reason); return; }
+    if (!r.ok) { showToast(send ? `${r.reason} Your message was not sent.` : r.reason); return; }
     showToast(BROUGHT_IN);
-    setMovedIn({ product: r.product, id: r.id, reply });
+    setMovedIn({ product: r.product, id: r.id, reply, send });
   }, [showToast]);
   useEffect(() => {
     if (!movedIn) return;
@@ -3764,7 +3765,8 @@ export default function App() {
     setMovedIn(null);
     setFocused(it);
     markSeen(it);
-    if (movedIn.reply) setModal('reply');
+    if (movedIn.send) void answerWithRef.current?.(it, movedIn.send);
+    else if (movedIn.reply) setModal('reply');
   }, [snap, movedIn, markSeen]);
   // From one of those sessions' ⋯, the inbox's View and filters, or ⌘K. The
   // filters menu shows the list change under it, so it raises no toast.
@@ -8336,7 +8338,12 @@ export default function App() {
                     // row there is no ledger to answer; the text is handed to
                     // the running session itself, and the toast says what came
                     // back rather than assuming it landed.
-                    if (focused.agent) { replyToAgent(focused, text); return; }
+                    if (focused.agent) {
+                      // A command typed to a terminal session reaches it as words, so it moves in and runs here.
+                      if (movesInWithCommand(focused.agent, text)) void bringIn(focused, { send: text });
+                      else replyToAgent(focused, text);
+                      return;
+                    }
                     // A schedule set on a reply, by the control or by the
                     // words. Applying the rule instead of delivering them would
                     // be the system swallowing something the user wrote, which is the

@@ -11,13 +11,13 @@ const focus = fs.readFileSync(new URL('../renderer/src/components/Focus.tsx', im
 
 describe('the slash menu in a reply box', () => {
   it('opens only when the reply reaches an agent', () => {
-    expect(focus).toContain('const toAgent = !item.agent && !talkTo?.length && ownControls;');
+    expect(focus).toContain('const toAgent = (!item.agent || movesIn) && !talkTo?.length && ownControls;');
     expect(focus).toContain('const query = toAgent ? slashQuery(text) : null;');
   });
   it('holds no command in a reply to people', () => {
     expect(focus).toContain('const holding = toAgent ? commandBeingWritten(text, claudeCode, nativeNames) : null;');
   });
   it('does not ask Claude Code for its commands for a reply to people', () => {
-    expect(focus).toMatch(/const discoveringCommands = !item\.agent && !talkTo\?\.length && /);
+    expect(focus).toMatch(/const discoveringCommands = \(!item\.agent \|\| movesIn\) && !talkTo\?\.length && /);
   });
 });

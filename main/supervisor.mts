@@ -10136,7 +10136,7 @@ export class Supervisor {
         continuation,
         // A teammate's words are never one of your commands.
         command: continuation && !toldBy(item)
-          && !!commandPrompt(item.answer, this._nativeCommands?.[item.id])
+          && !!commandPrompt(item.answer, this.nativeNamesFor(item.product, item.id) ?? [])
           && this._engineFor(item) === DEFAULT_ENGINE,
       });
     }
@@ -10870,7 +10870,7 @@ export class Supervisor {
      * trace this app already
      * keeps puts it in the thread with nothing new written to show it. */
     const review = continuation && harnessFor(engine).capabilities.nativeReview && providerCommand(item.answer, engine)?.name === 'review' ? providerCommand(item.answer, engine) : null;
-    const command = continuation && harnessFor(engine).capabilities.nativeCommands ? commandPrompt(item.answer, this._nativeCommands?.[item.id]) : review ? item.answer!.trim() : null;
+    const command = continuation && harnessFor(engine).capabilities.nativeCommands ? commandPrompt(item.answer, this.nativeNamesFor(item.product, item.id) ?? []) : review ? item.answer!.trim() : null;
     if (command) prompt = command;
     else prompt = withWorkerGitBrief(prompt, product.repoPath, engine);
     if (!command && resumeId) {
@@ -11035,9 +11035,20 @@ export class Supervisor {
     return { args, command: !!command, ...(review ? { reviewTarget: reviewTarget(review.args) } : {}), resumeProfile, prompt, system, resumeId, model, effort, product: product?.slug ?? null, answerMode: item?.answerMode ?? null, ...(pictures.length ? { pictures } : {}) };
   }
 
+  // A terminal session's row has no item, and is Claude Code's.
   commandCatalog(product: string, id: string) {
     const item = this.store.readItem(product, id);
-    return item && harnessFor(this._engineFor(item)).capabilities.nativeCommands ? this._nativeCommands?.[id] ?? [] : [];
+    if (item && !harnessFor(this._engineFor(item)).capabilities.nativeCommands) return [];
+    return this.nativeNamesFor(product, id) ?? [];
+  }
+
+  /**
+   * What Claude Code offers on this row: its own list once it has run, else
+   * the list a run in the same project last reported (same folder, same
+   * skills). Null when neither has been reported, which is unknown, not none.
+   */
+  nativeNamesFor(product: string, id: string): string[] | null {
+    return this._nativeCommands?.[id] ?? this._nativeCommands?.[`project:${product}`] ?? null;
   }
 
   remoteControl(product: string, id: string, action: Parameters<typeof taskRemoteControl>[3]) { return taskRemoteControl(this, product, id, action); }
@@ -13190,7 +13201,7 @@ export class Supervisor {
       if (harness.capabilities.nativeCommands) {
         try {
           const names = nativeCommandNames(JSON.parse(frame[0] as string) as unknown);
-          if (names) { this._nativeCommands ??= {}; this._nativeCommands[item.id] = names; this._saveState(); }
+          if (names) { this._nativeCommands ??= {}; this._nativeCommands[item.id] = names; this._nativeCommands[`project:${item.product}`] = names; this._saveState(); }
         } catch { /* Non-JSON output is handled by the existing readers. */ }
       }
       // THE MOMENT THE ID ARRIVES, AND NOT ON EXIT. Writing it on exit is
