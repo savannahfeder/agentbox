@@ -141,17 +141,17 @@ describe('the change saved for a thread carries it', () => {
     expect(saved().uncommitted).toBe(true);
   });
 
-  // The run that answers "Discard the change" writes a change of its own —
-  // the work coming back out — and that one says the folder is empty.
-  it('writes down that there is nothing left once it is discarded', () => {
+  // The run that answers "Discard the change" leaves the branch the same as
+  // main, so no change is left saved to offer
+  // (tests/a-discarded-change-leaves-no-diff-on-the-thread).
+  it('keeps no change once it is discarded', () => {
     const first = snapshotRepo(dir);
     fs.appendFileSync(path.join(dir, 'strutils.py'), '\ndef is_palindrome(s):\n    return True\n');
     endRun(first);
     const second = snapshotRepo(dir);
     run(dir, 'git', ['checkout', '-q', '--', '.']);
     endRun(second);
-    expect(saved().committed).toBe(false);
-    expect(saved().uncommitted).toBe(false);
+    expect(fs.existsSync(machineryPath(docs, changePath('w-5b58a4d743')))).toBe(false);
   });
 
   // A RUN THAT CHANGED NOTHING STILL MOVES THE GROUND UNDER THE LAST ONE. It

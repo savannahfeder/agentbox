@@ -1212,15 +1212,30 @@ export class Store {
 
   // A CLOUD RUN'S WORK KEPT ON A BRANCH OF ITS OWN, because laying it into the
   // task folder would have undone work done there (main/cloud/run.mts
-  // `park`). Said as a note; the row waits for her, and loses `ship`, so the
-  // folder never ships without the run's work.
-  cloudWorkKeptAside(slug: string, id: string, note: string) {
+  // `park`). Said as a note; the row loses `ship`, so the folder never ships
+  // without the run's work, and waits for her unless its agent has been handed
+  // the branch (`waits: false`).
+  cloudWorkKeptAside(slug: string, id: string, note: string, { waits = true }: { waits?: boolean } = {}) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     const labels = this.readItem(slug, id)?.labels ?? [];
     const kept = labels.filter((l) => l !== 'ship');
     workItemsDisk.updateWorkItem(dir, id, { note, ...(kept.length !== labels.length ? { labels: kept } : {}) }, { source: 'system' });
-    return workItemsDisk.updateWorkItem(dir, id, { status: 'blocked' }, { source: 'system' });
+    return workItemsDisk.updateWorkItem(dir, id, { status: waits ? 'blocked' : 'open' }, { source: 'system' });
+  }
+
+  /** Closes the open causes `which` picks, with a note saying why; the threads behind them carry on (`resumeFinishedWaits`). */
+  clearCauses(which: (row: ListedItem) => boolean, note: string, now = Date.now()): number {
+    let cleared = 0;
+    for (const row of this.listItems(now)) {
+      if (!which(row)) continue;
+      const dir = this.productDir(row.product);
+      if (!dir) continue;
+      this.modules.workItemsDisk.updateWorkItem(dir, row.id, { note }, { source: 'system', now });
+      this.modules.workItemsDisk.updateWorkItem(dir, row.id, { status: 'done' }, { source: 'system', now });
+      cleared++;
+    }
+    return cleared;
   }
 
   // A CLOSED ROW WHOSE WORK NEVER REACHED MAIN, put back in front of the
