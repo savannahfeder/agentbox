@@ -205,7 +205,7 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
     {out.map((e) => (
       <div key={e} className="tm-person-line tm-invited">
         <Face name={e} />{e}
-        <small>Invited. They join when they sign in with this email.</small>
+        <small>Invited</small>
         <button type="button" className="tm-line-act" onClick={() => {
           // One you invited on this page is not in `sent` until the next sync.
           const by = team.sent?.find((s) => s.email === e)?.invitedBy ?? me?.id;

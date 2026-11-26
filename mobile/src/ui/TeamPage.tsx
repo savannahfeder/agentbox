@@ -67,7 +67,7 @@ export function TeamPage() {
                 control={owner && p.id !== me?.id ? <Button title="Remove" disabled={busy} onPress={run(() => removeFromTeam(cloud!, team.id, p.id))} /> : undefined} />
             ))}
             {team.invited.map((e) => (
-              <Row key={e} label={e} desc="Invited. They join when they sign in with this email."
+              <Row key={e} label={e} desc="Invited"
                 control={owner ? <Button title="Cancel" disabled={busy} onPress={run(() => cancelInvite(cloud!, team.id, e))} /> : undefined} />
             ))}
           </Group>

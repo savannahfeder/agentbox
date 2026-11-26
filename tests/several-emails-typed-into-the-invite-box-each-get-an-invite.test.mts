@@ -83,6 +83,11 @@ describe('every invite box reads it this way', () => {
     const page = read('renderer/src/team/TeamPage.tsx');
     expect(page).toMatch(/<\/form>\}\n\s*\{inviteProblem && <p className="tm-invite-problem">\{inviteProblem\}<\/p>\}/);
   });
+  it('each invited row says Invited on one line, where a member row has its email, so a list of them stays even', () => {
+    const page = read('renderer/src/team/TeamPage.tsx');
+    expect(page).toMatch(/<Face name=\{e\} \/>\{e\}\n\s*<small>Invited<\/small>/);
+    expect(page).not.toContain('They join when they sign in with this email.');
+  });
   it('the phone’s Team page', () => {
     const phone = read('mobile/src/ui/TeamPage.tsx');
     expect(phone).toMatch(/inviteEach\(email,/);
