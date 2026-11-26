@@ -250,7 +250,7 @@ describe('the connection card', () => {
     // which is what this file is named for, is unchanged.
     // A limit on this computer's login is left out while the cloud takes every thread
     // (tests/an-agent-page-shows-the-cloud-login-it-is-missing).
-    expect(settingsTsx).toContain("(!agent.found || (agent.trouble && !limitIsHereOnly) || agent.chosen)\n          && (engine === 'codex' ? <CodexCli {...status} /> : <ClaudeCode {...status} />)");
+    expect(settingsTsx).toContain("(!agent.found || (agent.trouble && !limitIsHereOnly) || agent.chosen)\n          && (engine === 'codex' ? <CodexCli {...status} notReady={!ready} /> : <ClaudeCode {...status} notReady={!ready} />)");
     // And it is still SAID, not turned into a word of ours.
     expect(settingsTsx).not.toContain("<span className=\"ac-warn\">not running</span>");
   });

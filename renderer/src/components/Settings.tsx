@@ -1403,7 +1403,7 @@ const STATE_WORD: Record<ConnectionState, string> = { connected: 'connected', tr
    for the reason the walk and this screen share one vocabulary: two drawings of
    the same three states drift within a week, and the state that drifts is
    always the unsure one, because it is the one nobody is looking at. */
-function Connection({ copy, check, engine, found, certain, bin, chosen = false, url, trouble = null, account = null, onChecked }: {
+function Connection({ copy, check, engine, found, certain, bin, chosen = false, url, trouble = null, account = null, onChecked, notReady = false }: {
   copy: ConnectionCopy;
   /**
    * WHICH AGENT THIS CARD IS ABOUT, and the only thing the window hands over
@@ -1434,6 +1434,8 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
    * Re-read the whole settings model, the way every other write on this
    *  screen does: the page never draws what a press assumed. */
   onChecked: () => Promise<void> | void;
+  /** The card above says it needs a sign-in or an update, so "connected" would contradict it. */
+  notReady?: boolean;
 }) {
   const [checking, setChecking] = useState(false);
   // Whether the LAST press came back with nothing. Null until she has pressed,
@@ -1490,6 +1492,7 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
 
   return (
     <Group id="status" label="Status">
+      {!(notReady && state === 'connected') && (
       <Row label={label} desc={say}>
         {/* The dot says the state and the word beside it says the same thing
             in English, so neither has to be learned from the other. There is
@@ -1501,6 +1504,7 @@ function Connection({ copy, check, engine, found, certain, bin, chosen = false, 
           {checking ? copy.checking : copy.check}
         </button>
       </Row>
+      )}
       {/* WHO IT IS SIGNED IN AS. Only ever drawn when the engine was FOUND: an
           account line over "Codex is not on this Mac" is two rows disagreeing
           about whether there is anything here at all. */}
@@ -2139,14 +2143,13 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
     const status ={ found: agent.found, certain: agent.certain, bin: agent.bin, chosen: agent.chosen, url: agent.url, trouble: agent.trouble, onChecked: load };
     return (
       <Page title={agent.name}>
-        <AgentSettingsCard engine={engine} />
         {/* THE STATE SPEAKS ONLY WHEN IT IS BAD -- OR WHEN YOU MADE IT THIS WAY
             (w-ce8c1a9275). A path somebody chose themselves is the one healthy
             state worth a row, because the card is the only place that choice can
             be given back: a choice that could only be undone by hand-editing a
             file nobody is told about is not a door, it is a trap. */}
-        {(!agent.found || (agent.trouble && !limitIsHereOnly) || agent.chosen)
-          && (engine === 'codex' ? <CodexCli {...status} /> : <ClaudeCode {...status} />)}
+        <AgentSettingsCard engine={engine} below={(ready) => (!agent.found || (agent.trouble && !limitIsHereOnly) || agent.chosen)
+          && (engine === 'codex' ? <CodexCli {...status} notReady={!ready} /> : <ClaudeCode {...status} notReady={!ready} />)} />
         {agent.found && (
           <>
             {/* "SIGNED IN", NOT "ACCOUNTS": a heading that works at any
