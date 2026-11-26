@@ -1050,7 +1050,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const bringIn = agent?.product && agent.sessionId && onBringIn ? onBringIn : null;
   // The bar offers it beside Respond in terminal; only a session without that bar has it in ⋯.
   const barBringsIn = !!bringIn && !update && !trouble && replyBlocked && !codexAtWork && !!onReveal;
-  // A Claude Code session its terminal still holds: Continue in Agentbox sits beside its reply box.
+  // A Claude Code session its terminal still holds: a reply from here moves it in.
   const movesIn = !!bringIn && canMoveIn(agent);
   const respondIn = agent?.app === 'Codex app' ? 'Respond in Codex' : agent?.app === 'Codex in your editor' ? 'Respond in your editor' : 'Respond in terminal';
 
@@ -2743,12 +2743,6 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                what picks up her next message, which is a fact about the box.
                And with the choices folded away, the sign that they are there
                (w-65bcefb857). */
-            ((pill: ReactNode) => (movesIn ? <div className="dock-split">{pill}
-              <button type="button" className="dock-pill dock-pill-go dock-pill-in" onClick={bringIn!}>
-                <span className="dock-pill-icon">{inIcon}</span>
-                <span className="dock-pill-text">{BRING_IN}</span>
-              </button>
-            </div> : pill))(
             <button className={`dock-pill${folded.draft ? ' dock-pill-kept' : ''}`} onClick={onReply}>
               <span className="dock-pill-text">{folded.text}</span>
               {folded.files && <span className="dock-pill-files">{folded.files}</span>}
@@ -2761,7 +2755,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
               )}
               <span className="dock-pill-key"><kbd>R</kbd></span>
               {choicesFolded && page && stripShown && !fullScreenDoc && !closeAsk && !answered && <ChoicesShow count={options.length} onShow={foldChoices} />}
-            </button>)
+            </button>
           )}
         </div>}
       </div>
@@ -2974,8 +2968,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   /** She opened the box by pressing the model word on the folded box, so the
    *  model drawer opens with it (w-e731ca9376). */
   openModel?: boolean;
-  /** A Claude Code session in a terminal that can move into Agentbox: a
-   *  command cannot reach it there, so sending one moves it here first. */
+  /** A Claude Code session in a terminal that a reply from here moves into Agentbox. */
   movesIn?: boolean;
 }) {
   // A CONVERSATION WITH A PERSON ASKS FOR A REPLY TO THEM, not for the
@@ -3793,7 +3786,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
             exactly the footer it had. */}
         {talkTo?.length ? <FormatBar box={ref} onChange={changeText} onAttach={pickFiles} marksAt={marksAt} onFromFiles={(f) => setAttachments((a) => [...a, f])} onVoice={addVoice} onNotice={onNotice}
           voiceKey={`direct:${item.product}:${item.id}`} voice={voiceCtl} onRecording={setRecording} /> : null}
-        {item.agent ? <span className="compose-clauses"><span className="dim">{movesIn && text.startsWith('/') ? `Moves this session into ${Name} and runs it here.` : `Goes straight into ${item.agent.name}.`}</span></span> : talkTo?.length ? null : <span className="dock-chips" ref={chipsRef}>
+        {item.agent ? <span className="compose-clauses"><span className="dim">{movesIn ? `Moves this session into ${Name} and runs it here.` : `Goes straight into ${item.agent.name}.`}</span></span> : talkTo?.length ? null : <span className="dock-chips" ref={chipsRef}>
             <PriorityPicker variant="chip" value={shown} set={!!prio} onChange={setPrio} title="Priority" />
             {repeat && <WhenPicker value={{ runAt: 0, repeat }} onChange={(v) => setRepeat(v.repeat)} only="repeat" empty="Runs once" />}
             {canSetMode && (

@@ -275,7 +275,7 @@ import { mentionRows } from './team/rooms/room-rules';
 import { notMarkedDone, useChatsMarkedDone } from './team/rooms/chats-marked-done';
 import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheLastToast, opensTheToast, saysWhereItWent, toastOpens, toastParts, type LastToast, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
-import { BROUGHT_IN, OUTSIDE_SAID, movesInWithCommand } from './outside-agents';
+import { BROUGHT_IN, OUTSIDE_SAID, canMoveIn } from './outside-agents';
 import { movedLabel, movedSessions } from '../../shared/bring-in.mts';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
@@ -8339,8 +8339,8 @@ export default function App() {
                     // the running session itself, and the toast says what came
                     // back rather than assuming it landed.
                     if (focused.agent) {
-                      // A command typed to a terminal session reaches it as words, so it moves in and runs here.
-                      if (movesInWithCommand(focused.agent, text)) void bringIn(focused, { send: text });
+                      // A reply to a Claude Code terminal session moves it in and runs here.
+                      if (canMoveIn(focused.agent)) void bringIn(focused, { send: text });
                       else replyToAgent(focused, text);
                       return;
                     }
