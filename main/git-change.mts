@@ -46,6 +46,8 @@ export interface RepoChange {
   stands: WorkStands;
   knowsYou: boolean | null;
   at?: number;
+  /** A thread's own branch with no difference from main and nothing loose. */
+  nothingLeft?: boolean;
 }
 
 interface HunkStarts { old: number; now: number }
@@ -166,6 +168,16 @@ function wholeBranchBase(root: string): string | null {
   const base = cutFrom(root);
   const now = tryGit(root, ['rev-parse', 'HEAD'])?.trim();
   return base && base !== now ? base : null;
+}
+
+function nothingLeftOnTheBranch(root: string): boolean {
+  const here = tryGit(root, ['rev-parse', '--abbrev-ref', 'HEAD'])?.trim();
+  if (!here?.startsWith(TASK_BRANCHES)) return false;
+  const base = cutFrom(root);
+  if (!base) return false;
+  if (tryGit(root, ['diff', '--quiet', base, '--']) === null) return false;
+  const untracked = tryGit(root, ['ls-files', '-z', '--others', '--exclude-standard']);
+  return untracked !== null && !zList(untracked).some((rel) => !NOT_CODE.test(rel));
 }
 
 function isAncestor(root: string, older: string, newer: string): boolean {
@@ -489,5 +501,6 @@ export function changeFromRepo(snapshot: RepoSnapshot | null | undefined): RepoC
     // honest answer to "how long did this take" for a run whose conversation
     // carried no edits at all.
     at: snapshot.at,
+    nothingLeft: nothingLeftOnTheBranch(root),
   };
 }
