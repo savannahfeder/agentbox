@@ -20,10 +20,9 @@ describe("the phone's AI teammates switch", () => {
     expect(read('renderer/src/settings-search.ts')).toMatch(/page: 'general', label: 'Use AI teammates'/);
   });
 
-  it('is no longer under Alpha features, where Rooms and Multiplayer stay', () => {
-    expect(page('Alpha')).not.toMatch(/alphaTeammates/);
-    expect(page('Alpha')).toMatch(/k="alphaRooms"/);
-    expect(page('Alpha')).toMatch(/k="alphaMultiplayer"/);
+  it('is not under an Alpha features page, which is gone with its Rooms and Multiplayer switches', () => {
+    expect(page('Alpha')).toBe('');
+    expect(read('mobile/src/ui/SettingsPages.tsx')).not.toMatch(/k="alpha(Rooms|Multiplayer)"/);
   });
 
   it("is found by the phone's settings search on General", () => {
