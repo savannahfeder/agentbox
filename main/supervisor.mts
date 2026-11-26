@@ -7928,7 +7928,7 @@ export class Supervisor {
         settled = true;
         continue;
       }
-      // Three runs that ended without a word from the agent: the thread waits in Needs you.
+      // Three runs that ended without a word from the agent: left for the person.
       if ((one.handed ?? 0) >= 3) continue;
       if (this.sessions.has(item.id) || this._preparing?.has(item.id) || stoppedByHer(item) || this.claimHeldElsewhere(item)) continue;
       if (!this.store.isDue(item, now) || !mayRunHere(item, productBySlug.get(item.product), me)) continue;
