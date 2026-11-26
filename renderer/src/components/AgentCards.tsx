@@ -2,7 +2,6 @@
 // agent, and so do Settings and the sidebar for someone already past setup.
 // Nothing runs until the button is pressed.
 import { useCallback, useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
 import { api } from '../api';
 import { agentCard, sidebarAgent, type AgentPress, type AgentReading } from '../setup-split';
 import { EngineLogo } from './EngineLogos';
@@ -120,20 +119,15 @@ export function SidebarAgentSlot({ collapsed, rail = false }: { collapsed: boole
 }
 
 /** At the top of an agent's Settings page, its card while it is not ready; nothing once it is. */
-export function AgentSettingsCard({ engine, below }: { engine: AgentId; below?: (ready: boolean) => ReactNode }) {
+export function AgentSettingsCard({ engine }: { engine: AgentId }) {
   const { cards, cardOf, press } = useAgentCards(useAgentReadings());
   // Once pressed, the card stays to say Ready.
   const [pressed, setPressed] = useState(false);
   const reading = cards.find((r) => r.engine === engine);
-  const ready = !reading || agentCard(reading).ready;
-  const rest = below?.(ready) ?? null;
-  if (ready && !pressed) return <>{rest}</>;
-  return <>
-    <div className="agent-tiles"><div className="ss-tiles">
-      <AgentTile engine={engine} card={cardOf(engine)} onPress={(act) => { setPressed(true); void press(engine, act); }} />
-    </div></div>
-    {rest}
-  </>;
+  if (!reading || (agentCard(reading).ready && !pressed)) return null;
+  return <div className="agent-tiles"><div className="ss-tiles">
+    <AgentTile engine={engine} card={cardOf(engine)} onPress={(act) => { setPressed(true); void press(engine, act); }} />
+  </div></div>;
 }
 
 export function AgentTile({ engine, card, onPress }: { engine: AgentId; card: ReturnType<typeof agentCard>; onPress: (act: string) => void }) {

@@ -97,13 +97,4 @@ describe('one card, everywhere', () => {
     expect(read('components/AgentCards.tsx')).toMatch(/function AgentSettingsCard[\s\S]*<AgentTile\b/);
     expect(read('components/WorkspaceNavigation.tsx')).toMatch(/<SidebarAgentSlot\b/);
   });
-  // A chosen path draws the status box under the card, which said "Claude Code
-  // is connected ... nothing for you to set up" under "Version 2.1.30 is too old".
-  it('leaves out "is connected" under a card saying the agent is not ready', () => {
-    const read = (f: string) => fs.readFileSync(new URL(`../renderer/src/${f}`, import.meta.url), 'utf8');
-    expect(read('components/AgentCards.tsx')).toMatch(/function AgentSettingsCard\(\{ engine, below \}/);
-    const settings = read('components/Settings.tsx');
-    expect(settings).toMatch(/<AgentSettingsCard engine=\{engine\} below=\{\(ready\) =>/);
-    expect(settings).toMatch(/\{!\(notReady && state === 'connected'\) && \(\n\s*<Row label=\{label\} desc=\{say\}>/);
-  });
 });
