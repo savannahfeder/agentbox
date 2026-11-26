@@ -6,6 +6,7 @@ import { api, type FileLinkState, type LinkComment } from '../api';
 import { shareSignedOutWords, shareWords } from '../public-link-words';
 import { shareSignInStartsOn, signInWasSkipped } from '../sign-in-ask';
 import { NoteGlyph } from './NoteGlyphs';
+import { inviteEach } from '../team/invite-list';
 import { placeWords, shownName, type NotePlace } from '../../../shared/artifact-marks.mts';
 
 /** A link comment's place, short: "at 0:24", "a pin", the quote. */
@@ -58,7 +59,6 @@ type Can = 'view' | 'comment' | 'edit';
 type Access = 'anyone' | 'people';
 type Person = { email: string; can: Can; name: string | null };
 const CANS: Can[] = ['view', 'comment', 'edit'];
-const looksLikeEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 
 /** What a link lets people do, as words a select can show. */
 export function CanPick({ value, editable, onPick, label, remove = false, disabled }: {
@@ -117,15 +117,22 @@ function People({ token, editable, onProblem }: { token: string; editable: boole
     return true;
   };
   const add = async () => {
-    const email = adding.trim();
-    if (!email) return;
-    if (!looksLikeEmail(email)) { onProblem('That is not an email address.'); return; }
-    if (await setPerson(email, editable ? 'edit' : 'comment')) setAdding('');
+    if (!adding.trim()) return;
+    setBusy(true); onProblem(null);
+    const sent = await inviteEach(adding, { invited: people?.map((p) => p.email) }, async (email) => {
+      const out = await api.fileLinkPerson({ token, email, can: editable ? 'edit' : 'comment' });
+      if (!out.ok) return out.error ?? 'That did not change.';
+      setPeople(out.people ?? []);
+      return null;
+    });
+    setBusy(false);
+    setAdding(sent.left);
+    onProblem(sent.problem);
   };
   return (
     <>
       <form className="av-share-add" onSubmit={(e) => { e.preventDefault(); void add(); }}>
-        <input type="email" value={adding} onChange={(e) => { setAdding(e.target.value); onProblem(null); }} placeholder={shareWords.addPeople} aria-label={shareWords.addPeople} disabled={busy} autoComplete="off" spellCheck={false} />
+        <input type="text" inputMode="email" value={adding} onChange={(e) => { setAdding(e.target.value); onProblem(null); }} placeholder={shareWords.addPeople} aria-label={shareWords.addPeople} disabled={busy} autoComplete="off" spellCheck={false} />
       </form>
       {people && people.length > 0 && (
         <ul className="av-share-people" aria-label="People added">

@@ -13,6 +13,7 @@ import { api } from '../api';
 import { Face } from './people';
 import { handoverAsk, handoverOf } from './handover';
 import { inviteWords } from './invite-words';
+import { inviteEach, pastedInvites } from './invite-list';
 import { AskForMultiplayer, NOT_LET_IN } from './ask-for-multiplayer';
 import { StartPro } from './StartPro';
 import { StartTeam } from './StartTeam';
@@ -223,8 +224,27 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
         <span className="tm-leave-ask">{PRO_FOR_INVITES}</span>
         <StartPro hasTeam name={me?.name} className="tm-btn" autoFocus={inviteFocus} />
       </> : <span className="tm-leave-ask">{askOwnerForPro(team.people.find((p) => p.role === 'owner')?.name)}</span>}
-    </div> : <form className="tm-field-row" onSubmit={async (e) => { e.preventDefault(); const sent = email.trim(); if (await run(() => api.teamInvite(sent))) { setEmail(''); setInvited((was) => [...was.filter((x) => x !== sent), sent]); } }}>
-      <input className="tm-input" placeholder="Their email" value={email} autoFocus={inviteFocus} onChange={(e) => setEmail(e.target.value)} />
+    </div> : <form className="tm-field-row" onSubmit={(e) => {
+      e.preventDefault();
+      void run(async () => {
+        const sent = await inviteEach(email, { onTeam: team.people.map((p) => p.email), invited: out }, async (one) => {
+          const got = await api.teamInvite(one);
+          return got.ok ? null : got.error ?? 'That did not work.';
+        });
+        setEmail(sent.left);
+        if (sent.invited.length) setInvited((was) => [...was.filter((x) => !sent.invited.includes(x)), ...sent.invited]);
+        return sent.problem ? { ok: false, error: sent.problem } : { ok: true };
+      });
+    }}>
+      <input className="tm-input" placeholder="Their emails" value={email} autoFocus={inviteFocus} onChange={(e) => setEmail(e.target.value)}
+        onPaste={(e) => {
+          const lines = pastedInvites(e.clipboardData.getData('text'));
+          if (lines == null) return;
+          e.preventDefault();
+          const box = e.currentTarget;
+          const at = box.selectionStart ?? email.length;
+          setEmail(email.slice(0, at) + lines + email.slice(box.selectionEnd ?? at));
+        }} />
       <button className="tm-btn" disabled={busy || !email.trim()}>Invite</button>
     </form>}
 
