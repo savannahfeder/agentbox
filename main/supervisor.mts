@@ -129,7 +129,7 @@ import { saveConfig } from './config.mts';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mts';
 import type { AccountIdentity } from './account-tooling.mts';
 import { effectiveProfiles } from './account-discovery.mts';
-import { isCause } from '../shared/causes.mts';
+import { isCause, nothingWaitsOn, NOTHING_WAITS_NOTE } from '../shared/causes.mts';
 import { referencedFiles, isImagePath } from '../shared/referenced-files.mts';
 import { namedThreadsBlock } from '../shared/named-threads.mts';
 import { changePath } from './code-change.mts';
@@ -2570,6 +2570,17 @@ export class Supervisor {
     }
     if (resumed.length) this._saveState();
     return resumed;
+  }
+
+  /** Closes, as the app, each cause row still waiting on the person that no thread waits on any more. */
+  closeCausesNothingWaitsOn(items: WorkItem[], now = Date.now()): string[] {
+    const closed: string[] = [];
+    for (const c of items) {
+      if (this.sessions.has(c.id) || !nothingWaitsOn(c, items, now)) continue;
+      this.store.modules.workItemsDisk.updateWorkItem(this.store.productDir(c.product), c.id, { status: 'done', note: NOTHING_WAITS_NOTE }, { source: 'system' });
+      closed.push(c.id);
+    }
+    return closed;
   }
 
   // The rows resumed by name that had no slot, taken IN HER RUNNING ORDER as
@@ -9933,6 +9944,7 @@ export class Supervisor {
 
     // Threads whose wait has just cleared go into the same queue (w-5244c90c33).
     try { this.resumeFinishedWaits(items); } catch (e) { console.warn('zero: could not resume a finished wait:', (e as Error).message); }
+    try { this.closeCausesNothingWaitsOn(items, now); } catch (e) { console.warn('zero: could not close a cause nothing waits on:', (e as Error).message); }
     try { this.retryHeldThreads(items, now); } catch (e) { console.warn('zero: could not try a held thread again:', (e as Error).message); }
 
     // Rows she resumed by name that had no slot at the time. First call on the
