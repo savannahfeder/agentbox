@@ -79,6 +79,10 @@ describe('every invite box reads it this way', () => {
     expect(page).toMatch(/onPaste=/);
     expect(page).toContain('placeholder="Their emails"');
   });
+  it('the Team page says what was not sent under the box, not at the foot of a long page', () => {
+    const page = read('renderer/src/team/TeamPage.tsx');
+    expect(page).toMatch(/<\/form>\}\n\s*\{inviteProblem && <p className="tm-invite-problem">\{inviteProblem\}<\/p>\}/);
+  });
   it('the phone’s Team page', () => {
     const phone = read('mobile/src/ui/TeamPage.tsx');
     expect(phone).toMatch(/inviteEach\(email,/);

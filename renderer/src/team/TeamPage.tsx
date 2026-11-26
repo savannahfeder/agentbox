@@ -149,6 +149,9 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  // Said under the box, where the eye is, rather than at the foot of the page.
+  const [inviteProblem, setInviteProblem] = useState<string | null>(null);
+  const inviteEnd = useRef<HTMLDivElement>(null);
   const owner = team.people.find((p) => p.id === me?.id)?.role === 'owner';
   // You first, from the team's own list so your role comes with you.
   const mine = team.people.find((p) => p.id === me?.id) ?? me;
@@ -233,10 +236,12 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
         });
         setEmail(sent.left);
         if (sent.invited.length) setInvited((was) => [...was.filter((x) => !sent.invited.includes(x)), ...sent.invited]);
-        return sent.problem ? { ok: false, error: sent.problem } : { ok: true };
-      });
+        setInviteProblem(sent.problem);
+        return { ok: true };
+      // The invited rows above push the box down; keep it, and what it says, in view.
+      }).then(() => requestAnimationFrame(() => inviteEnd.current?.scrollIntoView({ block: 'nearest' })));
     }}>
-      <input className="tm-input" placeholder="Their emails" value={email} autoFocus={inviteFocus} onChange={(e) => setEmail(e.target.value)}
+      <input className="tm-input" placeholder="Their emails" value={email} spellCheck={false} autoFocus={inviteFocus} onChange={(e) => { setEmail(e.target.value); setInviteProblem(null); }}
         onPaste={(e) => {
           const lines = pastedInvites(e.clipboardData.getData('text'));
           if (lines == null) return;
@@ -247,6 +252,8 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
         }} />
       <button className="tm-btn" disabled={busy || !email.trim()}>Invite</button>
     </form>}
+    {inviteProblem && <p className="tm-invite-problem">{inviteProblem}</p>}
+    <div ref={inviteEnd} />
 
     <div className="tm-section">Leave</div>
     {confirmLeave ? (
