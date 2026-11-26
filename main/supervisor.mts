@@ -61,7 +61,7 @@ import { REPLY_MARK, replyFrame, serverJoinedKey } from '../shared/cloud-kit.mts
 import { NEW_THREAD, NEW_THREAD_CODEX, NEW_ITEM_MARK, NEW_TITLE_MARK, NEW_BODY_MARK, fillNewThreadKit } from '../shared/cloud-kit.mts';
 import { macAsleep, carryCommand, CARRY_AHEAD_MS, handOverSpent, notBeforeOf } from '../shared/cloud-carry.mts';
 import { execFile as execFileCb } from 'node:child_process';
-import { CLOSED_UNSHIPPED, closedBeforeItShipped, shippedAs } from '../shared/not-shipped.mts';
+import { CLOSED_UNSHIPPED, closedBeforeItShipped, shippedAs, notShipped } from '../shared/not-shipped.mts';
 import { asksForCloud, handBackWhat, handsBack, SEND_TO_CLOUD } from '../shared/cloud-hand-back.mts';
 import { CLOUD_SENT, readSent } from '../shared/cloud-start.mts';
 import { readCloudConfig, cloudAccountConfig, OLD_TOKEN_SERVICE, imageCapsToTry } from './cloud/config.mts';
@@ -227,7 +227,7 @@ import type { ShipItem, ShipProduct } from './ship-queue.mts';
 import type { GitHubPushSignIn } from './github-push-sign-in.mts';
 import { SignInReturns } from './sign-in-returns.mts';
 import { openSignIn } from '../shared/sign-in-ask.mts';
-import { causeCleared, waitingForMemory } from '../shared/notes-for-the-agent.mts';
+import { causeCleared, waitingForMemory, bringingItTogether, bringItTogether } from '../shared/notes-for-the-agent.mts';
 import type { CloudKit } from './cloud/kit.mts';
 import type { CatchUpCard } from './catch-up.mts';
 import type { QueuedLine, ReplyItem, ReplyPayload } from './live-replies.mts';
@@ -799,7 +799,7 @@ export interface SupervisorStore {
   fileItem(slug: string, fields: Record<string, unknown>): { id: string };
   noteItem(slug: string, id: string, note: string): unknown;
   fileMark(slug: string, id: string, mark: unknown): unknown;
-  cloudWorkKeptAside(slug: string, id: string, note: string): unknown;
+  cloudWorkKeptAside(slug: string, id: string, note: string, opts?: { waits?: boolean }): unknown;
   closedBeforeItShipped(slug: string, id: string, note: string): unknown;
   shipped(slug: string, id: string, result: { sha: string | null; labels: string[] }): unknown;
   shipFailed(slug: string, id: string, result: { note: string; labels: string[] }): unknown;
@@ -1433,6 +1433,7 @@ export class Supervisor {
   declare _reaching: Promise<unknown> | null | undefined;
   declare connections: SupervisorConnections | null | undefined;
   declare _resumeQueue: Set<string>;
+  declare _afterSessionEnds?: Map<string, () => void>;
   declare _recoverPending: boolean;
   declare _recovering: Set<string> | undefined;
   declare _lastRecovery: (RecoveryNews & { at: number }) | undefined;
@@ -3782,6 +3783,8 @@ export class Supervisor {
       return Promise.resolve(null);
     }
     this.sessions.delete(item.id);
+    const next = this._afterSessionEnds?.get(item.id);
+    if (next) { this._afterSessionEnds!.delete(item.id); setTimeout(next, 0); }
     // Moved to this Mac: it carries on here now, not at the next tick, and
     // reads as starting in between rather than as answered. Not one that had
     // answered and only kept its machine for a reply: nothing is left to do.
@@ -8457,8 +8460,9 @@ export class Supervisor {
   }
 
   // A CLOUD RUN'S WORK KEPT ON A BRANCH OF ITS OWN (main/cloud/run.mts
-  // `park`): said on its row, which then waits for her and does not ship
-  // without that work.
+  // `park`) goes straight back to its agent to bring in, as a failed ship
+  // does. Set aside again before the agent has answered, or on a thread she
+  // stopped, the row waits for her and does not ship without that work.
   _sayCloudNews(folder: string, item: WorkItem | null = null) {
     let news: ReturnType<typeof takeCloudNews> = [];
     try { news = takeCloudNews(folder); } catch { return; }
@@ -8470,11 +8474,28 @@ export class Supervisor {
         // A run the app will ask again (a dead machine, the time limit): the
         // row is told why and runs on, rather than waiting for them.
         if (n.lost) this.store.noteItem?.(product, id, n.note);
-        else if (this.store.cloudWorkKeptAside) this.store.cloudWorkKeptAside(product, id, n.note);
-        else this.store.noteItem?.(product, id, n.note);
+        else if (this.store.cloudWorkKeptAside) {
+          const row = this.store.readItem?.(product, id) ?? null;
+          const handBack = !!n.branch && !!row && !notShipped(row)?.branch && !stoppedByHer(row);
+          this.store.cloudWorkKeptAside(product, id, handBack ? bringingItTogether(n.note) : n.note, { waits: !handBack });
+          if (handBack) {
+            const branch = n.branch!;
+            this._onceSessionEnds(id, () => {
+              const fresh = this.store.readItem?.(product, id) ?? row;
+              if (fresh.status !== 'done' && !stoppedByHer(fresh)) this.spawnWorker(fresh, { continuation: true, shipFailure: bringItTogether(branch) });
+            });
+          }
+        } else this.store.noteItem?.(product, id, n.note);
       } catch (e) { console.warn('zero: could not say a cloud run was kept aside:', (e as Error).message); }
     }
     if (news.length) this.onChange?.();
+  }
+
+  // The run that brought the news home may still be being put away (it is what
+  // calls `_sayCloudNews` as it exits), and a start in between would be dropped.
+  _onceSessionEnds(id: string, then: () => void) {
+    if (!this.sessions.has(id)) { setTimeout(then, 0); return; }
+    (this._afterSessionEnds ??= new Map()).set(id, then);
   }
 
   /**
