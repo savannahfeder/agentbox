@@ -171,27 +171,6 @@ export function agentCard(r: AgentReading, press: AgentPress | null = null): { r
   return not(r.certain === false ? 'Could not check sign-in' : 'Not signed in', 'Sign in');
 }
 
-/** Not ready, on a computer where it is used: found, or gone with its traces left. One never set up here is someone who does not use it. */
-export const agentNotReady = (r: AgentReading): boolean => !agentCard(r).ready && (!!r.found || r.certain === false);
-
-const AGENT_NAME: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' };
-
-export interface SidebarAgentNote { engine: string; title: string; say: string | null; act: string }
-
-/** The first agent worth the sidebar's card, unless its × put this state away (`<engine>:<act>`). */
-export function sidebarAgent(readings: readonly AgentReading[], closed: readonly string[] = []): SidebarAgentNote | null {
-  for (const r of readings) {
-    if (!agentNotReady(r)) continue;
-    const act = agentCard(r).act ?? 'Sign in';
-    if (closed.includes(`${r.engine}:${act}`)) continue;
-    const name = AGENT_NAME[r.engine] ?? r.engine;
-    const title = act === 'Update' ? `${name} needs an update` : act === 'Install' ? `${name} is not found` : `${name} is not signed in`;
-    const other = readings.find((o) => o.engine !== r.engine && agentCard(o).ready);
-    return { engine: r.engine, title, say: other ? `Threads run on ${AGENT_NAME[other.engine] ?? other.engine} until it is.` : null, act };
-  }
-  return null;
-}
-
 export const stepLabel = (steps: SetupStep[], step: SetupStep) => `Step ${steps.indexOf(step) + 1} of ${steps.length}`;
 
 /** Ids in shared sky themes and skins.ts: Light and Dark are the plain looks. */

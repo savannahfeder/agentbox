@@ -27,7 +27,6 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { AgentSettingsCard } from './AgentCards';
 import { OUTSIDE_MODES, OUTSIDE_TITLE } from '../outside-agents';
 import type { AgentMode, CodexModeId, PermissionMode, ProjectSettings, Settings as SettingsModel, UpdateState } from '../types';
 import { onCloudPhone, onPhone, phoneSized } from '../phone-screen';
@@ -2139,7 +2138,6 @@ export function Settings({ look, onSetLook, onSkyTheme, tune, onSetTune, onReset
     const status ={ found: agent.found, certain: agent.certain, bin: agent.bin, chosen: agent.chosen, url: agent.url, trouble: agent.trouble, onChecked: load };
     return (
       <Page title={agent.name}>
-        <AgentSettingsCard engine={engine} />
         {/* THE STATE SPEAKS ONLY WHEN IT IS BAD -- OR WHEN YOU MADE IT THIS WAY
             (w-ce8c1a9275). A path somebody chose themselves is the one healthy
             state worth a row, because the card is the only place that choice can

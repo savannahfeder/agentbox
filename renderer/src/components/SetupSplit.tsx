@@ -15,13 +15,12 @@ import { ago } from '../format';
 import { MAC } from '../this-keyboard';
 import { starterAsks } from '../../../shared/teammates.mts';
 import { MATCH_SKY, SKY_THEMES, drawSky, releaseCanvas } from '../home/sky';
-import { PRO_PITCH, agentCard, bringInBehind, chatFrom, chatOpened, chatReplyLabel, proFreeDays, proOffer, cloudShowcase, heldPress, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type AgentReading, type SetupPlan, type SetupStep } from '../setup-split';
+import { PRO_PITCH, agentCard, bringInBehind, chatFrom, chatOpened, chatReplyLabel, proFreeDays, proOffer, cloudShowcase, heldPress, nextChoice, setupPreview, dashGoesBack, stepBefore, tabStop, teamPaid, typingInSetup, lookChoices, setUpLines, setupSteps, starterChoices, stepLabel, type AgentPress, type AgentReading, type SetupPlan, type SetupStep } from '../setup-split';
 import { ENGINE_CHOSEN, writeLastEngine } from '../engines';
 import { startProTrial } from '../pro-trial';
 import { TEAM } from '../../../cloud/gateway/plans.mjs';
 import FolderPicker from './FolderPicker';
 import { EngineLogo } from './EngineLogos';
-import { AgentTile, useAgentCards } from './AgentCards';
 import { PERK_ICONS, ProShowcase } from './ProShowcase';
 import { SignInPage } from '../team/SignInPage';
 import { Name } from '../../../shared/product-name.mjs';
@@ -213,7 +212,56 @@ export function SetupSplit(p: SetupSplitProps) {
   }, [payState, next]);
 
   // ---- The agents' cards. Nothing runs until a card's button is pressed.
-  const agentCards = useAgentCards(p.readings ?? []);
+  // The updater only updates a copy from Claude Code's own installer; any other says "its own installer", which says nothing to do.
+  const stoppedUpdate = (engine: 'claude' | 'codex', message: string | null | undefined): AgentPress & { via: 'update' } =>
+    /own installer/.test(message ?? '') ? { phase: 'manual', error: `Run ${engine} update in a terminal`, via: 'update' } : { phase: 'failed', error: message ?? null, via: 'update' };
+  const [cards, setCards] = useState<readonly AgentReading[]>(p.readings ?? []);
+  const [presses, setPresses] = useState<Partial<Record<'claude' | 'codex', AgentPress & { via: 'setup' | 'update' }>>>({});
+  const pressing = (['claude', 'codex'] as const).filter((e) => ['checking', 'installing', 'signing-in', 'updating'].includes(presses[e]?.phase ?? ''));
+  const pressOn = (engine: 'claude' | 'codex', press: (AgentPress & { via: 'setup' | 'update' }) | null) =>
+    setPresses((had) => { const n = { ...had }; if (press) n[engine] = press; else delete n[engine]; return n; });
+  const readAgain = useCallback(async (engine: 'claude' | 'codex') => {
+    const r = await api.engineSetup('ready', engine).catch(() => null);
+    if (r) setCards((had) => [...had.filter((x) => x.engine !== engine), r]);
+    return r;
+  }, []);
+  const pressCard = useCallback(async (engine: 'claude' | 'codex', act: string) => {
+    if (act === 'Open again') { void api.engineSetup('again', engine).catch(() => null); return; }
+    if (act === 'Check again') { pressOn(engine, { phase: 'checking', via: 'update' }); await readAgain(engine); pressOn(engine, null); return; }
+    const update = act === 'Update' || (act === 'Try again' && presses[engine]?.via === 'update');
+    if (update) {
+      pressOn(engine, { phase: 'updating', via: 'update' });
+      try {
+        const u = await api.agentUpdate(engine, 'start');
+        if (u.state === 'current') { await readAgain(engine); pressOn(engine, null); }
+        else if (u.state !== 'running') pressOn(engine, stoppedUpdate(engine, u.message));
+      } catch (e) { pressOn(engine, stoppedUpdate(engine, (e as Error)?.message)); }
+      return;
+    }
+    pressOn(engine, { phase: 'checking', via: 'setup' });
+    const s = await api.engineSetup('start', engine).catch(() => null);
+    pressOn(engine, { phase: s?.phase ?? 'failed', error: s?.error ?? null, via: 'setup' });
+  }, [presses, readAgain]);
+  // A press is watched until it settles.
+  useEffect(() => {
+    if (!pressing.length) return undefined;
+    const tick = setInterval(async () => {
+      for (const engine of pressing) {
+        const via = presses[engine]?.via;
+        if (via === 'update') {
+          const u = await api.agentUpdate(engine, 'status').catch(() => null);
+          if (u?.state === 'current') { await readAgain(engine); pressOn(engine, null); }
+          else if (u?.state === 'failed') pressOn(engine, stoppedUpdate(engine, u.message));
+        } else {
+          const s = await api.engineSetup('status', engine).catch(() => null);
+          if (!s) continue;
+          if (s.phase === 'ready') { await readAgain(engine); pressOn(engine, { phase: 'ready', via: 'setup' }); }
+          else pressOn(engine, { phase: s.phase, error: s.error ?? null, via: 'setup' });
+        }
+      }
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [pressing.join(), presses, readAgain]);
 
   // ---- AI teammates
   const left = useMemo(() => starterChoices(starterAsks(p.snap?.teammates?.list ?? [])), [p.snap?.teammates?.list]);
@@ -388,7 +436,13 @@ export function SetupSplit(p: SetupSplitProps) {
     body = <>
       <div className="ss-tiles">
         {(['claude', 'codex'] as const).map((id) => {
-          return <AgentTile key={id} engine={id} card={agentCards.cardOf(id)} onPress={(act) => void agentCards.press(id, act)} />;
+          const card = agentCard(cards.find((r) => r.engine === id) ?? { engine: id, found: false }, presses[id] ?? null);
+          return <div key={id} className="ss-tile">
+            <span className="ss-tile-logo"><EngineLogo engine={id} size={22} /></span>
+            <span className="ss-tile-name">{id === 'claude' ? 'Claude Code' : 'Codex'}</span>
+            {card.sub && <span className="ss-tile-sub" title={card.sub}>{card.sub}</span>}
+            <span className="ss-tile-end">{card.ready ? <><Tick />Ready</> : card.act && <button type="button" className="ss-tile-btn" onClick={() => void pressCard(id, card.act!)}>{card.act}</button>}</span>
+          </div>;
         })}
       </div>
       <div className="ss-acts">{go('Continue', next)}</div>

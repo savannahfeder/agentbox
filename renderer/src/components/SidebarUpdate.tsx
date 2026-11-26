@@ -26,8 +26,6 @@ import { NAME } from '../../../shared/product-name.mjs';
 import { MOVE_SAY, SAY } from '../update-row';
 import { SidebarGlyph } from './SidebarGlyph';
 import { sayWhere } from '../../../shared/where-it-runs-from.mts';
-import { EngineLogo } from './EngineLogos';
-import type { SidebarAgentNote } from '../setup-split';
 
 export const SIDE_SAY = {
   title: 'New version ready',
@@ -39,7 +37,6 @@ export const SIDE_SAY = {
   // The move card's × hides a card about something no later version will fix,
   // so it says where the offer still is rather than when it comes back.
   moveCloseTip: 'Hide it · Settings still offers it',
-  agentCloseTip: 'Hide it · Settings still offers it',
 } as const;
 
 // AND THE CARD FOR A COPY THAT CANNOT UPDATE ITSELF AT ALL (w-ca1fc3ac58,
@@ -75,39 +72,6 @@ export function SidebarMove({ place, error = null, collapsed, rail = false, onMo
     <button type="button" className="sb-update-close" aria-label={SIDE_SAY.close} title={SIDE_SAY.moveCloseTip} onClick={onClose}><CloseIcon /></button>
     <p>{why}</p>
     <button type="button" className="sb-update-go" onClick={onMove}>{MOVE_SAY.button}</button>
-  </div>;
-}
-
-// AND THE CARD FOR AN AGENT THAT IS NOT READY (Nov 26 onboarding call). Setup
-// shows each agent's card, but someone already past it whose Claude Code signed
-// out or fell too far behind had every thread put on Codex without a word. Its
-// button is the agent card's own (AgentCards.tsx); while pressed, its line says
-// what the press is doing. The × puts that state away.
-export function SidebarAgent({ note, sub, act, collapsed, rail = false, onPress, onClose }: {
-  note: SidebarAgentNote;
-  /** What a press is doing now, from the agent's card, in place of the line. */
-  sub: string | null;
-  /** The card's button now, or null while a press runs. */
-  act: string | null;
-  collapsed: boolean;
-  rail?: boolean;
-  onPress: (act: string) => void;
-  onClose: () => void;
-}) {
-  const icon = <EngineLogo engine={note.engine} size={16} />;
-  const text = (act === note.act ? note.say : sub) ?? '';
-  const row = <button type="button" className="sb-update-row" title={note.title} aria-label={act ?? note.title} onClick={() => act && onPress(act)}>
-    {icon}<span>{act ?? sub ?? note.title}</span>
-  </button>;
-
-  if (rail) return <RailCard icon={icon} title={note.title} text={text} closeTip={SIDE_SAY.agentCloseTip} onClose={onClose} row={row} />;
-  if (collapsed) return row;
-
-  return <div className="sb-update-card">
-    <div className="sb-update-card-title">{icon}<span>{note.title}</span></div>
-    <button type="button" className="sb-update-close" aria-label={SIDE_SAY.close} title={SIDE_SAY.agentCloseTip} onClick={onClose}><CloseIcon /></button>
-    {text && <p>{text}</p>}
-    {act && <button type="button" className="sb-update-go" onClick={() => onPress(act)}>{act}</button>}
   </div>;
 }
 
