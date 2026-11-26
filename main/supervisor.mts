@@ -10,7 +10,7 @@ export { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/c
 import { taskRemoteControl } from './task-remote-control.mts';
 import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder, spareFolderPath } from './task-folders.mts';
-import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot, stopShips } from './ship-queue.mts';
+import { SHIP_LABEL, ShipQueue, failureReply, readShipSettings, shipScriptFor, shipSlot, stopShips } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
 import { SecurityScan } from './the-security-scan-went-red.mts';
 import { CloudServerWatch, serverError } from './cloud-server-down.mts';
@@ -61,7 +61,7 @@ import { REPLY_MARK, replyFrame, serverJoinedKey } from '../shared/cloud-kit.mts
 import { NEW_THREAD, NEW_THREAD_CODEX, NEW_ITEM_MARK, NEW_TITLE_MARK, NEW_BODY_MARK, fillNewThreadKit } from '../shared/cloud-kit.mts';
 import { macAsleep, carryCommand, CARRY_AHEAD_MS, handOverSpent, notBeforeOf } from '../shared/cloud-carry.mts';
 import { execFile as execFileCb } from 'node:child_process';
-import { CLOSED_UNSHIPPED, closedBeforeItShipped, shippedAs, notShipped } from '../shared/not-shipped.mts';
+import { CLOSED_UNSHIPPED, SHIP_FAILED, closedBeforeItShipped, shippedAs, notShipped } from '../shared/not-shipped.mts';
 import { asksForCloud, handBackWhat, handsBack, SEND_TO_CLOUD } from '../shared/cloud-hand-back.mts';
 import { CLOUD_SENT, readSent } from '../shared/cloud-start.mts';
 import { readCloudConfig, cloudAccountConfig, OLD_TOKEN_SERVICE, imageCapsToTry } from './cloud/config.mts';
@@ -596,6 +596,17 @@ export interface HeldStart {
   next?: number | null;
   trying?: number;
   account?: string | null;
+}
+
+// A ship that bounced in the last week and nobody has written on since: a
+// record of it from before owed failures were kept, or a quit between the note
+// and the hand-back.
+function bouncedWithNoWordSince(item: WorkItem, now: number): boolean {
+  const note = item.wrote?.note;
+  if (!note || note.source !== 'system' || now - note.ts > 7 * 24 * 3_600_000) return false;
+  if (typeof item.note !== 'string' || !item.note.startsWith(SHIP_FAILED)) return false;
+  if (item.status === 'done' || (item.labels ?? []).includes(SHIP_LABEL)) return false;
+  return (item.wrote?.result?.ts ?? 0) < note.ts && (item.wrote?.answer?.ts ?? 0) < note.ts;
 }
 
 /** A bounced ship's words for its agent, kept until the agent writes back after `at`. */
@@ -7900,20 +7911,25 @@ export class Supervisor {
   }
 
   handOverOwedShipFailures(items: WorkItem[], now = Date.now()) {
-    const owed = this._owedShipFailures;
-    if (!owed || !Object.keys(owed).length) return;
+    const owed = (this._owedShipFailures ??= {});
+    for (const item of items) {
+      const key = `${item.product}:${item.id}`;
+      if (!owed[key] && bouncedWithNoWordSince(item, now)) owed[key] = { reply: failureReply(item.note!.slice(SHIP_FAILED.length)), at: item.wrote!.note!.ts };
+    }
+    if (!Object.keys(owed).length) return;
     const byKey = new Map(items.map((i) => [`${i.product}:${i.id}`, i]));
     const productBySlug = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
     const me = process.env.AGENTBOX_PERSON_ID || null;
     let settled = false;
     for (const [key, one] of Object.entries(owed)) {
       const item = byKey.get(key);
-      // Three runs that ended without a word from the agent: the thread waits in Needs you.
-      if (!item || item.status === 'done' || (item.labels ?? []).includes(SHIP_LABEL) || (item.wrote?.result?.ts ?? 0) > one.at || (one.handed ?? 0) >= 3) {
+      if (!item || item.status === 'done' || (item.labels ?? []).includes(SHIP_LABEL) || (item.wrote?.result?.ts ?? 0) > one.at) {
         delete owed[key];
         settled = true;
         continue;
       }
+      // Three runs that ended without a word from the agent: the thread waits in Needs you.
+      if ((one.handed ?? 0) >= 3) continue;
       if (this.sessions.has(item.id) || this._preparing?.has(item.id) || stoppedByHer(item) || this.claimHeldElsewhere(item)) continue;
       if (!this.store.isDue(item, now) || !mayRunHere(item, productBySlug.get(item.product), me)) continue;
       if (!this._roomFor(this._engineFor(item), item)) continue;

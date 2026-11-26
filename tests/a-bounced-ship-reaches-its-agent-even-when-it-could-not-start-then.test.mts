@@ -132,6 +132,39 @@ describe('a ship failure handed over', () => {
   });
 });
 
+describe('a ship that bounced before failures were kept', () => {
+  it('is handed to its agent from the note the thread already shows', () => {
+    const starts: Start[] = [];
+    const sup = supervisor({ starts });
+    now += 3 * 24 * 3_600_000;
+    sup.handOverOwedShipFailures(items, now);
+    expect(starts).toHaveLength(1);
+    expect(starts[0].shipFailure).toContain('tests/widget.test.mts');
+    expect(starts[0].shipFailure).toContain('add the label');
+  });
+
+  it('is left alone when the agent or the person wrote after the note', () => {
+    const starts: Start[] = [];
+    const sup = supervisor({ starts });
+    items = [
+      row({ id: 'w-answered', wrote: { result: { ts: T0 + 1, source: 'agent' }, note: { ts: T0, source: 'system' } } }),
+      row({ id: 'w-replied', wrote: { answer: { ts: T0 + 1, source: 'founder' }, note: { ts: T0, source: 'system' } } }),
+    ];
+    sup.handOverOwedShipFailures(items, now + 15_000);
+    expect(starts).toEqual([]);
+  });
+
+  it('is left alone when the note is over a week old, or is not the bounce', () => {
+    const starts: Start[] = [];
+    const sup = supervisor({ starts });
+    items = [row({ id: 'w-old' }), row({ id: 'w-other', note: 'Shipped as abc1234.' })];
+    sup.handOverOwedShipFailures(items, T0 + 8 * 24 * 3_600_000);
+    items = [row({ id: 'w-other', note: 'Shipped as abc1234.' })];
+    sup.handOverOwedShipFailures(items, T0 + 15_000);
+    expect(starts).toEqual([]);
+  });
+});
+
 describe('a ship failure whose runs keep ending without a word', () => {
   it('is handed over three times at most, then left for the person', () => {
     const starts: Start[] = [];
