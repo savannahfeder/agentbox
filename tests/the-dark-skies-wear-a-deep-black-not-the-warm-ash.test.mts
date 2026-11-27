@@ -7,7 +7,9 @@
 // from 1.56 to 1.14 and nearly vanished, so they are held at today's strength.
 // On 2026-11-27 she found #131315 too deep to read on and pointed at Notion's
 // dark page (#191919, measured from her screenshot). The card was lifted to
-// that grey; the frame around it stays #0b0b0c.
+// that grey; the frame around it stays #0b0b0c. On that card she still saw
+// brown: the page was Notion's exact pixel, but the text greys, the command bar
+// and the new thread menus were the warm Ember ones. They are neutral here too.
 import fs from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { SKY_THEMES } from '../renderer/src/home/sky.ts';
@@ -29,7 +31,12 @@ const contrast = (a: string, b: string) => { const [x, y] = [rel(a), rel(b)].sor
 const neutral = (hex: string) => { const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)); return Math.max(...c) - Math.min(...c) <= 3; };
 
 const TODAY_CARD = '#282625';
-const INKS = ['#efebe7', '#c4bdb8', '#a09994', '#7f7975'];
+const ASH_INKS = ['#efebe7', '#c4bdb8', '#a09994', '#7f7975'];
+const INK_NAMES = ['--text', '--text-dim', '--text-faint', '--agent-ink'];
+const darkSkyRule = (sel: string) => {
+  const at = css.indexOf(`${SELECTOR} ${sel}`);
+  return at < 0 ? '' : css.slice(at, css.indexOf('}', at));
+};
 
 describe('the dark skies', () => {
   it('are named on the page while one is worn', () => {
@@ -46,7 +53,25 @@ describe('the dark skies', () => {
   });
 
   it('keep every text ink at least as readable as on today’s card', () => {
-    for (const ink of INKS) expect(contrast(ink, varOf('--surface')!)).toBeGreaterThanOrEqual(contrast(ink, TODAY_CARD));
+    INK_NAMES.forEach((name, i) => {
+      expect(varOf(name), name).not.toBeNull();
+      expect(contrast(varOf(name)!, varOf('--surface')!), name).toBeGreaterThanOrEqual(contrast(ASH_INKS[i], TODAY_CARD));
+    });
+  });
+
+  it('write in neutral greys, not the warm Ember ones', () => {
+    for (const name of [...INK_NAMES, '--skin-tick']) {
+      expect(varOf(name), name).not.toBeNull();
+      expect(neutral(varOf(name)!), `${name} is neutral`).toBe(true);
+    }
+  });
+
+  it('open the command bar and the new thread menus on neutral grey', () => {
+    for (const sel of ['.modal.palette', '.tc-menu']) {
+      const colours = darkSkyRule(sel).match(/#[0-9a-fA-F]{6}/g) ?? [];
+      expect(colours.length, sel).toBeGreaterThan(0);
+      for (const c of colours) expect(neutral(c), `${sel} ${c}`).toBe(true);
+    }
   });
 
   it('draw every surface on the card a step lighter than the card, and code a step darker', () => {

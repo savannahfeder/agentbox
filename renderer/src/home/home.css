@@ -30,7 +30,16 @@ html:root[data-skin="ember-grid"][data-sky-dark] {
   --code-ground: #151515;
   --work-fill: #191919;
   --on-solid: #0b0b0c;
+  /* Ember's warm inks, at the same brightness: on this grey they read as brown. */
+  --text: #ececec;
+  --text-dim: #bebebe;
+  --text-faint: #9a9a9a;
+  --agent-ink: #7a7a7a;
+  --skin-tick: #595959;
 }
+html:root[data-skin="ember-grid"][data-sky-dark] .modal.palette { background: #252525; }
+html:root[data-skin="ember-grid"][data-sky-dark] .tc-card,
+html:root[data-skin="ember-grid"][data-sky-dark] .tc-menu { --tc-modal: #2b2b2b; --tc-hair: #393939; }
 
 /* The light card is white and the window around it takes the sky's tint. */
 :root[data-theme="light"][data-sky-frame] body,
