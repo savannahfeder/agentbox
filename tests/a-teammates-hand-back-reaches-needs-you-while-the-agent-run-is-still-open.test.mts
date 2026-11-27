@@ -8,6 +8,8 @@
 // the thread in In progress (`belongsInInbox`'s `live` branch). Measured from
 // her copy's ledger: hand-back at 16:24:22, run open until 16:36:03.
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 import { belongsInInbox, belongsInProgress, inProgressTab } from '../renderer/src/list-rules.ts';
 
 const now = 1_795_797_000_000;
@@ -28,6 +30,18 @@ describe("a teammate's hand-back on a thread whose run is still open", () => {
   });
   it('is in Needs you once the run has ended too, as before', () => {
     expect(belongsInInbox(handedBack, { now, live: false })).toBe(true);
+  });
+});
+
+// The rerun still missed it: the window checks for a live run itself before it
+// asks the rule (App.tsx `inboxCandidates`), so the exception has to be there too.
+describe('the window', () => {
+  it('lets a hand-back through before its own live-run check', () => {
+    const app = fs.readFileSync(path.join(import.meta.dirname, '..', 'renderer/src/App.tsx'), 'utf8');
+    const handBack = app.indexOf("if (i.status !== 'done' && handBackWaits(i)) return true;");
+    const liveVeto = app.indexOf('if (liveIds.has(i.id) && !stillAsksYou(i) && !asking(i)) return false;');
+    expect(handBack).toBeGreaterThan(0);
+    expect(handBack).toBeLessThan(liveVeto);
   });
 });
 

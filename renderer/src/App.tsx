@@ -70,7 +70,7 @@ import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
 import { AskSentLine, AsksChip, UnderTheAsk } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
-import { askIGave, askIsOpen, askOf, askOnMe, asksOnThread, handedBackBy, newestAskPerThread, sentAwayByMe, withoutAskLead } from '../../shared/thread-asks.mts';
+import { askIGave, askIsOpen, askOf, askOnMe, asksOnThread, handBackWaits, handedBackBy, newestAskPerThread, sentAwayByMe, withoutAskLead } from '../../shared/thread-asks.mts';
 import { ASK_PERSON_EVENT, HAND_BACK_EVENT, SEE_SAID, askAnswers, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
@@ -1864,6 +1864,8 @@ export default function App() {
     if (commentsWaitOnYou(i, seenAt[i.id] ?? unreadSince)) return true;
     if (i.linkComments?.length) return true;
     if (fileNewsFor(i, team?.me ?? null, { myName }).length) return true;
+    // A teammate's hand-back waits for you while the run is still open, as in the rule.
+    if (i.status !== 'done' && handBackWaits(i)) return true;
     // An agent is working on it right now: In progress, whatever it says
     // (`live` in list-rules, w-bc976fd247). Ahead of every branch here,
     // the team ones included, because none of them can see a session.
