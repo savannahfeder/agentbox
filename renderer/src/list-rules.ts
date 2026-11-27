@@ -16,6 +16,7 @@ import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
 import { isCause } from '../../shared/causes.mts';
 import { heldOutside } from '../../shared/carried-on-outside.mts';
+import { handBackWaits } from '../../shared/thread-asks.mts';
 
 /**
  * A thread put in Later and not begun. The window's copy of `notStarted` in
@@ -245,6 +246,9 @@ export function belongsInInbox(
   // A teammate's words wait for you whatever the thread is doing, a running
   // agent included (`waitingComments`, shared/work-items.mts).
   if (wordsWait(i, seen)) return true;
+  // So does a teammate's hand-back, held for your yes while the run that asked
+  // for help is still open (shared/thread-asks.mts).
+  if (i.status !== 'done' && handBackWaits(i)) return true;
   // In Later and not begun: it waits for a person, not a clock, so it is in
   // Later and nowhere else.
   if (notStarted(i)) return false;
