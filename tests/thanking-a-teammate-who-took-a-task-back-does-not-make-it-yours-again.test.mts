@@ -16,7 +16,7 @@ import path from 'node:path';
 import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
 import { foldWorkItems, takenBack } from '../shared/work-items.mts';
-import { statusForReply } from '../renderer/src/list-rules.ts';
+import { heldRowStarts, statusForReply } from '../renderer/src/list-rules.ts';
 
 const ID = 'w-046afaf5e0';
 const LENA = 'p-lena', SAM = 'p-sam';
@@ -97,6 +97,20 @@ describe("through the app's own write path", () => {
   });
   it('a reply on a task you closed yourself still reopens it', () => {
     expect(statusAfter(SAM).status).toBe('open');
+  });
+});
+
+// The final rerun: it stayed closed, but for the few seconds a sent reply can be
+// undone the header said In progress (10 sightings), because a reply held for
+// Z is drawn there as starting an agent (`heldRowStarts`).
+describe('while the reply can still be undone', () => {
+  it('a reply on a taken-back task is not drawn as starting anything', () => {
+    const item = { ...fold([...given, line(LENA, 200, 'u-2', { status: 'done' })]), product: 'direct-c0ffee03' };
+    expect(heldRowStarts(item, { product: item.product, id: ID })).toBe(false);
+  });
+  it('a reply on any other row still is', () => {
+    const item = { ...fold([...given, line(SAM, 200, 'u-2', { status: 'done' })]), product: 'direct-c0ffee03' };
+    expect(heldRowStarts(item, { product: item.product, id: ID })).toBe(true);
   });
 });
 

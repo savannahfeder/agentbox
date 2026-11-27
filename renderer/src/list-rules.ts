@@ -17,6 +17,7 @@ import { DONE } from './done-word';
 import { isCause } from '../../shared/causes.mts';
 import { heldOutside } from '../../shared/carried-on-outside.mts';
 import { handBackWaits } from '../../shared/thread-asks.mts';
+import { takenBack } from '../../shared/work-items.mts';
 
 /**
  * A thread put in Later and not begun. The window's copy of `notStarted` in
@@ -424,12 +425,13 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
  * Whether an action held for Z starts an agent on the row it holds: a reply, an
  * approval or a pick on that row. Only those read as In progress while held; a
  * close starts nothing, and "do it in this thread" starts the parent instead.
+ * Nor does a reply on a task its giver took back, which stays closed.
  */
 export function heldRowStarts(
-  row: { product: string; id: string },
+  row: { product: string; id: string } & Parameters<typeof takenBack>[0],
   goes: { product: string; id: string } | null | undefined,
 ): boolean {
-  return !!goes && goes.id === row.id && goes.product === row.product;
+  return !!goes && goes.id === row.id && goes.product === row.product && !takenBack(row);
 }
 
 /** The `live` the list rules take: threads with a run, or with one being started (Try again). */
