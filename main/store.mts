@@ -40,7 +40,7 @@ import {
   CODEX_IMPORT_LABEL, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow, codexMirrorPatch, isCodexImportRow, isCodexMirrorRow,
   productsForThread, threadsNeedingRows as codexThreadsNeedingRows,
 } from '../shared/codex-import.mts';
-import { buildClaimLine, buildReleaseLine, GIVEN_TASK, LEASE_MS, type LinkComment } from '../shared/work-items.mts';
+import { buildClaimLine, buildReleaseLine, GIVEN_TASK, LEASE_MS, takenBack, type LinkComment } from '../shared/work-items.mts';
 import { isEffortWord } from '../shared/effort-levels.mts';
 import { shippedNote } from '../shared/shipped-note.mts';
 import { shipClosesIt, shippedButOpen } from '../shared/ship-closes-its-thread.mts';
@@ -636,9 +636,9 @@ export class Store {
     }
     // The pane may still show a running row after Stop or a provider result.
     // Resolve omitted reply status against the ledger that was just written.
-    // Except an ask handed back (shared/thread-asks.mts): a thank-you there is a message, not more work.
+    // Except an ask handed back (shared/thread-asks.mts) or a task taken back: a thank-you there is a message, not more work.
     if (status == null && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)'
-      && (item?.status === 'blocked' || item?.status === 'done') && !(item?.ask && item?.verdict)) status = 'open';
+      && (item?.status === 'blocked' || item?.status === 'done') && !(item?.ask && item?.verdict) && !(item && takenBack(item))) status = 'open';
     // WHAT THE ANSWER ITSELF MAY DO does not go on the ledger. It is a grant,
     // the ledger is an append-only file every worker writes, and every line on
     // it names its own author with nothing checking the name. It goes in the

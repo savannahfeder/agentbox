@@ -9,9 +9,12 @@
 // closed row anyone else wrote on after the close (`reopenIfWrittenPastTheClose`).
 // The first attempt fixed only the first, and the rerun showed no change.
 // A hand-back already stays handed back after a thank-you; a take-back now does too.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import * as disk from '../main/store/work-items.mts';
+import { Store } from '../main/store.mts';
 import { foldWorkItems, takenBack } from '../shared/work-items.mts';
 import { statusForReply } from '../renderer/src/list-rules.ts';
 
@@ -55,6 +58,45 @@ describe('what stays as it was', () => {
     expect(statusForReply('done')).toBe('open');
     expect(statusForReply('blocked')).toBe('open');
     expect(statusForReply('open')).toBeUndefined();
+  });
+});
+
+// The second rerun still saw it: the app's write path (`answerItem`) turns a
+// reply with no status on a closed row into a reopen of its own.
+describe("through the app's own write path", () => {
+  let root: string;
+  let store: Store;
+  let dir: string;
+  const SLUG = 'direct-c0ffee03';
+  const team = { projectId: 'c0ffee03', teamId: 't1', people: [SAM, LENA], sharedBy: LENA, direct: true };
+  beforeEach(async () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'took-back-'));
+    dir = path.join(root, SLUG);
+    fs.mkdirSync(dir);
+    fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify({ schemaVersion: 1, id: SLUG, name: 'Direct', team }));
+    store = await new Store({ accountRoot: root, products: [] }).init();
+    disk.setLineAuthor(SAM);
+  });
+  afterEach(() => {
+    disk.setLineAuthor(null);
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+  const statusAfter = (closer: string) => {
+    const now = Date.now();
+    disk.appendForeignLines(dir, [
+      { id: ID, ts: now - 3000, source: 'system', by: LENA, uid: 'f-0', patch: { title: 'Web app dark mode spec', status: 'open', priority: 5, labels: ['given-task'] } },
+      { id: ID, ts: now - 2000, source: 'founder', by: LENA, uid: 'f-1', patch: { assignee: SAM, body: 'Could you take ownership of the dark mode spec?', people: [LENA, SAM] } },
+      { id: ID, ts: now - 1000, source: 'founder', by: closer, uid: 'f-2', patch: { status: 'done' } },
+    ]);
+    store.answerItem(SLUG, ID, { answer: 'Thanks for taking it back, Lena!' });
+    return { written: store.readHistory(SLUG, ID).slice(-1)[0].patch, status: fold(store.readHistory(SLUG, ID)).status };
+  };
+
+  it('a thank-you on a task its giver took back writes no reopen', () => {
+    expect(statusAfter(LENA)).toEqual({ written: { answer: 'Thanks for taking it back, Lena!' }, status: 'done' });
+  });
+  it('a reply on a task you closed yourself still reopens it', () => {
+    expect(statusAfter(SAM).status).toBe('open');
   });
 });
 
