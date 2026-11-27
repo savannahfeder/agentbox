@@ -523,16 +523,8 @@ export function belongsOnTheRail(
 // a blocked or done row reopens it, or the reply never reaches a worker. A
 // claimed row is left alone: its worker reads the reply when it exits, and
 // reopening would spawn a second one.
-// A task between two people runs no worker, so a reply on one the other person
-// closed (taken back, or finished) is only a message and leaves it closed.
-export function statusForReply(status: string, closedByOther = false): 'open' | undefined {
-  if (status === 'done' && closedByOther) return undefined;
+export function statusForReply(status: string): 'open' | undefined {
   return status === 'blocked' || status === 'done' ? 'open' : undefined;
-}
-
-export function taskClosedByOther(i: Pick<InboxItem, 'status' | 'labels'> & { wrote?: Record<string, { by?: string } | undefined> }, me: string | null): boolean {
-  const by = i.wrote?.status?.by;
-  return i.status === 'done' && isTaskRow(i) && !!me && !!by && by !== me;
 }
 
 // Withdrawing a reply kills the session, and a kill parks the row blocked (ipc

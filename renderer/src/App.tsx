@@ -107,7 +107,7 @@ import { approvalAnswered, approvalAsker, approvalView, KEY_CARD_TOOL } from './
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
 import { newToDraw, useKeptSet, type Drawn } from './shown-snapshot';
-import { agentOnOrComing, askPutOff, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, taskClosedByOther, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
+import { agentOnOrComing, askPutOff, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, heldForHer, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentLayout, agentRow, agentRowId, asksSomething, byRecency, choicesArePressed, listed as agentIsListed, onTheRail, putAway, railLine, reachesInbox, progressAfterReply, replyIsSwallowed, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
@@ -4830,7 +4830,7 @@ export default function App() {
     // Claimed is deliberately left alone: a worker is on it right now, and it
     // reads her reply when it exits (deliverMidflightReply). Reopening would
     // put a second worker on the same item.
-    const status = statusForReply(item.status, taskClosedByOther(item, snap?.team?.me?.id ?? null));
+    const status = statusForReply(item.status);
     // A REPLY SET FOR LATER (w-54cdf7c768) is written now with the row set for
     // its time, so nothing hands it to an agent before then.
     const later = (runAt ?? 0) > Date.now();
@@ -5290,7 +5290,7 @@ export default function App() {
     // which meant a pick was only ever offered on a row still open. Options
     // now come off the result too (format.ts), so a finished row can offer one,
     // and this is the half of the reply path it was missing.
-    const status = statusForReply(item.status, taskClosedByOther(item, snap?.team?.me?.id ?? null));
+    const status = statusForReply(item.status);
     // The option in the words the thread drew it with when it was picked.
     const undid = [{ product: item.product, id: item.id, words: 'Undid picking', choice: option.text.replace(/\s*\(recommended\)\s*$/i, '').trim() }];
     // On the thread at once, as a typed reply is (w-388be0a968).
@@ -5319,7 +5319,7 @@ export default function App() {
     }, pickSentWords(option.text, rowTitle(item)), takeBack, isTourPractice(tourRef.current, item) || !movesOn(item) || pickStaysPut(option.text, { live: liveIds.has(item.id) }), { product: item.product, id: item.id }, undid,
     // Nothing real is sent from the practice thread, so nothing is held back for an undo: its agent answers at once.
     isTourPractice(tourRef.current, item) ? 0 : undefined);
-  }, [deferCommit, pushUndo, markDone, markSeen, movesOn, offerNow, focused?.id, focused?.product, liveIds, replyToAgent, snap?.team?.me?.id]);
+  }, [deferCommit, pushUndo, markDone, markSeen, movesOn, offerNow, focused?.id, focused?.product, liveIds, replyToAgent]);
   // The discard question is raised inside `pickOption` and answered by
   // `answerCloseAsk`, which is made above it.
   useEffect(() => { pickRef.current = pickOption; }, [pickOption]);
