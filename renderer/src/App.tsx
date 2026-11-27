@@ -62,6 +62,7 @@ import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, scre
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mts';
 import { SEEN_SENT } from '../../shared/phone-settings.mts';
+import { takenBack } from '../../shared/work-items.mts';
 import { choose, copyText, openTo, seenNow, sentWords, sharedThreadOfDoc, threadLink, type ShareActs } from './threads/share-rules';
 
 const SHARE_LAST = 'agentbox:share-last';
@@ -4830,7 +4831,7 @@ export default function App() {
     // Claimed is deliberately left alone: a worker is on it right now, and it
     // reads her reply when it exits (deliverMidflightReply). Reopening would
     // put a second worker on the same item.
-    const status = statusForReply(item.status);
+    const status = statusForReply(item.status, takenBack(item));
     // A REPLY SET FOR LATER (w-54cdf7c768) is written now with the row set for
     // its time, so nothing hands it to an agent before then.
     const later = (runAt ?? 0) > Date.now();
@@ -5290,7 +5291,7 @@ export default function App() {
     // which meant a pick was only ever offered on a row still open. Options
     // now come off the result too (format.ts), so a finished row can offer one,
     // and this is the half of the reply path it was missing.
-    const status = statusForReply(item.status);
+    const status = statusForReply(item.status, takenBack(item));
     // The option in the words the thread drew it with when it was picked.
     const undid = [{ product: item.product, id: item.id, words: 'Undid picking', choice: option.text.replace(/\s*\(recommended\)\s*$/i, '').trim() }];
     // On the thread at once, as a typed reply is (w-388be0a968).

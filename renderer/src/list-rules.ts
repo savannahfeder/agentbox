@@ -523,7 +523,10 @@ export function belongsOnTheRail(
 // a blocked or done row reopens it, or the reply never reaches a worker. A
 // claimed row is left alone: its worker reads the reply when it exits, and
 // reopening would spawn a second one.
-export function statusForReply(status: string): 'open' | undefined {
+// A task its giver took back stays closed: a reply on it is a message, not the
+// task again (`takenBack`, shared/work-items.mts).
+export function statusForReply(status: string, wasTakenBack = false): 'open' | undefined {
+  if (status === 'done' && wasTakenBack) return undefined;
   return status === 'blocked' || status === 'done' ? 'open' : undefined;
 }
 
