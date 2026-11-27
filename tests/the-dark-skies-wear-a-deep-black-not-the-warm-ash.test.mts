@@ -7,9 +7,11 @@
 // from 1.56 to 1.14 and nearly vanished, so they are held at today's strength.
 // On 2026-11-27 she found #131315 too deep to read on and pointed at Notion's
 // dark page (#191919, measured from her screenshot). The card was lifted to
-// that grey; the frame around it stays #0b0b0c. On that card she still saw
+// that grey. On that card she still saw
 // brown: the page was Notion's exact pixel, but the text greys, the command bar
 // and the new thread menus were the warm Ember ones. They are neutral here too.
+// Then the #0b0b0c frame round the grey card looked too black and out of
+// place, so it is now #131313, one step under the card.
 import fs from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { SKY_THEMES } from '../renderer/src/home/sky.ts';
@@ -43,8 +45,8 @@ describe('the dark skies', () => {
     expect(app).toMatch(/if \(sky\?\.dark\) root\.dataset\.skyDark = ''; else delete root\.dataset\.skyDark;/);
   });
 
-  it('wear a black frame round a Notion grey card: frame #0b0b0c, card #191919', () => {
-    expect(varOf('--bg')).toBe('#0b0b0c');
+  it('wear a frame one step under a Notion grey card: frame #131313, card #191919', () => {
+    expect(varOf('--bg')).toBe('#131313');
     expect(varOf('--surface')).toBe('#191919');
     for (const name of ['--bg', '--surface', '--bg-raised', '--bg-hover', '--bg-selected', '--line', '--line-strong']) {
       expect(varOf(name), name).not.toBeNull();
@@ -81,6 +83,11 @@ describe('the dark skies', () => {
     for (const name of ['--skin-pane', '--skin-solid', '--doc-page', '--doc-page-held', '--work-fill']) expect(varOf(name), name).toBe(varOf('--surface'));
   });
 
+  it('keep the frame close to the card, darker but never a black edge round it', () => {
+    expect(rel(varOf('--bg')!)).toBeLessThan(rel(varOf('--surface')!));
+    expect(contrast(varOf('--bg')!, varOf('--surface')!)).toBeLessThan(1.1);
+  });
+
   it('keep the hairlines as visible as today’s', () => {
     expect(contrast(varOf('--line')!, varOf('--surface')!)).toBeGreaterThanOrEqual(1.5);
   });
@@ -92,7 +99,7 @@ describe('the dark skies', () => {
 
   it('paint the ground with no orange glow', () => {
     const image = block.match(/--skin-image:.*/)?.[0] ?? '';
-    expect(image).toContain("fill='%230b0b0c'");
+    expect(image).toContain("fill='%23131313'");
     expect(image.toLowerCase()).not.toContain('ee6018');
   });
 });

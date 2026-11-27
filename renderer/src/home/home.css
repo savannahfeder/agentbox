@@ -8,13 +8,13 @@
 .home-sky::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07); }
 :root[data-theme="light"] .home-sky::after { box-shadow: inset 0 0 0 1px rgba(30, 22, 36, .08); }
 
-/* The dark skies wear a neutral black frame round a neutral grey card: the
-   warm Ash read as brown under the sky, and the deeper #131315 card was hard
-   to read on. Hairlines stay at Ash's contrast (1.5:1) so rows and edges do
-   not vanish. */
+/* The dark skies wear a neutral grey card in a frame one step darker: the
+   warm Ash read as brown under the sky, the deeper #131315 card was hard to
+   read on, and a #0b0b0c frame round the grey card looked out of place.
+   Hairlines stay at Ash's contrast (1.5:1) so rows and edges do not vanish. */
 html:root[data-skin="ember-grid"][data-sky-dark] {
-  --skin-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%'><defs><pattern id='d' width='32' height='32' patternUnits='userSpaceOnUse'><circle cx='16' cy='16' r='1.15' fill='white' fill-opacity='0.05'/></pattern></defs><rect width='100%' height='100%' fill='%230b0b0c'/><rect width='100%' height='100%' fill='url(%23d)'/></svg>");
-  --bg: #0b0b0c;
+  --skin-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%'><defs><pattern id='d' width='32' height='32' patternUnits='userSpaceOnUse'><circle cx='16' cy='16' r='1.15' fill='white' fill-opacity='0.05'/></pattern></defs><rect width='100%' height='100%' fill='%23131313'/><rect width='100%' height='100%' fill='url(%23d)'/></svg>");
+  --bg: #131313;
   --surface: #191919;
   --bg-raised: #202020;
   --bg-hover: #1f1f1f;
@@ -29,7 +29,7 @@ html:root[data-skin="ember-grid"][data-sky-dark] {
   --doc-page-held: #191919;
   --code-ground: #151515;
   --work-fill: #191919;
-  --on-solid: #0b0b0c;
+  --on-solid: #131313;
   /* Ember's warm inks, at the same brightness: on this grey they read as brown. */
   --text: #ececec;
   --text-dim: #bebebe;
