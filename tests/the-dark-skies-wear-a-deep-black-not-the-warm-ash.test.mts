@@ -5,6 +5,9 @@
 // sky. Her worry was whether it would be harder to read: measured, every text
 // ink gains contrast on the new card, but the hairlines first drawn with it fell
 // from 1.56 to 1.14 and nearly vanished, so they are held at today's strength.
+// On 2026-11-27 she found #131315 too deep to read on and pointed at Notion's
+// dark page (#191919, measured from her screenshot). The card was lifted to
+// that grey; the frame around it stays #0b0b0c.
 import fs from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { SKY_THEMES } from '../renderer/src/home/sky.ts';
@@ -33,9 +36,9 @@ describe('the dark skies', () => {
     expect(app).toMatch(/if \(sky\?\.dark\) root\.dataset\.skyDark = ''; else delete root\.dataset\.skyDark;/);
   });
 
-  it('wear the picked deep black: frame #0b0b0c, card #131315', () => {
+  it('wear a black frame round a Notion grey card: frame #0b0b0c, card #191919', () => {
     expect(varOf('--bg')).toBe('#0b0b0c');
-    expect(varOf('--surface')).toBe('#131315');
+    expect(varOf('--surface')).toBe('#191919');
     for (const name of ['--bg', '--surface', '--bg-raised', '--bg-hover', '--bg-selected', '--line', '--line-strong']) {
       expect(varOf(name), name).not.toBeNull();
       expect(neutral(varOf(name)!), `${name} is neutral`).toBe(true);
@@ -46,12 +49,19 @@ describe('the dark skies', () => {
     for (const ink of INKS) expect(contrast(ink, varOf('--surface')!)).toBeGreaterThanOrEqual(contrast(ink, TODAY_CARD));
   });
 
+  it('draw every surface on the card a step lighter than the card, and code a step darker', () => {
+    const lum = (name: string) => rel(varOf(name)!);
+    for (const name of ['--bg-raised', '--bg-hover', '--bg-selected', '--pop']) expect(lum(name), name).toBeGreaterThan(lum('--surface'));
+    expect(lum('--code-ground')).toBeLessThan(lum('--surface'));
+    for (const name of ['--skin-pane', '--skin-solid', '--doc-page', '--doc-page-held', '--work-fill']) expect(varOf(name), name).toBe(varOf('--surface'));
+  });
+
   it('keep the hairlines as visible as today’s', () => {
     expect(contrast(varOf('--line')!, varOf('--surface')!)).toBeGreaterThanOrEqual(1.5);
   });
 
   it('paint the dots of the sky on the card colour, and leave the light skies white', () => {
-    for (const k of SKY_THEMES.filter((t) => t.dark)) expect(k.art.bg).toBe('#131315');
+    for (const k of SKY_THEMES.filter((t) => t.dark)) expect(k.art.bg).toBe(varOf('--surface'));
     for (const k of SKY_THEMES.filter((t) => !t.dark)) expect(k.art.bg).toBe('#ffffff');
   });
 
