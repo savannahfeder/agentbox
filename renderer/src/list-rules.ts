@@ -202,6 +202,19 @@ export function askPutOff(i: InboxItem, asking: boolean, now = Date.now()): bool
   return asking && putAwayByThem(i) > now;
 }
 
+/**
+ * You put it in Later yourself, so it is in Later even with its agent still
+ * running. `hiddenUntil` is the caller's, which a start being made lifts.
+ */
+export function inLaterByThem(i: InboxItem, hiddenUntil: number, now = Date.now()): boolean {
+  return hiddenUntil > now && putAwayByThem(i) > now;
+}
+
+/** A person closed it, so a run still winding down on it is not In progress. */
+export function closedByThem(i: InboxItem): boolean {
+  return i.status === 'done' && i.wrote?.status?.source === 'founder';
+}
+
 /** What a person said this thread waits on has ended, and they have not acted on it since. */
 export function waitCameBack(i: InboxItem & { waitEnded?: { at: number } }): boolean {
   return !!i.waitEnded && i.status !== 'done' && i.waitEnded.at > herLastWord(i);
@@ -341,11 +354,13 @@ export function waitsInLater(i: InboxItem, waitingOn: readonly string[]): boolea
 }
 
 /**
- * Later holds a put-off or waiting row only once no run is on it or queued for
- *  it. Until then it is In progress, which is "running or queued", so it is
- *  counted in one tab (tests/a-queued-thread-put-off-stays-in-progress-until-its-run-ends).
+ * Later holds a row you put off at once, and a row put off by its agent or
+ * waiting on another only once no run is on it or queued for it. Until then
+ * that one is In progress, so it is counted in one tab
+ * (tests/a-thread-you-close-or-put-in-later-leaves-in-progress-at-once).
  */
 export function putOffInLater(i: InboxItem, { hiddenUntil, now, waitingOn, runOnIt }: { hiddenUntil: number; now: number; waitingOn: readonly string[]; runOnIt: boolean }): boolean {
+  if (inLaterByThem(i, hiddenUntil, now)) return true;
   return (hiddenUntil > now || waitsInLater(i, waitingOn)) && !runOnIt;
 }
 
@@ -445,8 +460,9 @@ export function belongsInProgress(
 ): boolean {
   // A thread in Later waits for the user to say go, so no worker is coming.
   if (notStarted(i)) return false;
-  // A live session keeps the promise whatever the status says, until it exits.
-  if (live) return true;
+  // A live session keeps the promise whatever the status says, until it exits,
+  // unless a person closed it and the run is only winding down.
+  if (live) return !closedByThem(i);
   // So does the ship queue still owing this row a ship.
   if (shipping) return true;
   if (deferredUntil > now) return false;
