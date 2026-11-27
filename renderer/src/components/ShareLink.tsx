@@ -6,7 +6,7 @@ import { api, type FileLinkState, type LinkComment } from '../api';
 import { shareSignedOutWords, shareWords } from '../public-link-words';
 import { shareSignInStartsOn, signInWasSkipped } from '../sign-in-ask';
 import { NoteGlyph } from './NoteGlyphs';
-import { inviteEach } from '../team/invite-list';
+import { inviteEach, pastedInvites } from '../team/invite-list';
 import { placeWords, shownName, type NotePlace } from '../../../shared/artifact-marks.mts';
 
 /** A link comment's place, short: "at 0:24", "a pin", the quote. */
@@ -132,7 +132,15 @@ function People({ token, editable, onProblem }: { token: string; editable: boole
   return (
     <>
       <form className="av-share-add" onSubmit={(e) => { e.preventDefault(); void add(); }}>
-        <input type="text" inputMode="email" value={adding} onChange={(e) => { setAdding(e.target.value); onProblem(null); }} placeholder={shareWords.addPeople} aria-label={shareWords.addPeople} disabled={busy} autoComplete="off" spellCheck={false} />
+        <input type="text" inputMode="email" value={adding} onChange={(e) => { setAdding(e.target.value); onProblem(null); }} placeholder={shareWords.addPeople} aria-label={shareWords.addPeople} disabled={busy} autoComplete="off" spellCheck={false}
+          onPaste={(e) => {
+            const lines = pastedInvites(e.clipboardData.getData('text'));
+            if (lines == null) return;
+            e.preventDefault();
+            const box = e.currentTarget;
+            const at = box.selectionStart ?? adding.length;
+            setAdding(adding.slice(0, at) + lines + adding.slice(box.selectionEnd ?? at));
+          }} />
       </form>
       {people && people.length > 0 && (
         <ul className="av-share-people" aria-label="People added">

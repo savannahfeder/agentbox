@@ -11,12 +11,15 @@ const lowered = (list: Iterable<string | null | undefined> | undefined) => new S
 export function splitInvites(text: string, have: Have = {}): InviteList {
   const onTeam = lowered(have.onTeam);
   const invited = lowered(have.invited);
-  // `Name <address>`, the name quoted or not, becomes the address alone.
-  const bare = text.replace(/(?:"[^"]*"|[^<>,;\n"])*<([^<>]*)>/g, ' $1 ');
+  // `Name <address>` becomes the address alone. The name is the quoted parts and
+  // whole words without an @ just before it on its line, commas included for
+  // Outlook's "Last, First <address>"; an address typed before it is not a name.
+  // Each word and gap matches whole, so a long box cannot backtrack for ever.
+  const bare = !text.includes('<') ? text : text.replace(/(?<=^|[\s,;>])(?:"[^"]*"|[^<>;\n"@\s,]+(?![^<>;\n"@\s,])|[ \t,]+(?![ \t,]))*<([^<>]*)>/g, ' $1 ');
   const out: InviteList = { emails: [], onTeam: [], notEmails: [] };
   const seen = new Set<string>();
   for (const raw of bare.split(/[\s,;]+/)) {
-    const token = raw.replace(/^mailto:/i, '').replace(/^["'(<[]+|["')>\].]+$/g, '');
+    const token = raw.replace(/^mailto:([^?]*)(\?.*)?$/i, '$1').replace(/^["'(<[]+|["')>\].]+$/g, '');
     if (!token) continue;
     if (!EMAIL.test(token)) { out.notEmails.push(raw); continue; }
     const email = token.toLowerCase();
