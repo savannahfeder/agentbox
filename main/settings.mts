@@ -12,9 +12,7 @@
 // place a grant is reviewed; what changed is that she edits them as fields on
 // the project they belong to instead of in a text editor.
 
-import { isPackagedElectron } from './team/session.mts';
 import { teammatesOn } from '../shared/teammates.mts';
-import { roomsOnFor } from '../shared/rooms-on.mts';
 import { phoneChoiceOf, phoneProjectsOf, withPhoneAll, withPhoneProject, phoneEligible } from '../shared/phone-snapshot.mts';
 import fs from 'node:fs';
 import { harnessFor } from './harnesses.mts';
@@ -36,7 +34,7 @@ import { NAME, Name } from '../shared/product-name.mjs';
 import { autoSlots, memoryGateWorksOn } from './memory-gate.mts';
 import { accountIdentity, claudeLoginCommand, duplicateAccountNote, linkAccountTooling, makeClaudeHome } from './account-tooling.mts';
 import { isEngine } from '../shared/engines.mts';
-import { codexAccount, codexFreePlan, codexLoginCommand, makeCodexHome } from './codex-account.mts';
+import { codexAccount, codexFreePlan, codexLoginCommand, codexLoginMode, makeCodexHome } from './codex-account.mts';
 import { codexDefaultModel, codexModelsAcross } from './codex-models.mts';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mts';
 import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-permission.mts';
@@ -86,13 +84,10 @@ export interface SettingsConfig {
   importNew?: boolean | null;
   cornerTag?: boolean | null;
   activeAccount?: Record<string, string | null | undefined> | null;
-  alphaRooms?: boolean | null;
   diagnostics?: boolean;
   posthogKey?: unknown;
   posthogHost?: string;
   alphaTeammates?: unknown;
-  alphaMultiplayer?: boolean | null;
-  alphaGlass?: boolean | null;
   [key: string]: unknown;
 }
 
@@ -603,19 +598,16 @@ export function searchForEngineBin(config: SettingsConfig, engine: string) {
   return { ok: true, state };
 }
 
-// THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Glass is off unless someone
-// turned it on; only a real `true` counts. Multiplayer is on unless turned off:
-// the first run offers a team, so it cannot wait behind a switch. AI teammates
-// left alpha and are on unless turned off too (shared/teammates.mts). Rooms is on for someone on a team with Multiplayer on, unless they
-// turned it off, since a team without it gets no Team page
-// (shared/rooms-on.mts); a caller that does not know about the team reads it
-// as no team.
-export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPackagedElectron(), onTeam = false }: { packaged?: boolean; onTeam?: boolean } = {}) {
+// What the old Alpha features page switched. It is gone (w-11d0017da3), so a
+// saved `alphaRooms` or `alphaMultiplayer` is ignored: nobody could undo it.
+// Rooms is on for anyone on a team, since a team without it gets no Team page;
+// a caller that does not know about the team reads it as no team. AI teammates
+// keep their switch, in General (shared/teammates.mts).
+export function alphaFeatures(config?: SettingsConfig | null, { onTeam = false }: { onTeam?: boolean } = {}) {
   return {
-    rooms: roomsOnFor(config, onTeam),
+    rooms: onTeam,
     teammates: teammatesOn(config),
-    multiplayer: config?.alphaMultiplayer !== false,
-    glass: config?.alphaGlass === true,
+    multiplayer: true,
   };
 }
 
@@ -1110,6 +1102,8 @@ function codexAccountRows(supervisor: SettingsSupervisor) {
       planNamed: id?.planNamed ?? false,
       accountId: id?.accountId ?? null,
       signedIn: !!id,
+      // A key is a login Codex accepts and agents never run on (`codexKeyRefusal`).
+      apiKey: !id && codexLoginMode(home) === 'apikey',
       // WHICH ONE RUNS, and one of them always does (`chosen` above).
       chosen: chosen === profile,
     };
@@ -1440,23 +1434,14 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       if (!value) saveConfig(config, { importNew: false });
       else if (config.importNew !== true) saveConfig(config, { importNew: true, importNewSince: Date.now() });
       break;
-    // Rooms is read on every snapshot.
-    case 'alphaRooms':
-      saveConfig(config, { alphaRooms: !!value });
-      supervisor.onChange?.();
-      break;
     case 'alphaTeammates':
       saveConfig(config, { alphaTeammates: !!value });
       supervisor.onChange?.();
       supervisor.wake?.();
       break;
+    // A phone app from before the Alpha features page went still sends these.
+    case 'alphaRooms':
     case 'alphaMultiplayer':
-      saveConfig(config, { alphaMultiplayer: !!value });
-      supervisor.onChange?.();
-      break;
-    case 'alphaGlass':
-      saveConfig(config, { alphaGlass: !!value });
-      supervisor.onChange?.();
       break;
     // THE CORNER TAG (w-dafae58a23). Turning it back on also ends any hide, so
     // the switch does what it says the moment she flips it.

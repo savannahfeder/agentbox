@@ -16,6 +16,8 @@ export type HereLogin = {
   plan: string | null;
   chosen: boolean;
   signedIn: boolean;
+  /** A Codex login that holds an API key and no plan, which agents never run on. */
+  apiKey?: boolean;
   /** Why it cannot be used, in main's words, or null. */
   trouble: string | null;
   /** The trouble is only that it is at its limit, which its meters can say better. */
@@ -81,7 +83,7 @@ export function accountsOnce({ here, cloud = [], readings = [], current = null, 
     const localError = h ? readings.find((r) => r.profile === h.profile)?.error ?? null : null;
     return {
       key: h?.profile ?? `cloud:${c!.key}`,
-      name: h?.email ?? (c ? accountLabel(c, cloud) : h?.signedIn && engine === 'claude' ? accountName({ engine, index: here.indexOf(h), total: here.length }) : 'Not signed in'),
+      name: h?.email ?? (c ? accountLabel(c, cloud) : h?.signedIn && engine === 'claude' ? accountName({ engine, index: here.indexOf(h), total: here.length }) : h?.apiKey ? 'API key' : 'Not signed in'),
       plan: (h?.signedIn ? h.plan : null) ?? c?.plan ?? null,
       here: h,
       cloud: c,

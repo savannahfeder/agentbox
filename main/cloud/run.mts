@@ -62,6 +62,7 @@ import { run } from './exec.mts';
 import { readMarker, writeMarker, clearMarker, addCloudNews, commonGitDirOf } from './marker.mts';
 import { Name, nameSlug } from '../../shared/product-name.mjs';
 import { KEPT_ASIDE } from '../../shared/not-shipped.mts';
+import { ASKS_FOR_A_REPLY } from '../../shared/notes-for-the-agent.mts';
 import { codexTranscriptFile } from '../codex-session.mts';
 import { CLIENT_INFO } from '../codex-app-server.mts';
 import { appendCloudUsage } from './usage.mts';
@@ -2312,7 +2313,7 @@ export async function cloudRun({
       if (await has(ref) && (nothingNew || await gitOk(cwd, ['merge-base', '--is-ancestor', ref, branch!]))) await gitOk(cwd, ['update-ref', '-d', ref]);
     }
     if (branch) {
-      const note = `${KEPT_ASIDE}${why}. Nothing is lost. The folder is as this Mac left it, and the run's version is on the branch ${branch}. Reply to have the agent bring the two together; it will not ship until then.`;
+      const note = `${KEPT_ASIDE}${why}. Nothing is lost. The folder is as this Mac left it, and the run's version is on the branch ${branch}. ${ASKS_FOR_A_REPLY}`;
       say(note);
       addCloudNews(cwd, { runId: rec.runId, item, product, branch, note });
     }

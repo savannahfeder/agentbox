@@ -70,7 +70,7 @@ jobs:
       - run: npm run build
 
       - name: The glass was built
-        run: ls main/native/liquid-glass/build/liquid-glass.node main/native/window-glass/build/window-glass.node
+        run: ls main/native/liquid-glass/build/liquid-glass.node
 
       - name: The package carries the analytics key
         run: |

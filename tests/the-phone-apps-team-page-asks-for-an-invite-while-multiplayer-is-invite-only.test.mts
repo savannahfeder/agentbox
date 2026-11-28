@@ -55,6 +55,6 @@ describe('the page', () => {
     expect(page).toContain('Ask for an invite');
   });
   it('shows the invite field only when the team is not known to be shut out', () => {
-    expect(page).toMatch(/multiplayer === false \? [\s\S]*placeholder="Their email"/);
+    expect(page).toMatch(/multiplayer === false \? [\s\S]*placeholder="Their emails"/);
   });
 });

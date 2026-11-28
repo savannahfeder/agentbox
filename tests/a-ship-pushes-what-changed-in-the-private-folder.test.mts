@@ -60,7 +60,27 @@ describe('a ship and the private folder', () => {
     put(path.join(w.at, 'handoff/SKILL.md'), 'new\n');
     git(w.at, 'add', '-A');
     git(w.at, 'commit', '-q', '-m', 'A new skill');
-    expect(pushPrivateFolder(w.folder, { message: 'unused', env })).toMatchObject({ pushed: true, commits: 1 });
+    const r = pushPrivateFolder(w.folder, { message: 'unused', env });
+    expect(r.why).toBeUndefined();
+    expect(r).toMatchObject({ pushed: true, commits: 1 });
+    expect(remoteLog(w.remote).split('\n')[0]).toBe('A new skill');
+  });
+
+  // main went red once on a Mac with { pushed: false, why } on the test above.
+  // A warning git writes is not a change in the folder or a count of commits.
+  it('pushes when git warns about something else while it reads the folder', () => {
+    const w = world();
+    const unreadable = path.join(path.dirname(w.folder), 'config-home', 'git', 'ignore');
+    put(unreadable, '');
+    fs.chmodSync(unreadable, 0o000);
+    const warned = { ...env, XDG_CONFIG_HOME: path.dirname(path.dirname(unreadable)) };
+    expect(execFileSync('git', ['status', '--porcelain'], { cwd: w.at, env: warned, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })).toBe('');
+    put(path.join(w.at, 'handoff/SKILL.md'), 'new\n');
+    git(w.at, 'add', '-A');
+    git(w.at, 'commit', '-q', '-m', 'A new skill');
+    const r = pushPrivateFolder(w.folder, { message: 'unused', env: warned });
+    expect(r.why).toBeUndefined();
+    expect(r).toMatchObject({ pushed: true, commits: 1 });
     expect(remoteLog(w.remote).split('\n')[0]).toBe('A new skill');
   });
 

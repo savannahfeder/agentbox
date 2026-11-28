@@ -357,7 +357,7 @@ export interface TeamServiceOptions {
   /** Where a file's link opens; the phone site when undefined, no links when null. */
   shareSite?: string | null;
   rooms?: TeamRoomsSetup | null;
-  /** Settings › Alpha features › Multiplayer. Off, no thread of this person's is shared. */
+  /** Off, no thread of this person's is shared. The app always passes on (main/settings.mts alphaFeatures). */
   sharing?: () => boolean;
   /** Words from someone you asked for help, to your thread's agent, through your own supervisor. */
   tellThread?: TellThread | null;
@@ -396,8 +396,8 @@ const LINK_EDITS_EVERY_MS = 60_000;
 // page can offer that link again rather than a button that does nothing.
 const EMPTY: TeamState = { configured: false, canSignIn: false, started: false, settling: false, signedIn: false, signingIn: null, me: null, team: null, invites: [], sent: [], people: [], cards: [], lastSyncAt: null, error: null };
 
-// With Alpha features › Multiplayer off the window gets the sign-in the phone
-// needs and no team, so it draws the single-person app.
+// With multiplayer off the window gets the sign-in the phone needs and no
+// team, so it draws the single-person app.
 export function teamForWindow(state: TeamState | null | undefined, multiplayer: boolean) {
   if (multiplayer || !state) return state;
   const { rooms, ...rest } = state;

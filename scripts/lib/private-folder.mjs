@@ -88,11 +88,12 @@ function pushFrom(copy, { at, rel, gate, env, message, signIn }) {
     const opts = { cwd: at, encoding: 'utf8', env: quiet, timeout, killSignal: 'SIGKILL' };
     const line = ['-c', `core.hooksPath=${gate}`, `--git-dir=${copy}`, `--work-tree=${at}`, ...args];
     const r = signIn && (args[0] === 'fetch' || args[0] === 'push') ? signIn(line, { ...opts, pushing: args[0] === 'push' }) : spawnSync('git', line, opts);
-    return { ok: r.status === 0, out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() };
+    // A warning on stderr is not an answer: `answer` is what decides, `out` is what a refusal quotes.
+    return { ok: r.status === 0, answer: `${r.stdout ?? ''}`.trim(), out: `${r.stdout ?? ''}${r.stderr ?? ''}`.trim() };
   };
   const status = git(['status', '--porcelain']);
   if (!status.ok) return { pushed: false, why: `git could not read ${rel}: ${status.out}` };
-  if (status.out) {
+  if (status.answer) {
     git(['add', '-A']);
     const committed = git(['commit', '--quiet', '-m', message]);
     if (!committed.ok) return { pushed: false, why: `could not commit what changed in ${rel}: ${committed.out}` };
@@ -100,7 +101,7 @@ function pushFrom(copy, { at, rel, gate, env, message, signIn }) {
   const fetched = git(['fetch', '--quiet'], PUSH_MS);
   if (!fetched.ok) return { pushed: false, why: `could not reach ${rel}'s repository: ${fetched.out}` };
   const ahead = git(['rev-list', '--count', '@{u}..HEAD']);
-  const commits = Number(ahead.out) || 0;
+  const commits = Number(ahead.answer) || 0;
   if (!ahead.ok || !commits) return { pushed: false };
   const rebased = git(['rebase', '--quiet', '@{u}']);
   if (!rebased.ok) {

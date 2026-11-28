@@ -35,10 +35,32 @@ export function isCause(item: unknown): boolean {
     && (row.wrote as { kind?: { source?: string } } | undefined)?.kind?.source !== 'agent';
 }
 
+/** An open cause about main being red, which the app clears itself once main's tests pass (main/main-went-red.mts). */
+export function aboutRedMain(row: CauseRow | null | undefined): boolean {
+  if (!isCause(row) || row!.status === 'done') return false;
+  const title = String(row!.title ?? '');
+  return /^main('s)?\b/i.test(title.trim()) && /\b(red|broken|failing)\b/i.test(title);
+}
+
 /** The threads still waiting on this cause, from every project. */
 export function waitingOn<T extends CauseRow>(cause: CauseRow, items: readonly T[] | null | undefined): T[] {
   return (items ?? []).filter((i) => i.id !== cause.id && i.status === 'blocked'
     && Array.isArray(i.blockedBy) && i.blockedBy.includes(cause.id));
+}
+
+/** Long enough for the thread that opened a cause to write its own wait. */
+export const CAUSE_SETTLES_MS = 10 * 60_000;
+export const NOTHING_WAITS_NOTE = 'Closed, since nothing waits on it any more.';
+
+/**
+ * A cause still waiting on the person that no thread waits on any more, as
+ * when its one thread was answered by itself. Only `blocked`: one the person
+ * answered has a lead starting or working, and the lead decides.
+ */
+export function nothingWaitsOn(cause: CauseRow, items: readonly CauseRow[] | null | undefined, now: number): boolean {
+  return isCause(cause) && cause.status === 'blocked'
+    && now - (cause.createdAt ?? now) >= CAUSE_SETTLES_MS
+    && waitingOn(cause, items).length === 0;
 }
 
 /** The open cause a thread waits behind, or null. */

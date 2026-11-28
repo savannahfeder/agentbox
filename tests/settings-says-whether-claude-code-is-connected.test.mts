@@ -204,7 +204,7 @@ describe('where it lives', () => {
     expect(read('renderer/src/settings-search.ts')).toContain("{ id: 'claude', label: 'Claude Code', group: 'Agents' }");
     const page = settings.slice(settings.indexOf('const enginePage = (engine'), settings.indexOf('<div className="set-nav">'));
     expect(page).toContain('(!agent.found || (agent.trouble && !limitIsHereOnly) || agent.chosen)\n          && (engine === \'codex\' ? <CodexCli {...status} /> : <ClaudeCode {...status} />)');
-    expect(page.indexOf('<ClaudeCode')).toBeLessThan(page.indexOf('name="Signed in"'));
+    expect(page.indexOf('<ClaudeCode')).toBeLessThan(page.indexOf('name={accountsHeading(accounts)}'));
     // And the card still reads main's answer rather than deriving a second one.
     expect(settings).toContain('found: !!w.claudeFound');
     expect(settings).toContain('certain: w.claudeCertain !== false');

@@ -6,7 +6,7 @@
 
 import { DONE } from '../../../renderer/src/done-word';
 import { closesTheTask, type ParsedOption } from '../../../renderer/src/format';
-import { clipToSentence, statusForReply, withdrawReply } from '../../../renderer/src/list-rules';
+import { clipToSentence, rowTitle, statusForReply, withdrawReply } from '../../../renderer/src/list-rules';
 import { threadMessage } from '../../../renderer/src/threads/composer-rules';
 import { sentLine } from '../../../renderer/src/compose-says';
 import { attachmentLinks } from '../../../renderer/src/attachments';
@@ -68,7 +68,7 @@ export interface Plan {
   /** The thread a tap on the toast opens, when it is not the one pressed; null for none. */
   goes?: { product: string; id: string } | null;
 }
-export interface PressedItem { product: string; id: string; status: string; title?: string; productName?: string; runAt?: number | null; snoozedUntil?: number | null; waitsForMac?: boolean; body?: string; priority?: number; start?: string; engine?: string; model?: string; effort?: string }
+export interface PressedItem { product: string; id: string; status: string; title?: string; label?: string; labels?: string[]; result?: string; wrote?: Parameters<typeof rowTitle>[0]['wrote']; productName?: string; runAt?: number | null; snoozedUntil?: number | null; waitsForMac?: boolean; body?: string; priority?: number; start?: string; engine?: string; model?: string; effort?: string }
 /** Where the computer is: away, and whether Agentbox Cloud starts what is sent meanwhile; `inCloud` is the pressed thread running there now. */
 export interface Reach { away?: boolean; cloud?: boolean; inCloud?: boolean }
 
@@ -113,6 +113,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
   if (!item) return null;
   const on = { product: item.product, id: item.id };
   const to = item.productName ?? '';
+  const named = clipToSentence(rowTitle(item), TOAST_TITLE);
 
   const reply = (answer: string, choices: Choices, toast: string, undone: string): Plan => {
     const status = statusForReply(item.status);
@@ -143,15 +144,15 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
   }).filter(([, v]) => v !== undefined)) }];
   const close = (): Plan => (item.waitsForMac ? {
     steps: [{ door: 'answer', payload: { ...on, status: 'done' } }],
-    toast: `Withdrawn: ${clipToSentence(item.title ?? '', TOAST_TITLE)}. It never reached your computer.${UNDO}`,
+    toast: `Withdrawn: ${named}. It never reached your computer.${UNDO}`,
     goes: null,
     undo: again,
-    undone: () => `Sent again: ${clipToSentence(item.title ?? '', TOAST_TITLE)}`,
+    undone: () => `Sent again: ${named}`,
   } : {
     steps: [{ door: 'answer', payload: { ...on, status: 'done' } }],
-    toast: `${DONE.verb}: ${clipToSentence(item.title ?? '', TOAST_TITLE)}${UNDO}`,
+    toast: `${DONE.verb}: ${named}${UNDO}`,
     undo: () => [{ door: 'answer', payload: { ...on, status: 'open' } }],
-    undone: () => `Reopened: ${clipToSentence(item.title ?? '', TOAST_TITLE)}`,
+    undone: () => `Reopened: ${named}`,
   });
 
   switch (press.kind) {
@@ -218,7 +219,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
       // App.tsx `retag`'s toast.
       return { steps: [{ door: 'threadEdit', payload: { ...on, patch: { priority: press.value } } }], toast: `Priority: ${priorityLabelOf(priorityIdOf(press.value)).toLowerCase()}` };
     case 'reopen':
-      return { steps: [{ door: 'reopen', payload: on }], toast: `${waits ? 'Reopens when your computer is back' : 'Reopened'}: ${clipToSentence(item.title ?? '', TOAST_TITLE)}` };
+      return { steps: [{ door: 'reopen', payload: { ...on, done: true } }], toast: `${waits ? 'Reopens when your computer is back' : 'Reopened'}: ${named}` };
     case 'try-again':
       return { steps: [{ door: 'resumeItems', payload: { ids: [item.id] } }], toast: waits ? 'Up next once your computer is back.' : tryAgainWords({ resumed: 1 }) };
     case 'resume':
@@ -240,7 +241,7 @@ export function planFor(press: Press, item: PressedItem | null, now = Date.now()
     case 'do-here': {
       const writes = doItHereWrites(press.child, press.parent);
       if (!writes) return null;
-      const title = clipToSentence(press.child.title, TOAST_TITLE);
+      const title = clipToSentence(rowTitle(press.child), TOAST_TITLE);
       return {
         steps: writes.map((w) => ({ door: 'answer' as const, payload: w })),
         toast: `Doing it in this thread: ${title}${UNDO}`,

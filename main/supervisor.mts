@@ -10,7 +10,7 @@ export { streamingText, countHelpers, saidNothingSheCanUse } from './harnesses/c
 import { taskRemoteControl } from './task-remote-control.mts';
 import type { BridgeStateEvent } from './task-remote-control.mts';
 import { taskFolderPath, real, restoreTaskFolder, spareFolderPath } from './task-folders.mts';
-import { SHIP_LABEL, ShipQueue, readShipSettings, shipScriptFor, shipSlot, stopShips } from './ship-queue.mts';
+import { SHIP_LABEL, ShipQueue, failureReply, readShipSettings, shipScriptFor, shipSlot, stopShips } from './ship-queue.mts';
 import { MainTests } from './main-went-red.mts';
 import { SecurityScan } from './the-security-scan-went-red.mts';
 import { CloudServerWatch, serverError } from './cloud-server-down.mts';
@@ -61,7 +61,7 @@ import { REPLY_MARK, replyFrame, serverJoinedKey } from '../shared/cloud-kit.mts
 import { NEW_THREAD, NEW_THREAD_CODEX, NEW_ITEM_MARK, NEW_TITLE_MARK, NEW_BODY_MARK, fillNewThreadKit } from '../shared/cloud-kit.mts';
 import { macAsleep, carryCommand, CARRY_AHEAD_MS, handOverSpent, notBeforeOf } from '../shared/cloud-carry.mts';
 import { execFile as execFileCb } from 'node:child_process';
-import { CLOSED_UNSHIPPED, closedBeforeItShipped, shippedAs } from '../shared/not-shipped.mts';
+import { CLOSED_UNSHIPPED, SHIP_FAILED, closedBeforeItShipped, shippedAs, notShipped } from '../shared/not-shipped.mts';
 import { asksForCloud, handBackWhat, handsBack, SEND_TO_CLOUD } from '../shared/cloud-hand-back.mts';
 import { CLOUD_SENT, readSent } from '../shared/cloud-start.mts';
 import { readCloudConfig, cloudAccountConfig, OLD_TOKEN_SERVICE, imageCapsToTry } from './cloud/config.mts';
@@ -129,7 +129,7 @@ import { saveConfig } from './config.mts';
 import { accountIdentity, nameForOrganization, profileForCloudLogin, isCloudLoginOf, toolingLine } from './account-tooling.mts';
 import type { AccountIdentity } from './account-tooling.mts';
 import { effectiveProfiles } from './account-discovery.mts';
-import { isCause } from '../shared/causes.mts';
+import { isCause, nothingWaitsOn, NOTHING_WAITS_NOTE } from '../shared/causes.mts';
 import { referencedFiles, isImagePath } from '../shared/referenced-files.mts';
 import { namedThreadsBlock } from '../shared/named-threads.mts';
 import { changePath } from './code-change.mts';
@@ -227,7 +227,7 @@ import type { ShipItem, ShipProduct } from './ship-queue.mts';
 import type { GitHubPushSignIn } from './github-push-sign-in.mts';
 import { SignInReturns } from './sign-in-returns.mts';
 import { openSignIn } from '../shared/sign-in-ask.mts';
-import { causeCleared, waitingForMemory } from '../shared/notes-for-the-agent.mts';
+import { causeCleared, waitingForMemory, bringingItTogether, bringItTogether } from '../shared/notes-for-the-agent.mts';
 import type { CloudKit } from './cloud/kit.mts';
 import type { CatchUpCard } from './catch-up.mts';
 import type { QueuedLine, ReplyItem, ReplyPayload } from './live-replies.mts';
@@ -598,6 +598,25 @@ export interface HeldStart {
   account?: string | null;
 }
 
+// A ship that bounced in the last week and nobody has written on since: a
+// record of it from before owed failures were kept, or a quit between the note
+// and the hand-back.
+function bouncedWithNoWordSince(item: WorkItem, now: number): boolean {
+  const note = item.wrote?.note;
+  if (!note || note.source !== 'system' || now - note.ts > 7 * 24 * 3_600_000) return false;
+  if (typeof item.note !== 'string' || !item.note.startsWith(SHIP_FAILED)) return false;
+  if (item.status === 'done' || (item.labels ?? []).includes(SHIP_LABEL)) return false;
+  return (item.wrote?.result?.ts ?? 0) < note.ts && (item.wrote?.answer?.ts ?? 0) < note.ts;
+}
+
+/** A bounced ship's words for its agent, kept until the agent writes back after `at`. */
+export interface OwedShipFailure {
+  reply: string;
+  at: number;
+  /** Runs started carrying it. */
+  handed?: number;
+}
+
 export interface CompactionRecord {
   state: string;
   at?: number;
@@ -730,6 +749,7 @@ export interface SavedState {
   deliveryAttempts?: Record<string, number>;
   fruitless?: Record<string, FruitlessRecord>;
   heldStarts?: Record<string, HeldStart>;
+  owedShipFailures?: Record<string, OwedShipFailure>;
   filesForCloud?: Record<string, { paths: string[]; at: number }>;
   deadStarts?: Record<string, number[]>;
   carried?: Record<string, CarriedMark>;
@@ -799,7 +819,7 @@ export interface SupervisorStore {
   fileItem(slug: string, fields: Record<string, unknown>): { id: string };
   noteItem(slug: string, id: string, note: string): unknown;
   fileMark(slug: string, id: string, mark: unknown): unknown;
-  cloudWorkKeptAside(slug: string, id: string, note: string): unknown;
+  cloudWorkKeptAside(slug: string, id: string, note: string, opts?: { waits?: boolean }): unknown;
   closedBeforeItShipped(slug: string, id: string, note: string): unknown;
   shipped(slug: string, id: string, result: { sha: string | null; labels: string[] }): unknown;
   shipFailed(slug: string, id: string, result: { note: string; labels: string[] }): unknown;
@@ -1409,6 +1429,7 @@ export class Supervisor {
   declare _deliveryAttempts: Record<string, number>;
   declare _fruitless: Record<string, FruitlessRecord>;
   declare _heldStarts: Record<string, HeldStart>;
+  declare _owedShipFailures: Record<string, OwedShipFailure>;
   declare _deadStarts: Record<string, number[]>;
   // The login that last refused each thread's run, and when.
   declare _refusedOn: Record<string, { account: string; at: number }> | undefined;
@@ -1433,6 +1454,7 @@ export class Supervisor {
   declare _reaching: Promise<unknown> | null | undefined;
   declare connections: SupervisorConnections | null | undefined;
   declare _resumeQueue: Set<string>;
+  declare _afterSessionEnds?: Map<string, () => void>;
   declare _recoverPending: boolean;
   declare _recovering: Set<string> | undefined;
   declare _lastRecovery: (RecoveryNews & { at: number }) | undefined;
@@ -1589,10 +1611,7 @@ export class Supervisor {
       // Not a second import while the thread's own relay is live: two racing
       // to lay in one run set its work aside as "changed on this Mac".
       liveSince: (item: ShipItem) => (this._cloudWorkOutstanding(item, { bring: !this.sessions.has(item.id) }) ? null : this.sessions.get(item.id)?.startedAt ?? null),
-      handBack: (item: ShipItem, reply: string) => {
-        const fresh = this.store.readItem?.(item.product, item.id) ?? item as WorkItem;
-        this.spawnWorker(fresh, { continuation: true, shipFailure: reply });
-      },
+      handBack: (item: ShipItem, reply: string) => this._handBackShipFailure(item, reply),
       afterShip: (shipped) => { this.onShipped(); this.watchMainsTests(shipped); this.reclaimShippedFolder(shipped); },
       memoryGate: () => this._memoryGate?.gate ?? null,
       shipScore: (item) => this.memoryGateScore(item.product, item.id) ?? 0,
@@ -1701,6 +1720,7 @@ export class Supervisor {
         if (held && held.tries == null) Object.assign(held, { tries: 0, next: (held.since ?? 0) + HELD_RETRY_MS[0] });
       }
       this._deadStarts = state.deadStarts ?? {};
+      this._owedShipFailures = state.owedShipFailures ?? {};
       // Rows handed to the cloud while asleep (`handedOver`), kept so a
       // restart cannot start one here that the cloud may be running.
       this._carried = state.carried && typeof state.carried === 'object' ? state.carried : {};
@@ -1757,6 +1777,7 @@ export class Supervisor {
       this.lastDigestTry = {};
       this._deliveryAttempts = {};
       this._fruitless = {};
+      this._owedShipFailures = {};
       this._profileTrouble = {};
       this._profileCooldown = {};
       this.productOrder = [];
@@ -2570,6 +2591,17 @@ export class Supervisor {
     }
     if (resumed.length) this._saveState();
     return resumed;
+  }
+
+  /** Closes, as the app, each cause row still waiting on the person that no thread waits on any more. */
+  closeCausesNothingWaitsOn(items: WorkItem[], now = Date.now()): string[] {
+    const closed: string[] = [];
+    for (const c of items) {
+      if (this.sessions.has(c.id) || !nothingWaitsOn(c, items, now)) continue;
+      this.store.modules.workItemsDisk.updateWorkItem(this.store.productDir(c.product), c.id, { status: 'done', note: NOTHING_WAITS_NOTE }, { source: 'system' });
+      closed.push(c.id);
+    }
+    return closed;
   }
 
   // The rows resumed by name that had no slot, taken IN HER RUNNING ORDER as
@@ -3771,6 +3803,8 @@ export class Supervisor {
       return Promise.resolve(null);
     }
     this.sessions.delete(item.id);
+    const next = this._afterSessionEnds?.get(item.id);
+    if (next) { this._afterSessionEnds!.delete(item.id); setTimeout(next, 0); }
     // Moved to this Mac: it carries on here now, not at the next tick, and
     // reads as starting in between rather than as answered. Not one that had
     // answered and only kept its machine for a reply: nothing is left to do.
@@ -7859,6 +7893,51 @@ export class Supervisor {
     if (tried) this._saveState();
   }
 
+  // A BOUNCED SHIP'S FAILURE IS OWED TO ITS AGENT UNTIL THE AGENT WRITES BACK.
+  // The start made at the bounce can be turned away like any other, and a
+  // turned-away reply goes back in the queue, but these words are not a reply,
+  // so nothing else would ever carry them.
+  _handBackShipFailure(item: ShipItem, reply: string) {
+    const fresh = this.store.readItem?.(item.product, item.id) ?? item as WorkItem;
+    const owed = { reply, at: Date.now() };
+    (this._owedShipFailures ??= {})[`${fresh.product}:${fresh.id}`] = owed;
+    this._handOver(fresh, owed);
+  }
+
+  _handOver(item: WorkItem, owed: OwedShipFailure) {
+    this.spawnWorker(item, { continuation: true, shipFailure: owed.reply });
+    if (this.sessions.has(item.id) || this._preparing?.has(item.id)) owed.handed = (owed.handed ?? 0) + 1;
+    this._saveState();
+  }
+
+  handOverOwedShipFailures(items: WorkItem[], now = Date.now()) {
+    const owed = (this._owedShipFailures ??= {});
+    for (const item of items) {
+      const key = `${item.product}:${item.id}`;
+      if (!owed[key] && bouncedWithNoWordSince(item, now)) owed[key] = { reply: failureReply(item.note!.slice(SHIP_FAILED.length)), at: item.wrote!.note!.ts };
+    }
+    if (!Object.keys(owed).length) return;
+    const byKey = new Map(items.map((i) => [`${i.product}:${i.id}`, i]));
+    const productBySlug = new Map((this.store.listProducts?.() ?? []).map((p) => [p.slug, p]));
+    const me = process.env.AGENTBOX_PERSON_ID || null;
+    let settled = false;
+    for (const [key, one] of Object.entries(owed)) {
+      const item = byKey.get(key);
+      if (!item || item.status === 'done' || (item.labels ?? []).includes(SHIP_LABEL) || (item.wrote?.result?.ts ?? 0) > one.at) {
+        delete owed[key];
+        settled = true;
+        continue;
+      }
+      // Three runs that ended without a word from the agent: left for the person.
+      if ((one.handed ?? 0) >= 3) continue;
+      if (this.sessions.has(item.id) || this._preparing?.has(item.id) || stoppedByHer(item) || this.claimHeldElsewhere(item)) continue;
+      if (!this.store.isDue(item, now) || !mayRunHere(item, productBySlug.get(item.product), me)) continue;
+      if (!this._roomFor(this._engineFor(item), item)) continue;
+      this._handOver(item, one);
+    }
+    if (settled) this._saveState();
+  }
+
   // Resume, Restart, Send Back and Run now are a person's word on the row, as
   // a reply is. `_heldFromStarting` cannot see them: none writes a field
   // `lastFounderWrite` counts, because a reopen is filed as the app's
@@ -8446,8 +8525,9 @@ export class Supervisor {
   }
 
   // A CLOUD RUN'S WORK KEPT ON A BRANCH OF ITS OWN (main/cloud/run.mts
-  // `park`): said on its row, which then waits for her and does not ship
-  // without that work.
+  // `park`) goes straight back to its agent to bring in, as a failed ship
+  // does. Set aside again before the agent has answered, or on a thread she
+  // stopped, the row waits for her and does not ship without that work.
   _sayCloudNews(folder: string, item: WorkItem | null = null) {
     let news: ReturnType<typeof takeCloudNews> = [];
     try { news = takeCloudNews(folder); } catch { return; }
@@ -8459,11 +8539,28 @@ export class Supervisor {
         // A run the app will ask again (a dead machine, the time limit): the
         // row is told why and runs on, rather than waiting for them.
         if (n.lost) this.store.noteItem?.(product, id, n.note);
-        else if (this.store.cloudWorkKeptAside) this.store.cloudWorkKeptAside(product, id, n.note);
-        else this.store.noteItem?.(product, id, n.note);
+        else if (this.store.cloudWorkKeptAside) {
+          const row = this.store.readItem?.(product, id) ?? null;
+          const handBack = !!n.branch && !!row && !notShipped(row)?.branch && !stoppedByHer(row);
+          this.store.cloudWorkKeptAside(product, id, handBack ? bringingItTogether(n.note) : n.note, { waits: !handBack });
+          if (handBack) {
+            const branch = n.branch!;
+            this._onceSessionEnds(id, () => {
+              const fresh = this.store.readItem?.(product, id) ?? row;
+              if (fresh.status !== 'done' && !stoppedByHer(fresh)) this._handBackShipFailure(fresh, bringItTogether(branch));
+            });
+          }
+        } else this.store.noteItem?.(product, id, n.note);
       } catch (e) { console.warn('zero: could not say a cloud run was kept aside:', (e as Error).message); }
     }
     if (news.length) this.onChange?.();
+  }
+
+  // The run that brought the news home may still be being put away (it is what
+  // calls `_sayCloudNews` as it exits), and a start in between would be dropped.
+  _onceSessionEnds(id: string, then: () => void) {
+    if (!this.sessions.has(id)) { setTimeout(then, 0); return; }
+    (this._afterSessionEnds ??= new Map()).set(id, then);
   }
 
   /**
@@ -9030,6 +9127,7 @@ export class Supervisor {
         deliveryAttempts: this._deliveryAttempts,
         fruitless: this._fruitless,
         heldStarts: this._heldStarts,
+        owedShipFailures: Object.fromEntries(Object.entries(this._owedShipFailures ?? {}).slice(-50)),
         filesForCloud: this._filesForCloudSaved(),
         // The starts a hold is counted from, pruned to the window they are
         // counted in. A restart in the middle of a storm used to reset the
@@ -9127,7 +9225,9 @@ export class Supervisor {
     const runId = s.cloud && s.cwd ? readMarker(this._cloudPlace(s.cwd, product, itemId))?.runId : null;
     let movable = false;
     try { movable = !s.cloud && this._movableNow().has(itemId); } catch { /* said as not movable */ }
-    return { since: s.turnStartedAt ?? s.startedAt, where: s.cloud ? 'cloud' : 'mac', ...(runId ? { runId } : {}), ...(movable ? { movable } : {}), doing: currentActivity(s).map((a) => ({ label: a.label, startedAt: a.startedAt })) };
+    let memoryHeld = false;
+    try { memoryHeld = (this._memoryGate?.gate?.snapshot?.().waiting ?? []).some((w) => w.item === itemId); } catch { /* said as not held */ }
+    return { since: s.turnStartedAt ?? s.startedAt, where: s.cloud ? 'cloud' : 'mac', ...(runId ? { runId } : {}), ...(movable ? { movable } : {}), ...(memoryHeld ? { memoryHeld } : {}), doing: currentActivity(s).map((a) => ({ label: a.label, startedAt: a.startedAt })) };
   }
 
   // The phone asks for each running thread on every pass, so one read serves a few seconds.
@@ -9931,7 +10031,9 @@ export class Supervisor {
 
     // Threads whose wait has just cleared go into the same queue (w-5244c90c33).
     try { this.resumeFinishedWaits(items); } catch (e) { console.warn('zero: could not resume a finished wait:', (e as Error).message); }
+    try { this.closeCausesNothingWaitsOn(items, now); } catch (e) { console.warn('zero: could not close a cause nothing waits on:', (e as Error).message); }
     try { this.retryHeldThreads(items, now); } catch (e) { console.warn('zero: could not try a held thread again:', (e as Error).message); }
+    try { this.handOverOwedShipFailures(items, now); } catch (e) { console.warn('zero: could not hand a ship failure to its agent:', (e as Error).message); }
 
     // Rows she resumed by name that had no slot at the time. First call on the
     // next free slot, ahead of everything: she asked for these out loud, and a
@@ -10034,7 +10136,7 @@ export class Supervisor {
         continuation,
         // A teammate's words are never one of your commands.
         command: continuation && !toldBy(item)
-          && !!commandPrompt(item.answer, this._nativeCommands?.[item.id])
+          && !!commandPrompt(item.answer, this.nativeNamesFor(item.product, item.id) ?? [])
           && this._engineFor(item) === DEFAULT_ENGINE,
       });
     }
@@ -10768,7 +10870,7 @@ export class Supervisor {
      * trace this app already
      * keeps puts it in the thread with nothing new written to show it. */
     const review = continuation && harnessFor(engine).capabilities.nativeReview && providerCommand(item.answer, engine)?.name === 'review' ? providerCommand(item.answer, engine) : null;
-    const command = continuation && harnessFor(engine).capabilities.nativeCommands ? commandPrompt(item.answer, this._nativeCommands?.[item.id]) : review ? item.answer!.trim() : null;
+    const command = continuation && harnessFor(engine).capabilities.nativeCommands ? commandPrompt(item.answer, this.nativeNamesFor(item.product, item.id) ?? []) : review ? item.answer!.trim() : null;
     if (command) prompt = command;
     else prompt = withWorkerGitBrief(prompt, product.repoPath, engine);
     if (!command && resumeId) {
@@ -10933,9 +11035,20 @@ export class Supervisor {
     return { args, command: !!command, ...(review ? { reviewTarget: reviewTarget(review.args) } : {}), resumeProfile, prompt, system, resumeId, model, effort, product: product?.slug ?? null, answerMode: item?.answerMode ?? null, ...(pictures.length ? { pictures } : {}) };
   }
 
+  // A terminal session's row has no item, and is Claude Code's.
   commandCatalog(product: string, id: string) {
     const item = this.store.readItem(product, id);
-    return item && harnessFor(this._engineFor(item)).capabilities.nativeCommands ? this._nativeCommands?.[id] ?? [] : [];
+    if (item && !harnessFor(this._engineFor(item)).capabilities.nativeCommands) return [];
+    return this.nativeNamesFor(product, id) ?? [];
+  }
+
+  /**
+   * What Claude Code offers on this row: its own list once it has run, else
+   * the list a run in the same project last reported (same folder, same
+   * skills). Null when neither has been reported, which is unknown, not none.
+   */
+  nativeNamesFor(product: string, id: string): string[] | null {
+    return this._nativeCommands?.[id] ?? this._nativeCommands?.[`project:${product}`] ?? null;
   }
 
   remoteControl(product: string, id: string, action: Parameters<typeof taskRemoteControl>[3]) { return taskRemoteControl(this, product, id, action); }
@@ -13088,7 +13201,7 @@ export class Supervisor {
       if (harness.capabilities.nativeCommands) {
         try {
           const names = nativeCommandNames(JSON.parse(frame[0] as string) as unknown);
-          if (names) { this._nativeCommands ??= {}; this._nativeCommands[item.id] = names; this._saveState(); }
+          if (names) { this._nativeCommands ??= {}; this._nativeCommands[item.id] = names; this._nativeCommands[`project:${item.product}`] = names; this._saveState(); }
         } catch { /* Non-JSON output is handled by the existing readers. */ }
       }
       // THE MOMENT THE ID ARRIVES, AND NOT ON EXIT. Writing it on exit is

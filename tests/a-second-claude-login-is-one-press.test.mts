@@ -147,7 +147,8 @@ describe('the door on the screen', () => {
   it('is one Add account row drawn for whichever agent the card is', () => {
     expect(settings).not.toContain("{agent.engine === 'codex' && (");
     // The Add account tile of the Signed in card, on either agent's page.
-    expect(settings).toContain('onAdd={() => void addAccount(agent)}');
+    // Offered once a login is signed in; before that the tile's Sign in is the way in.
+    expect(settings).toContain("onAdd={accountsHeading(accounts) === 'Signed in' ? () => void addAccount(agent) : undefined}");
   });
 
   it('asks main for the right kind of account', () => {

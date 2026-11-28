@@ -1,9 +1,7 @@
-// Builds main/native/liquid-glass into a .node the tray loads (main/liquid-glass.mts),
-// and main/native/window-glass into one the main window loads (main/window-glass.mts).
+// Builds main/native/liquid-glass into a .node the tray loads (main/liquid-glass.mts).
 //
 // It runs on every `npm run build`, on a Mac only, and never fails the build:
-// without them the tray draws its own glass, as it always has, and the main
-// window's Glass switch uses the older blur. The binary is
+// without it the tray draws its own glass, as it always has. The binary is
 // gitignored, because a checked-in binary is a thing nobody can review.
 // It is built for both Mac chips, since the release is one universal app.
 import { execFileSync } from 'node:child_process';
@@ -42,4 +40,3 @@ function build(name, without) {
 }
 
 build('liquid-glass', 'the tray draws its own glass');
-build('window-glass', 'the Glass switch uses the older blur');

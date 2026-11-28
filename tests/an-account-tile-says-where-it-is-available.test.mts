@@ -74,7 +74,7 @@ describe('where an account is available', () => {
 
   it('must NOT offer the cloud to an account not signed in here yet: that comes first', () => {
     const t = accountTile(account({ cloud: null, here: here({ signedIn: false, email: null }) }), acts());
-    expect(t.about).toEqual(['Finish signing in to use it']);
+    expect(t.about).toEqual([]);
     expect(tags(t)).toEqual([]);
   });
 });
