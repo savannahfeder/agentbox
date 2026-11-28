@@ -1,4 +1,5 @@
 import { harnessFor } from './harnesses.mts';
+import { harnessDefinition } from '../shared/harness-definitions.mts';
 // SETTING UP SOMEBODY'S PLAN FOR THEM (w-9f6975906c, picked 2026-10-05).
 //
 // A person with a Claude or ChatGPT plan and no Claude Code or Codex used to
@@ -87,7 +88,14 @@ export interface EngineSetupStatus {
   already: boolean;
 }
 
-export interface EngineReadiness { engine: string; found: boolean; signedIn: boolean; certain: boolean; error?: string }
+export interface EngineReadiness { engine: string; found: boolean; signedIn: boolean; certain: boolean; error?: string; tooOld?: boolean; version?: string }
+
+/** Whether `a` is an older x.y.z than `b`. */
+export function olderThan(a: string, b: string): boolean {
+  const x = a.split('.').map(Number), y = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) < (y[i] ?? 0);
+  return false;
+}
 
 export function installCommand(engine: string, platform: NodeJS.Platform = process.platform, env: NodeJS.ProcessEnv = process.env) {
   return harnessFor(engine).install(platform, env);
@@ -167,6 +175,14 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
     throw new Error(code === TIMED_OUT
       ? `${name} did not answer the sign-in check. Try again.`
       : `${name} could not check sign-in: ${lastLine(output) || `exit ${code}`}`);
+  }
+
+  async function versionOf(engine: string, bin: string | null | undefined): Promise<string | null> {
+    if (!bin) return null;
+    let output = '';
+    const p = spawn(bin, ['--version'], { env: { ...toolEnv(engine, bin), DISABLE_AUTOUPDATER: '1' }, onData: (d) => { output += String(d); } });
+    const code = await Promise.race([p.exit, wait(STATUS_TIMEOUT).then(() => { p.kill(); return null; })]);
+    return code === 0 ? /\b\d+\.\d+\.\d+\b/.exec(output)?.[0] ?? null : null;
   }
 
   function startLogin(j: SetupJob, bin: string | null | undefined) {
@@ -279,7 +295,14 @@ export function createEngineSetup({ find, spawn = realSpawn, wait = sleep, env =
     async readiness(engine: string): Promise<EngineReadiness> {
       const hit = await find(engine);
       if (!hit?.found) return { engine, found: false, signedIn: false, certain: hit?.certain !== false };
-      try { return { engine, found: true, signedIn: await signedIn({ engine, log: '' }, hit.path), certain: true }; }
+      // One older than runs need cannot run a thread, and before 2.1.40 its sign-in check
+      // fails as "unknown option", which reads as signed out. So it is asked its version first,
+      // where it has been set up: elsewhere nothing is started at all.
+      const least = harnessDefinition(engine)?.minVersion;
+      const version = least && setUpHere(engine, toolEnv(engine, hit.path)) ? await versionOf(engine, hit.path) : null;
+      if (version && least && olderThan(version, least)) return { engine, found: true, signedIn: false, certain: true, tooOld: true, version };
+      const read = version ? { version } : {};
+      try { return { engine, found: true, signedIn: await signedIn({ engine, log: '' }, hit.path), certain: true, ...read }; }
       catch (error) { return { engine, found: true, signedIn: false, certain: false, error: (error as Error).message }; }
     },
     /** The same question against a path already found, so asking it at

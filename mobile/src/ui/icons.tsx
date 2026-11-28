@@ -74,9 +74,9 @@ export const Repeat = ({ size = 14, tint = color.faint }: P) => (
 );
 
 /** A pinned thread (threads/ThreadMenu.tsx `PinMark`), square-headed like every shape here. */
-export const Pin = ({ size = 13, tint = color.faint }: P) => (
+export const Pin = ({ size = 13, tint = color.faint, filled = false }: P & { filled?: boolean }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={tint} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
-    <Path d="M8 3h8l-1.5 6 3.5 3.5H6L9.5 9z" /><Path d="M12 12.5V21" />
+    <Path d="M8 3h8l-1.5 6 3.5 3.5H6L9.5 9z" fill={filled ? tint : 'none'} /><Path d="M12 12.5V21" />
   </Svg>
 );
 
@@ -90,7 +90,7 @@ export const Tick = ({ size = 22, tint = 'rgba(238, 96, 24, 0.5)' }: P) => (
 
 /** A run in the cloud (threads/Pages.tsx `RunningMark`). */
 export const Cloud = ({ tint = color.accent }: P) => (
-  <Svg width={14} height={11} viewBox="2 5 21 15" fill="none" stroke={tint} strokeWidth={1.6} strokeLinejoin="round"><Path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></Svg>
+  <Svg width={14} height={11} viewBox="1.2 4.2 21.6 15.6" fill="none" stroke={tint} strokeWidth={1.6} strokeLinejoin="round"><Path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" /></Svg>
 );
 
 export const GoogleMark = ({ size = 16 }: P) => (

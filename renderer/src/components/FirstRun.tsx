@@ -18,7 +18,7 @@ import {
   type Engine, type Screen,
   inHomeFolder,
 } from '../first-run';
-import { heldPress } from '../setup-split';
+import { heldPress, type AgentReading } from '../setup-split';
 import { SetupSplit } from './SetupSplit';
 import './first-run.css';
 import { WelcomeSky } from './WelcomeSky';
@@ -84,6 +84,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
   const [ready, setReady] = useState<Engine[] | undefined>(undefined);
   const hasReady = !!ready?.length;
   const [signedOut, setSignedOut] = useState<Engine[]>([]);
+  const [readings, setReadings] = useState<AgentReading[]>([]);
   const [setup, setSetup] = useState<{ engine: Engine; phase: string; error: string | null } | null>(null);
   const gate = installGate(setup, signedOut);
   const [threads, setThreads] = useState<SessionThread[] | null>(null);
@@ -106,6 +107,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
       if (!live) return;
       setReady(offeredEngines(readings));
       setSignedOut(knownSignedOut(readings));
+      setReadings(readings.filter((r): r is NonNullable<typeof r> => !!r));
     })();
     api.agentThreads().then((t) => { if (live) setThreads(t); }).catch(() => { if (live) setThreads([]); });
     return () => { live = false; };
@@ -267,7 +269,7 @@ export function FirstRunFlow({ snap, home, onDone, look = 'light', skies = false
   const cls = `ob-screen${leaving ? ' ob-leaving' : ''}`;
 
   if (screen === 'setup') {
-    return <SetupSplit snap={snap} chats={chats} engines={ready ?? []} ticks={chatTicks}
+    return <SetupSplit snap={snap} chats={chats} engines={ready ?? []} readings={readings} ticks={chatTicks}
       onToggle={(id) => setChatTicks((had) => { const n = new Set(had); if (n.has(id)) n.delete(id); else n.add(id); return n; })}
       bringIn={bringIn} projectFor={async (folder) => { const p = await projectFor(folder); if (p) onProject?.(p.slug); return p; }} look={look} skies={skies} onLook={(id) => onLook?.(id)} onDone={onDone} onBack={() => go('welcome')} />;
   }

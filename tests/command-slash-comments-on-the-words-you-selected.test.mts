@@ -51,11 +51,11 @@ describe('the bar answers it', () => {
     expect(bar()).toContain("window.addEventListener('keydown', key, true)");
     expect(bar()).toContain('if (!isCommentChord(e, MAC)) return;');
   });
-  // Caps printed on the button were turned down twice; the app says a button's key on hover, in the hint plate.
-  it('says it the way every other button does, on the hover plate, not on the button', () => {
-    expect(bar().match(/data-hint="comment"/g)?.length).toBe(2);
-    expect(bar()).not.toContain('<kbd');
-    expect(HINTS.comment).toEqual([{ key: COMMENT_CHORD, what: 'Comment on selected words' }]);
+  // A hover plate was forgotten, so since 2026-11-28 the key is on the button
+  // (tests/the-comment-and-copy-keys-show-on-the-bar).
+  it('says it on the button itself, not on a hover plate', () => {
+    expect(bar().match(/\{chord\(COMMENT_CHORD\)\}/g)?.length).toBe(2);
+    expect(HINTS.comment).toBeUndefined();
   });
   it('is listed on the shortcuts page', () => {
     const row = SHORTCUTS.flatMap((g) => g.keys).find((k) => k.keys.includes(COMMENT_CHORD));
@@ -80,8 +80,7 @@ describe('the plate keeps off the words you selected', () => {
   it('every other control still hangs under', () => {
     expect(placeHint(bar, plate, screen)?.rose).toBe(false);
   });
-  it('the bar asks for above when it sits over the words, below when it sits under them', () => {
-    expect(fs.readFileSync(new URL('../renderer/src/components/SelectionBar.tsx', import.meta.url), 'utf8').match(/data-hint-side=\{side\}/g)?.length).toBe(2);
+  it('a control asks for above with data-hint-side', () => {
     expect(fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url), 'utf8')).toContain("shownHint.el.dataset.hintSide === 'above' ? 'above' : 'below'");
   });
 });

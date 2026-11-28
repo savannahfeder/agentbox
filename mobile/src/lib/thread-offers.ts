@@ -4,7 +4,7 @@
 
 import { dayLabel } from '../../../renderer/src/format';
 import { hiddenUntil, parkedByAgent } from '../../../renderer/src/list-rules';
-import { liveLine, livePlace, shortSpan, shortWord, type LiveFacts } from '../../../renderer/src/live-line';
+import { heldStepWord, liveLine, livePlace, shortSpan, shortWord, type LiveFacts } from '../../../renderer/src/live-line';
 import { priorityIdOf, type PriorityId } from '../../../renderer/src/priority';
 import { offersRunNow } from '../../../renderer/src/run-now';
 import { splitSlug, type PhoneItem } from '../../../renderer/src/phone-rows';
@@ -15,9 +15,9 @@ import { stoppedByHer } from '../../../shared/answers.mts';
 import { ruleIdOf } from '../../../shared/repeats.mts';
 import type { RunningSession, WorkItem } from '../../../renderer/src/types';
 
-export interface Session { startedAt: number; activity?: { id: string; label: string; detail: string; startedAt?: number }[]; helpers?: number; engine?: string; where?: string; movable?: boolean }
+export interface Session { startedAt: number; activity?: { id: string; label: string; detail: string; startedAt?: number }[]; helpers?: number; engine?: string; where?: string; movable?: boolean; memoryHeldMs?: number }
 // What the computer said of the thread when nothing runs on it (phone-rows.ts `waitFacts`), so waiting reads Queued.
-type Waits = Pick<LiveFacts, 'queued' | 'runNow' | 'signInNeeded' | 'atLimit' | 'paused' | 'stalled' | 'shipping' | 'asking'>;
+type Waits = Pick<LiveFacts, 'queued' | 'settingUp' | 'runNow' | 'signInNeeded' | 'atLimit' | 'paused' | 'stalled' | 'shipping' | 'asking'>;
 interface Facts extends Waits {
   session: Session | null; inProgress: boolean; now: number;
   /** Its computer leaves this project's threads ready for the cloud (phone-rows.ts `projects[].cloud`). */
@@ -122,7 +122,7 @@ export function liveOf(item: WorkItem, { session, inProgress, now, cloud: _cloud
     state: live.state,
     working,
     line: live.line,
-    word: working ? (activity[activity.length - 1]?.label || 'Thinking') : live.state === 'signin' || live.state === 'limit' ? live.line : shortWord(live.state, session?.helpers ?? 0),
+    word: working ? heldStepWord(activity[activity.length - 1], session?.memoryHeldMs) : live.state === 'signin' || live.state === 'limit' ? live.line : shortWord(live.state, session?.helpers ?? 0),
     more: Math.max(0, activity.length - 1),
     span: session ? shortSpan(Math.max(0, now - session.startedAt)) : null,
     // "in the cloud" on a cloud run, as the web app's working line ends (live-line.ts `livePlace`).

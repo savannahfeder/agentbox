@@ -22,16 +22,6 @@ if (process.platform !== 'darwin') {
   else document.addEventListener('DOMContentLoaded', markFlat);
 }
 
-// A Mac window can put the system's blur behind itself (main/window-glass.mts);
-// the page goes glass only while the Alpha switch is on.
-if ((process.argv ?? []).includes('--agentbox-glass')) {
-  const markGlass = () => {
-    if (document.documentElement) document.documentElement.dataset.glassAble = '';
-  };
-  if (document.documentElement) markGlass();
-  else document.addEventListener('DOMContentLoaded', markGlass);
-}
-
 // EVERY ASK BEFORE A RELOAD IS ANSWERED, held write or not. main waits for
 // this before it reloads (main/write-before-reload.mts), so a page with
 // nothing held, or one that has not set a handler yet, says so at once rather
@@ -103,6 +93,7 @@ contextBridge.exposeInMainWorld('zero', {
   teamThreadWork: (payload) => ipcRenderer.invoke('zero:team-thread-work', payload),
   findInThreads: (payload) => ipcRenderer.invoke('zero:find-in-threads', payload),
   warmFindInThreads: () => ipcRenderer.invoke('zero:warm-find-in-threads'),
+  findByDescription: (payload) => ipcRenderer.invoke('zero:find-by-description', payload),
   teamComment: (payload) => ipcRenderer.invoke('zero:team-comment', payload),
   teamContinueBrief: (payload) => ipcRenderer.invoke('zero:team-continue-brief', payload),
   teamContinued: (payload) => ipcRenderer.invoke('zero:team-continued', payload),
@@ -110,7 +101,7 @@ contextBridge.exposeInMainWorld('zero', {
   fileMark: (payload) => ipcRenderer.invoke('zero:file-mark', payload),
   fileNewVersion: (payload) => ipcRenderer.invoke('zero:file-new-version', payload),
   teamMarkFile: (payload) => ipcRenderer.invoke('zero:team-mark-file', payload),
-  filesPlace: () => ipcRenderer.invoke('zero:files-place'),
+  filesPlace: (opts) => ipcRenderer.invoke('zero:files-place', opts),
   filesPlaceOpen: (payload) => ipcRenderer.invoke('zero:files-place-open', payload),
   filesPlaceEdit: (payload) => ipcRenderer.invoke('zero:files-place-edit', payload),
   filesPlaceMark: (payload) => ipcRenderer.invoke('zero:files-place-mark', payload),
@@ -195,8 +186,6 @@ contextBridge.exposeInMainWorld('zero', {
   cornerTag: (state) => ipcRenderer.invoke('zero:corner-tag', state),
   // Whether this page came up from ⌘R, and which build it is running.
   bootInfo: () => ipcRenderer.invoke('zero:boot-info'),
-  // Which appearance the window's glass is drawn in (main/window-glass.mts).
-  glassTone: (payload) => ipcRenderer.invoke('zero:glass-tone', payload),
   // The Windows title bar buttons' glyphs, for a light or dark page (main/window-buttons.mts).
   windowButtons: (payload) => ipcRenderer.invoke('zero:window-buttons', payload),
   // KEEPING AGENTBOX CURRENT (main/updater.mts). The state of it rides the
@@ -309,6 +298,8 @@ contextBridge.exposeInMainWorld('zero', {
   track: (name, count) => ipcRenderer.invoke('zero:track', { name, count }),
   // How long this window's own thread held, a number and nothing else (renderer/src/window-holds.ts).
   windowHeld: (ms) => ipcRenderer.invoke('zero:window-held', { ms }),
+  // This window's long tasks and slow answers to input over the last minute, four numbers (renderer/src/window-lag.ts).
+  windowLag: (lag) => ipcRenderer.invoke('zero:window-lag', lag),
   onboardingArm: () => ipcRenderer.invoke('zero:onboarding-arm'),
   sessionTrace: (payload) => ipcRenderer.invoke('zero:session-trace', payload),
   // Everything that happened on one task, as the ledger lines it happened as.
@@ -349,6 +340,7 @@ contextBridge.exposeInMainWorld('zero', {
   // front" because nothing public can focus a pane inside another app.
   agentReply: (payload) => ipcRenderer.invoke('zero:agent-reply', payload),
   agentReveal: (payload) => ipcRenderer.invoke('zero:agent-reveal', payload),
+  bringInSession: (payload) => ipcRenderer.invoke('zero:bring-in-session', payload),
   agentConversation: (payload) => ipcRenderer.invoke('zero:agent-conversation', payload),
   scheduleAgent: (payload) => ipcRenderer.invoke('zero:schedule-agent', payload),
   closeAgent: (payload) => ipcRenderer.invoke('zero:close-agent', payload),
@@ -438,12 +430,6 @@ contextBridge.exposeInMainWorld('zero', {
     const handler = (_e, payload) => fn(payload);
     ipcRenderer.on('zero:open-item', handler);
     return () => ipcRenderer.removeListener('zero:open-item', handler);
-  },
-  // The corner tag's "Turn off…": opens Settings at the switch that does it.
-  onOpenSettings: (fn) => {
-    const handler = (_e, payload) => fn(payload);
-    ipcRenderer.on('zero:open-settings', handler);
-    return () => ipcRenderer.removeListener('zero:open-settings', handler);
   },
   // The window moved to a screen that wants the other set of theme pictures.
   // Only main can see which physical display a window is on, and only main can

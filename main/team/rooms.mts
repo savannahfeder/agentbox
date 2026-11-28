@@ -1,7 +1,7 @@
 // ROOMS ON THIS MAC (w-3d0fa23ffb, docs/team/ROOMS-PLAN.md): the rooms I am in,
 // each room's wall and chat, and the presence row this Mac publishes. Lives
-// inside the team service (main/team/index.mts) and only runs while Rooms is
-// switched on in Alpha features and someone is signed in.
+// inside the team service (main/team/index.mts) and only runs while someone is
+// signed in and on a team.
 import fs from 'node:fs';
 import path from 'node:path';
 import { wallCards, myPresence, displayNameOf, withoutHidden } from '../../shared/room-cards.mts';
@@ -16,6 +16,7 @@ import { readRoomMessage, roomBody } from '../../shared/agent-voice.mts';
 import { Name } from '../../shared/product-name.mjs';
 import { cleanMark } from '../../shared/artifact-marks.mts';
 import { isPairRoom, pairRooms } from '../../shared/pair-room.mts';
+import { shownTitle, type Titled } from '../../shared/thread-title.mts';
 import { TEAM_LOOK, TEAM_LOOK_POSTED, TEAM_LOOK_TEMPLATE, newestTeamLook } from '../../shared/team-look.mts';
 import { ROOM_MAX_BYTES, ROOM_PART_BYTES, partName, partList, partsOf, readPartList } from '../../shared/room-file-parts.mts';
 
@@ -225,7 +226,7 @@ export interface RoomsState {
 /** What this Mac knows to say about its own work, for the presence row. */
 export interface PresenceFacts {
   running?: { itemId: string; product: string; startedAt?: number }[];
-  items?: { id: string; label?: string; title?: string; visibility?: string }[];
+  items?: ({ id: string; visibility?: string } & Titled)[];
   products?: { slug?: string; personal?: boolean; seenBy?: string; seenByPeople?: string[] }[];
   summary?: AgentHoursSummary | null;
 }
@@ -475,7 +476,7 @@ export function createRooms({
     const lead = [...(f.running ?? [])].sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0))[0];
     if (!lead) return { workingOn: null, agents: 0 };
     const item = (f.items ?? []).find((i) => i.id === lead.itemId);
-    return { workingOn: (String(item?.label ?? '').trim() || String(item?.title ?? '')).slice(0, 64) || null, workingThread: lead.itemId, agents: f.running!.length };
+    return { workingOn: (item ? shownTitle(item) : '').slice(0, 64) || null, workingThread: lead.itemId, agents: f.running!.length };
   }
   const local = () => { gen += 1; };
 

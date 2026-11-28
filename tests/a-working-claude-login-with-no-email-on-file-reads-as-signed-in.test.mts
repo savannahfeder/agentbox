@@ -141,7 +141,6 @@ describe('the Claude Code page', () => {
     expect(tileOf(row).inUse).toBe(false);
     const html = draw(row);
     expect(html).toContain('Not signed in');
-    expect(html).toContain('Finish signing in to use it');
   });
 
   it('names an identified login by its email', () => {

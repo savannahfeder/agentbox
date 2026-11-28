@@ -35,6 +35,7 @@ export interface AddVersion { file: string; src: string; name: string; by?: stri
 
 export interface VersionLine {
   of(key: string): LineVersion[];
+  hashesOf(key: string): string[];
   add(p: AddVersion): Promise<LineVersion | null>;
   refresh(): Promise<boolean>;
   hashOf(src: string): Promise<FileHash | null>;
@@ -244,6 +245,11 @@ export function versionLine({ dir, cloud = () => null, onMoved = () => {}, clone
 
   return {
     of,
+    /** The bytes every version of `file` was, by hash, without a look at the disk: `of` checks each kept copy. */
+    hashesOf(key: string): string[] {
+      const id = lineId(key);
+      return [...lineOf(id).map((v) => v.hash), ...[...(pending.get(id)?.values() ?? [])].map((p) => p.hash)];
+    },
     /** One at a time, so two versions of one file never take the same number here. */
     add(p: AddVersion) {
       const run = queue.then(() => addNow(p));

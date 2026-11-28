@@ -19,6 +19,7 @@
 // dev server that renamed itself and hid its environment.
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { listProcesses } from './leftovers.mts';
@@ -26,6 +27,9 @@ import type { ProcessRecord } from './leftovers.mts';
 import { readMacPressure } from './memory-gate-server.mts';
 import { pressureFrom } from './memory-gate.mts';
 import type { PressureReading } from './memory-gate.mts';
+import { heaviestOver, overAllowance, roomMb, standing, SETTLE_MS, STALE_MS } from './memory-allowance.mts';
+import type { StampedStanding } from './memory-allowance.mts';
+import type { Holding } from './memory-give-back.mts';
 
 /** Days of files kept, today included. */
 export const KEEP_DAYS = 7;
@@ -45,6 +49,8 @@ export interface MemoryLogOptions {
   own?: () => unknown;
   keepDays?: number;
   footprints?: () => Promise<Map<number, number>> | Map<number, number>;
+  /** This computer's memory, which the allowance is a share of (main/memory-allowance.mts). */
+  ramMb?: number;
 }
 
 const UNIT: Record<string, number> = { B: 1 / 1048576, K: 1 / 1024, M: 1, G: 1024 };
@@ -118,8 +124,10 @@ export function summarizeReading(reading: PressureReading = {}, at = Date.now())
   };
 }
 
-/** One minute's line, from one listing. Pure. */
-export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, at = Date.now(), reading = {} }: { appPid?: number; at?: number; reading?: PressureReading } = {}) {
+interface TaskPrograms { item: string; product: string | null; list: ProcessRecord[] }
+
+/** Whose each program is: the app's, a thread's (by the tag it or a parent carries), or neither. Pure. */
+function byOwner(procs: ProcessRecord[], appPid: number): { app: ProcessRecord[]; tasks: Map<string, TaskPrograms>; others: ProcessRecord[] } {
   const byPid = new Map(procs.map((p) => [p.pid, p]));
   const owner = new Map<number, Owner>();
   const ownerOf = (p: ProcessRecord): Owner => {
@@ -134,7 +142,7 @@ export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, 
     owner.set(p.pid, found);
     return found;
   };
-  const tasks = new Map<string, { item: string; product: string | null; list: ProcessRecord[] }>();
+  const tasks = new Map<string, TaskPrograms>();
   const app: ProcessRecord[] = [];
   const others: ProcessRecord[] = [];
   for (const p of procs) {
@@ -147,13 +155,20 @@ export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, 
       tasks.set(o.item, t);
     } else others.push(p);
   }
-  const sum = (list: ProcessRecord[]) => Math.round(list.reduce((n, p) => n + (Number(p.mb) || 0), 0));
+  return { app, tasks, others };
+}
+
+const mbOf = (list: ProcessRecord[]) => Math.round(list.reduce((n, p) => n + (Number(p.mb) || 0), 0));
+
+/** One minute's line, from one listing. Pure. */
+export function summarizeMemory(procs: ProcessRecord[], { appPid = process.pid, at = Date.now(), reading = {} }: { appPid?: number; at?: number; reading?: PressureReading } = {}) {
+  const { app, tasks, others } = byOwner(procs, appPid);
   return {
     ...summarizeReading(reading, at),
-    totalMb: sum(procs),
-    app: { mb: sum(app), procs: app.length, top: top(app, 3) },
+    totalMb: mbOf(procs),
+    app: { mb: mbOf(app), procs: app.length, top: top(app, 3) },
     tasks: [...tasks.values()]
-      .map((t) => ({ item: t.item, product: t.product, mb: sum(t.list), procs: t.list.length, top: top(t.list, 3) }))
+      .map((t) => ({ item: t.item, product: t.product, mb: mbOf(t.list), procs: t.list.length, top: top(t.list, 3) }))
       .sort((a, b) => b.mb - a.mb),
     others: top(others, 5),
   };
@@ -174,18 +189,46 @@ export class MemoryLog {
   declare own: MemoryLogOptions['own'];
   declare keepDays: number;
   declare footprints: NonNullable<MemoryLogOptions['footprints']>;
+  declare ramMb: number;
   declare _pruned: string | null;
   declare _busy?: boolean;
   declare _listedAt?: number;
+  declare _standings: StampedStanding[];
+  declare _heaviest: Holding | null;
 
   constructor({
     dir, appPid = process.pid, list = listProcesses, readPressure = readMacPressure,
     now = Date.now, facts = () => ({}), own, keepDays = KEEP_DAYS,
     // Footprints are by pid of this Mac, so they only belong over its own listing.
     footprints = list === listProcesses ? readFootprints : () => new Map(),
+    ramMb = os.totalmem() / 1048576,
   }: MemoryLogOptions) {
-    Object.assign(this, { dir, appPid, list, readPressure, now, facts, own, keepDays, footprints });
+    Object.assign(this, { dir, appPid, list, readPressure, now, facts, own, keepDays, footprints, ramMb });
     this._pruned = null;
+    this._standings = [];
+    this._heaviest = null;
+  }
+
+  /** Whether the app and its agents are over their allowance, on the listings of the last minutes. */
+  overAllowance(now: number = this.now()): boolean {
+    return overAllowance(this._standings, now);
+  }
+
+  /** How many MB the newest listing left Agentbox, and when it was taken; null once that is too old to act on. */
+  room(now: number = this.now()): { mb: number; at: number } | null {
+    const newest = this._standings.at(-1);
+    const mb = newest && now - newest.at <= STALE_MS ? roomMb(newest) : null;
+    return mb === null ? null : { mb, at: newest!.at };
+  }
+
+  /**
+   * The thread to ask for memory back, with its programs
+   * (main/memory-give-back.mts): the newest listing's alone. One that is back
+   * inside names nobody, since the settling the doors wait out is not a
+   * reason to ask anyone anything.
+   */
+  heaviest(now: number = this.now()): Holding | null {
+    return this._heaviest && now - this._heaviest.at <= STALE_MS ? this._heaviest : null;
   }
 
   /** Writes this minute's line. Never throws: a log that breaks the app is worse than a gap in the log. */
@@ -209,7 +252,18 @@ export class MemoryLog {
         ]);
         this._listedAt = at;
         const procs = fp.size ? listed.map((p) => (fp.has(p.pid) ? { ...p, mb: fp.get(p.pid)! } : p)) : listed;
-        line = { ...summarizeMemory(procs, { appPid: this.appPid, at, reading }), measure: fp.size ? 'footprint' : 'rss', ...facts };
+        const summed = summarizeMemory(procs, { appPid: this.appPid, at, reading });
+        line = { ...summed, measure: fp.size ? 'footprint' : 'rss', ...facts };
+        // Resident sizes leave out what is compressed or swapped, so they read
+        // lowest exactly when the computer is short: only footprints are judged.
+        const sum = (list: { mb: number }[]) => list.reduce((n, p) => n + p.mb, 0);
+        const stands = fp.size ? standing({ ramMb: this.ramMb, appMb: summed.app.mb, tasksMb: sum(summed.tasks), othersMb: sum(summed.others) }) : null;
+        if (stands) {
+          line.allowance = stands;
+          this._standings = [...this._standings.filter((s) => at - s.at <= SETTLE_MS), { ...stands, at }];
+        }
+        const most = heaviestOver(summed.tasks, stands, this.ramMb);
+        this._heaviest = most && { ...most, programs: byOwner(procs, this.appPid).tasks.get(most.item)?.list ?? [], at };
       }
       if (this.own) { try { line.own = this.own() ?? null; } catch { line.own = null; } }
       fs.mkdirSync(this.dir, { recursive: true });

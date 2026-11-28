@@ -23,7 +23,7 @@ const claude = page.slice(page.indexOf('<Place'), page.indexOf('{/* SIGNING A SE
 describe('the Claude Code page', () => {
   it('the reported case:one group of tiles, every account in it, with Refresh at its head', () => {
     expect(claude.match(/<Place\b/g)).toHaveLength(1);
-    expect(claude).toMatch(/name="Signed in"[\s\S]*onClick=\{refresh\}[\s\S]*accounts=\{tiles\}/);
+    expect(claude).toMatch(/name=\{accountsHeading\(accounts\)\}[\s\S]*onClick=\{refresh\}[\s\S]*accounts=\{tiles\}/);
     expect(page).toContain("engine === 'codex' ? refreshCodex(true) : readAccounts(true)");
   });
 
@@ -38,7 +38,7 @@ describe('the Claude Code page', () => {
 
   it('the cloud is one row with a switch, not a second set of tiles', () => {
     expect(claude).toMatch(/<Group id="cloud-accounts" label="Cloud">\s*<Row label="Use the cloud"/);
-    expect(claude).toContain('cloudToggleTarget(cloudHere)');
+    expect(claude).toContain('cloudToggleTarget(cloud)');
     expect(page).not.toContain('cloudCard');
   });
 });

@@ -38,7 +38,7 @@ import { addressYouTyped, canFrameAWebsite, isWebsiteAddress } from '../../../sh
 // doc-md / doc-html rather than off the theme.
 //
 // THE PANE HAS NO ZOOM OF ITS OWN, and it is not missing.
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../api';
 import { CodeFile } from './CodeFile';
@@ -48,7 +48,8 @@ import { familyOfName } from '../../../shared/artifact-marks.mts';
 import { isTablePath } from '../table-file';
 import { FilmPlayer } from './FilmPlayer';
 import { PdfPages } from './PdfPages';
-import { crumbParts, docKind, docName, FOLLOW_FILE_MS, isPlainText, newerOnDisk, paneCanSave, splitFromPointer, OPENING_SPLIT, type PaneKind } from '../doc-pane';
+import { SelectionBar } from './SelectionBar';
+import { crumbParts, docKind, docName, FOLLOW_FILE_MS, isPlainText, newerOnDisk, paneCanSave, paneOffersComment, splitFromPointer, OPENING_SPLIT, type PaneKind } from '../doc-pane';
 import { askAtMostEvery } from '../ask-at-most-every';
 import { opening, pictureUrl, seenAt } from '../picture';
 import { fetchableFileUrl } from '../phone-files';
@@ -105,8 +106,8 @@ export type OpenDoc = { product: string; src: string; auto?: boolean; at?: strin
 
 // The same element with or without notes: a different one would rebuild the
 // editor inside it, from the text the pane first read, whenever Focus opens or closes.
-const Beside = ({ aside, children }: { aside?: ReactNode; children: ReactNode }) =>
-  <div className={aside ? 'doc-notes-split' : undefined} style={aside ? undefined : { display: 'contents' }}>{children}{aside}</div>;
+const Beside = ({ aside, at, children }: { aside?: ReactNode; at?: RefObject<HTMLDivElement>; children: ReactNode }) =>
+  <div ref={at} className={aside ? 'doc-notes-split' : undefined} style={aside ? undefined : { display: 'contents' }}>{children}{aside}</div>;
 
 // A website carries doc-html for what that class means: a card holding a
 // page whose colour the app cannot see into, so the header keeps its own dark
@@ -133,8 +134,8 @@ export function DocPane({ doc, thread, roots, split, onSplit, onClose, onNotice,
   focusControlStyle?: FocusControlStyle;
   /** Drawn beside a document's words, inside the card: the notes sidebar. */
   aside?: ReactNode;
-  /** A table cell's Comment, for the notes sidebar. */
-  onComment?: (quote: string, cell: TableCell) => void;
+  /** A Comment on selected words or a table cell, for the notes sidebar. */
+  onComment?: (quote: string, cell?: TableCell) => void;
   /** A mark before the pane's own ones in the corner. */
   firstMark?: ReactNode;
   headerTarget?: HTMLElement | null;
@@ -196,6 +197,7 @@ export function DocPane({ doc, thread, roots, split, onSplit, onClose, onNotice,
   const frameKey = url && app.local ? `${url} ${app.attempt}` : url;
   const [loaded, revealFrame] = usePreviewReveal(frameKey);
   const pageFrame = useRef<HTMLIFrameElement | null>(null);
+  const words = useRef<HTMLDivElement>(null);
   const [pageHeight, setPageHeight] = useState<number | null>(null);
   const besideNotes = !!aside;
   const fromText = !url && text !== null;
@@ -520,9 +522,9 @@ export function DocPane({ doc, thread, roots, split, onSplit, onClose, onNotice,
             <TableView text={text} path={src} mode="pane" live={liveSession} onComment={onComment} onSave={doc.readOnly || !canSave ? undefined : saveTable} onReload={() => setLooks((n) => n + 1)} onNotice={onNotice} storeKey={`${doc.product}/${src}`} />
           </Beside>
         ) : kind === 'text' ? (
-          <Beside aside={aside}><div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div></Beside>
+          <Beside aside={aside} at={words}><div className="code-scroll" ref={setCodeBox}><CodeFile text={text} /></div></Beside>
         ) : (
-          <Beside aside={aside}>
+          <Beside aside={aside} at={words}>
             <DocText
               key={liveSession ? `live:${family}` : (resolved ?? doc.src)}
               product={doc.product}
@@ -537,6 +539,7 @@ export function DocPane({ doc, thread, roots, split, onSplit, onClose, onNotice,
             />
           </Beside>
         )}
+        {onComment && paneOffersComment(kind, !!aside, !!onComment) && <SelectionBar page={words} onComment={(quote) => onComment(quote)} />}
       </div>
     </aside>
   );

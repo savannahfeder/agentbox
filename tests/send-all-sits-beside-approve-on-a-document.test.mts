@@ -21,9 +21,9 @@ describe('where Send all sits', () => {
   it('beside the notes on a document, a table, code, a page, a PDF and slides', () => {
     for (const kind of ['markdown', 'table', 'code', 'page', 'pdf', 'deck']) expect(sendAllBesideTheNotes(kind)).toBe(true);
   });
-  it('under the stage on a film and a picture, as before', () => {
+  // A picture moved beside the notes too (send-all-sits-beside-approve-on-a-picture).
+  it('under the stage on a film, as before', () => {
     expect(sendAllBesideTheNotes('film')).toBe(false);
-    expect(sendAllBesideTheNotes('image')).toBe(false);
   });
 });
 

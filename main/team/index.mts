@@ -18,7 +18,7 @@ import { createThreadShare } from './thread-share.mts';
 import { createAsks, type TellThread } from './asks.mts';
 import { changePath, readChangeSummary } from '../code-change.mts';
 import { changeWithCommits } from '../handed-commits.mts';
-import { askBody, askIsOpen, askOf, withoutAskLead, type AskKind } from '../../shared/thread-asks.mts';
+import { approvedDuring, askBody, askIsOpen, askOf, withoutAskLead, type AskKind } from '../../shared/thread-asks.mts';
 import type { SharedThreadView, ThreadShare, ThreadShareBackend } from './thread-share.mts';
 import { briefToContinue } from './continue-thread.mts';
 import { CONTINUED_NOTE } from '../../shared/thread-continued.mts';
@@ -56,7 +56,7 @@ import type { Departure } from './departures.mts';
 import type { CloudPhoneCommand } from './supabase-backend.mts';
 import { mateCard, splitCards } from '../../shared/mate-cards.mts';
 import type { BoardMate } from '../../shared/mate-cards.mts';
-import { cleanPlace, type Mark, type NotePlace, type RawPlace } from '../../shared/artifact-marks.mts';
+import { cleanPlace, marksOf, type Mark, type NotePlace, type RawPlace } from '../../shared/artifact-marks.mts';
 import type { RoomsBackend, RoomsOptions, RoomsState } from './rooms.mts';
 
 export interface TeamPerson {
@@ -295,6 +295,8 @@ export interface TeamStore {
 export interface TeamDisk extends SyncDisk {
   setLineAuthor(personId: string | null): void;
   readWorkItems(dir: string): PhoneItem[];
+  /** The same frozen rows until a thread changes, for a reader that writes into none of them. */
+  readWorkItemRows?(dir: string): PhoneItem[];
   updateWorkItem(dir: string, id: string, patch: Record<string, unknown>, opts?: { source?: string; now?: number }): unknown;
 }
 
@@ -355,8 +357,10 @@ export interface TeamServiceOptions {
   /** Where a file's link opens; the phone site when undefined, no links when null. */
   shareSite?: string | null;
   rooms?: TeamRoomsSetup | null;
-  /** Settings › Alpha features › Multiplayer. Off, no thread of this person's is shared. */
+  /** Off, no thread of this person's is shared. The app always passes on (main/settings.mts alphaFeatures). */
   sharing?: () => boolean;
+  /** True once for someone who had switched multiplayer off: what they made until then stays theirs (main/settings.mts multiplayerWasOff). */
+  sharedFromNow?: () => boolean;
   /** Words from someone you asked for help, to your thread's agent, through your own supervisor. */
   tellThread?: TellThread | null;
 }
@@ -394,8 +398,8 @@ const LINK_EDITS_EVERY_MS = 60_000;
 // page can offer that link again rather than a button that does nothing.
 const EMPTY: TeamState = { configured: false, canSignIn: false, started: false, settling: false, signedIn: false, signingIn: null, me: null, team: null, invites: [], sent: [], people: [], cards: [], lastSyncAt: null, error: null };
 
-// With Alpha features › Multiplayer off the window gets the sign-in the phone
-// needs and no team, so it draws the single-person app.
+// With multiplayer off the window gets the sign-in the phone needs and no
+// team, so it draws the single-person app.
 export function teamForWindow(state: TeamState | null | undefined, multiplayer: boolean) {
   if (multiplayer || !state) return state;
   const { rooms, ...rest } = state;
@@ -422,6 +426,7 @@ export function createTeamService({
   // This person's AI teammates, which the team sees on its board.
   ownMates = () => [],
   sharing = () => true,
+  sharedFromNow = () => false,
   tellThread = null,
 }: TeamServiceOptions) {
   // The phone site's address, only an https one, and its code for Settings.
@@ -477,6 +482,8 @@ export function createTeamService({
   function products() {
     try { return store.listProducts(); } catch { return []; }
   }
+  // A pass reads every project's threads several times, every few seconds: shared rows, not a copy each.
+  const rowsOf = (dir: string): PhoneItem[] => disk.readWorkItemRows?.(dir) ?? disk.readWorkItems(dir);
 
   const asks = createAsks({
     file: path.join(path.dirname(stateFile), '.team-asks.json'),
@@ -574,7 +581,9 @@ export function createTeamService({
     });
     const lines = store.readHistory(product.slug, row.id, { max: Number.MAX_SAFE_INTEGER }).filter(Boolean);
     // The newest review or help a teammate handed back, which the giver's note often points at, though they wrote since.
-    const back = [...lines].reverse().find((l) => typeof l.patch?.answer === 'string' && (l.patch.from as { teammate?: unknown } | undefined)?.teammate);
+    // `app` is the app's own notice on the thread (main/teammate-reach.mts), nobody's review.
+    const fromWho = (l: TeamHistoryLine) => (l.patch?.from as { teammate?: unknown } | undefined)?.teammate;
+    const back = [...lines].reverse().find((l) => typeof l.patch?.answer === 'string' && fromWho(l) && fromWho(l) !== 'app');
     const backWho = (back?.patch?.from as { teammate?: string; name?: string } | undefined);
     const backName = backWho ? state.people.find((p) => p.id === backWho.teammate)?.name?.split(/\s+/)[0] || backWho.name?.split(/\s+/)[0] || 'A teammate' : '';
     const words = titled([
@@ -656,8 +665,10 @@ export function createTeamService({
     const found = remembered === '' ? null : remembered ? teams.find((t) => t.id === remembered) ?? null : teams[0] ?? null;
     const team = found ? (await readTeamInfo(found)) ?? found : null;
     if (team && !remembered && me) kept().setTeam(me, team.id);
-    // The moment sharing starts on this Mac, kept so it never moves later.
-    if (team && me && !kept().getSince(me)) kept().setSince(me, Date.now());
+    // The moment sharing starts on this Mac, kept so it never moves later, but
+    // once for someone who had multiplayer off: a thread from before it with no
+    // word of its own stays theirs.
+    if (team && me && (sharedFromNow() || !kept().getSince(me))) kept().setSince(me, Date.now());
     const people = team ? teamPeopleShown(await backend!.teamPeople(team.id)) : [];
     const cards = team ? await backend!.listCards() : [];
     // An invite lookup that fails (an older cloud, a dropped request) leaves
@@ -727,7 +738,7 @@ export function createTeamService({
         set(withCards(cards, { lastSyncAt: Date.now(), error: null, people, me: me ?? state.me, ...(info ? { team: info } : {}), ...(await readSeen()) }));
         if (state.team) {
           noticeEndedWaits({
-            products: products(), read: (p: TeamProduct) => disk.readWorkItems(p.dir), cards, now: now(), me: state.me?.id ?? null,
+            products: products(), read: (p: TeamProduct) => rowsOf(p.dir), cards, now: now(), me: state.me?.id ?? null,
             nameOf: (id: string) => people.find((p) => p.id === id)?.name ?? 'Someone',
             write: (dir: string, id: string, patch: Record<string, unknown>) => disk.updateWorkItem(dir, id, patch, { source: 'system' }),
           });
@@ -867,7 +878,7 @@ export function createTeamService({
         const on = new Set(phoneProjectsOf(phone.projects(), owner, phoneEligible(products())));
         return products().filter((p) => on.has(p.slug)).map((p) => ({ slug: p.slug, name: p.name || p.slug, dir: p.dir || null, repoPath: p.repoPath || null }));
       },
-      listItems: (slug) => { const p = productOf(slug); try { return p ? disk.readWorkItems(p.dir) : []; } catch { return []; } },
+      listItems: (slug) => { const p = productOf(slug); try { return p ? rowsOf(p.dir) : []; } catch { return []; } },
       historyOf: (slug, id, { all = false }: { all?: boolean } = {}) => { try { return store.readHistory(slug, id, { max: all ? Number.MAX_SAFE_INTEGER : SNAPSHOT_LIMITS.lines * 4 }); } catch { return []; } },
       runsOf: (slug, id) => {
         const p = productOf(slug);
@@ -955,7 +966,7 @@ export function createTeamService({
     // goes up, and what was up comes down as a private thread's card does.
     // A team without Pro shares nothing either.
     const listCards = (): SyncCard[] => (!sharing() || state.pro === false ? [] : [
-      ...cardsFor({ products: products(), readItems: (p) => disk.readWorkItems(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds(), wontStart: wontStart() }),
+      ...cardsFor({ products: products(), readItems: (p) => rowsOf(p.dir), since: state.me ? kept().getSince(state.me.id) : null, me: state.me?.id ?? null, running: runningIds(), wontStart: wontStart() }),
       ...(ownMates() ?? []).map((t) => mateCard(t, { now: t.now ?? null, running: !!t.running, at: t.updatedAt ?? t.createdAt ?? 0 })),
     ]);
     threadShare = createThreadShare({
@@ -969,7 +980,7 @@ export function createTeamService({
         const threads = new Map<string, { item: PhoneItem; product: TeamProduct }>();
         for (const product of products()) {
           if (product.team?.direct) continue;
-          for (const item of disk.readWorkItems(product.dir)) threads.set(item.id, { item, product });
+          for (const item of rowsOf(product.dir)) threads.set(item.id, { item, product });
         }
         return threads;
       },
@@ -1411,8 +1422,9 @@ export function createTeamService({
       // A path of the sender's ending in the file is the file: the whole of it becomes the link, or a cut-down path is left to send.
       const quoted = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       for (const [rel, copy] of moved) text = text.replace(new RegExp(`(?<![\\w(\\]])(?:~|/)[^\\s()\\[\\]\`]*/${quoted(rel)}(?![\\w/])`, 'g'), `[${copy.name}](${copy.rel})`);
-      // The file's own path written out is the file too: a bare name in its place opens nothing for the receiver.
-      for (const [rel, copy] of moved) if (rel.includes('/')) text = text.replace(new RegExp(`(?<![\\w/(\\[\\]])${quoted(rel)}(?![\\w/\\]])`, 'g'), `${/\.(?:png|jpe?g|gif|webp|svg)$/i.test(copy.name) ? '!' : ''}[${copy.name}](${copy.rel})`);
+      // The file's own path alone on its line is the file too: a bare name in its place opens nothing for the receiver.
+      // Inside a sentence it stays a name, with the link at the foot: the receiver's view opens a file link only on a line of its own.
+      for (const [rel, copy] of moved) if (rel.includes('/')) text = text.replace(new RegExp(`^(\\s*(?:>\\s?)*)${quoted(rel)}[ \\t]*$`, 'gm'), (_m, lead: string) => `${lead}${/\.(?:png|jpe?g|gif|webp|svg)$/i.test(copy.name) ? '!' : ''}[${copy.name}](${copy.rel})`);
       for (const [rel, copy] of moved) text = text.split(rel).join(copy.name);
       const unlinked = saved.filter((s) => !text.includes(`](${s.rel})`));
       const full = [text, attachmentMarkdown(unlinked)].filter(Boolean).join('\n\n') || named;
@@ -1527,8 +1539,14 @@ export function createTeamService({
       const said = String(words ?? '').trim();
       const dir = products().find((p) => p.slug === slug)?.dir;
       if (!dir) throw new Error('that ask is gone');
+      // Approved on the review's page or on the owner's thread: both are yours to name.
+      const held = row as typeof row & { artifacts?: { approvals?: { file: string; by: string | null; ts: number }[] }; wrote?: { ask?: { ts?: number } } };
+      const onThread = marksOf((threadShare?.read(a.owner, a.thread).lines ?? [])
+        .filter((l) => l.patch?.artifact)
+        .map((l) => ({ ...(l.patch!.artifact as object), by: l.by ?? null, ts: l.ts, uid: l.uid ?? null })) as never).approvals;
+      const approvedFiles = approvedDuring([...(held.artifacts?.approvals ?? []), ...onThread], { by: state.me.id, from: held.wrote?.ask?.ts ?? row.createdAt ?? 0 });
       // Before the close, so the owner's copy never reads a close without its verdict.
-      disk.updateWorkItem(dir, id, { verdict: verdict === 'yes' || verdict === 'changes' ? verdict : 'done' }, { source: 'founder' });
+      disk.updateWorkItem(dir, id, { verdict: verdict === 'yes' || verdict === 'changes' ? verdict : 'done', ...(approvedFiles.length ? { approvedFiles } : {}) }, { source: 'founder' });
       store.answerItem(slug, id, { ...(said ? { answer: said } : {}), status: 'done' });
       onChange();
       await syncNow();

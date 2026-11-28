@@ -12,9 +12,7 @@
 // place a grant is reviewed; what changed is that she edits them as fields on
 // the project they belong to instead of in a text editor.
 
-import { isPackagedElectron } from './team/session.mts';
 import { teammatesOn } from '../shared/teammates.mts';
-import { roomsOnFor } from '../shared/rooms-on.mts';
 import { phoneChoiceOf, phoneProjectsOf, withPhoneAll, withPhoneProject, phoneEligible } from '../shared/phone-snapshot.mts';
 import fs from 'node:fs';
 import { harnessFor } from './harnesses.mts';
@@ -36,7 +34,7 @@ import { NAME, Name } from '../shared/product-name.mjs';
 import { autoSlots, memoryGateWorksOn } from './memory-gate.mts';
 import { accountIdentity, claudeLoginCommand, duplicateAccountNote, linkAccountTooling, makeClaudeHome } from './account-tooling.mts';
 import { isEngine } from '../shared/engines.mts';
-import { codexAccount, codexFreePlan, codexLoginCommand, makeCodexHome } from './codex-account.mts';
+import { codexAccount, codexFreePlan, codexLoginCommand, codexLoginMode, makeCodexHome } from './codex-account.mts';
 import { codexDefaultModel, codexModelsAcross } from './codex-models.mts';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mts';
 import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-permission.mts';
@@ -86,13 +84,10 @@ export interface SettingsConfig {
   importNew?: boolean | null;
   cornerTag?: boolean | null;
   activeAccount?: Record<string, string | null | undefined> | null;
-  alphaRooms?: boolean | null;
   diagnostics?: boolean;
   posthogKey?: unknown;
   posthogHost?: string;
   alphaTeammates?: unknown;
-  alphaMultiplayer?: boolean | null;
-  alphaGlass?: boolean | null;
   [key: string]: unknown;
 }
 
@@ -173,29 +168,16 @@ export interface SettingsDeps {
 // a question, or none. One reader, here, so the settings screen and the
 // snapshot the inbox is drawn from cannot end up believing different defaults.
 //
-// NOBODY'S TERMINAL IS IN THE INBOX UNLESS THEY ASK FOR IT.
+// A SESSION YOU STARTED YOURSELF IS IN THE INBOX UNLESS YOU TURN IT OFF.
 //
-// So the default is `off` on every install, new or old, and the fact it used to
-// turn on — whether this Mac had run Agentbox before — decides nothing any more.
-// Her own file has no `outsideAgents` in it, which is why the default is the
-// whole of what she sees: measured 2026-08-27, her running app resolved `all`
-// out of this line and filed a row for every session on the machine.
-//
-// SEPARATED IS NOT DELETED, and this is the half that makes it honest. An
-// outside session is still on the project's rail in the sidebar (`onTheRail`,
-// shared/agents.mts), which no mode gates, and still opens in one click. It
-// just does not queue up beside the work she has to answer.
-//
-// WHAT SHE IMPORTS IS UNAFFECTED, and it never came through here. The agents
-// taken in during the first run are FILES (~/.claude/agents/*.md), and each one
-// files its own work item asking for a first job (shared/agent-import.mts).
-// That is the "imported manually" side of her answer, and it is already a
-// separate path from this one.
+// It was off while every session got a row in Needs you, busy or not. A
+// session working on what she typed is In progress now, so on is safe to
+// default to. Off, a session is still on its project's rail (`onTheRail`).
 //
 // A setting actually chosen still wins over this line.
 export function outsideAgentsMode(config?: SettingsConfig | null) {
   if (AGENT_MODES.includes(config?.outsideAgents as AgentMode)) return config!.outsideAgents;
-  return 'off';
+  return 'all';
 }
 
 /* ---------------------------- session grants ------------------------------ */
@@ -616,19 +598,25 @@ export function searchForEngineBin(config: SettingsConfig, engine: string) {
   return { ok: true, state };
 }
 
-// THE ALPHA FEATURES SWITCHES (w-3d0fa23ffb). Teammates and Glass are off
-// unless someone turned them on; only a real `true` counts. Multiplayer is on
-// unless turned off: the first run offers a team, so it cannot wait behind a
-// switch. Rooms is on for someone on a team with Multiplayer on, unless they
-// turned it off, since a team without it gets no Team page
-// (shared/rooms-on.mts); a caller that does not know about the team reads it
-// as no team.
-export function alphaFeatures(config?: SettingsConfig | null, { packaged = isPackagedElectron(), onTeam = false }: { packaged?: boolean; onTeam?: boolean } = {}) {
+// What the old Alpha features page switched. It is gone (w-11d0017da3), so a
+// saved `alphaRooms` is ignored, and `alphaMultiplayer` is read once
+// (`multiplayerWasOff`): nobody could undo either.
+// Rooms is on for anyone on a team, since a team without it gets no Team page;
+// a caller that does not know about the team reads it as no team. AI teammates
+// keep their switch, in General (shared/teammates.mts).
+// Read once, then forgotten: someone who had switched multiplayer off keeps
+// what they made until now to themselves (main/team/index.mts sharedFromNow).
+export function multiplayerWasOff(config: SettingsConfig): boolean {
+  if (config.alphaMultiplayer !== false) return false;
+  saveConfig(config, { alphaMultiplayer: undefined });
+  return true;
+}
+
+export function alphaFeatures(config?: SettingsConfig | null, { onTeam = false }: { onTeam?: boolean } = {}) {
   return {
-    rooms: roomsOnFor(config, onTeam),
+    rooms: onTeam,
     teammates: teammatesOn(config),
-    multiplayer: config?.alphaMultiplayer !== false,
-    glass: config?.alphaGlass === true,
+    multiplayer: true,
   };
 }
 
@@ -1123,6 +1111,8 @@ function codexAccountRows(supervisor: SettingsSupervisor) {
       planNamed: id?.planNamed ?? false,
       accountId: id?.accountId ?? null,
       signedIn: !!id,
+      // A key is a login Codex accepts and agents never run on (`codexKeyRefusal`).
+      apiKey: !id && codexLoginMode(home) === 'apikey',
       // WHICH ONE RUNS, and one of them always does (`chosen` above).
       chosen: chosen === profile,
     };
@@ -1453,23 +1443,14 @@ export function setWorkspaceSetting({ config, supervisor, store }: SettingsDeps,
       if (!value) saveConfig(config, { importNew: false });
       else if (config.importNew !== true) saveConfig(config, { importNew: true, importNewSince: Date.now() });
       break;
-    // Rooms is read on every snapshot.
-    case 'alphaRooms':
-      saveConfig(config, { alphaRooms: !!value });
-      supervisor.onChange?.();
-      break;
     case 'alphaTeammates':
       saveConfig(config, { alphaTeammates: !!value });
       supervisor.onChange?.();
       supervisor.wake?.();
       break;
+    // A phone app from before the Alpha features page went still sends these.
+    case 'alphaRooms':
     case 'alphaMultiplayer':
-      saveConfig(config, { alphaMultiplayer: !!value });
-      supervisor.onChange?.();
-      break;
-    case 'alphaGlass':
-      saveConfig(config, { alphaGlass: !!value });
-      supervisor.onChange?.();
       break;
     // THE CORNER TAG (w-dafae58a23). Turning it back on also ends any hide, so
     // the switch does what it says the moment she flips it.

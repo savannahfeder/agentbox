@@ -38,6 +38,8 @@ import { CommandHistory } from './memory-gate-history.mts';
 import type { Verdict } from './memory-gate-history.mts';
 import { etimeSeconds } from './leftovers.mts';
 import { readMacPressure } from './mac-pressure.mts';
+import { askedByANestedAgent, giveBackAsk, mayAskAgain } from './memory-give-back.mts';
+import type { Holding } from './memory-give-back.mts';
 
 export const PROTOCOL = 1;
 export const DEFAULT_LOCK_PORT = 47263;
@@ -102,6 +104,11 @@ const CLAUDE_AGENT = /(^|\/)claude(\s|$)/;
 // names the file is still measured.
 const HOOK = /^\S*sh (-c '[^']*\/memory-gate-hook\.sh'|\/[^']*\/memory-gate-hook\.sh) (pre|post)$/;
 
+/** Whether `pid` is a running program. One that is another user's still counts. */
+export function isRunning(pid: number): boolean {
+  try { process.kill(pid, 0); return true; } catch (err) { return (err as NodeJS.ErrnoException).code === 'EPERM'; }
+}
+
 /** A process's parent from /proc, or null where there is none (macOS). */
 export function readParentPid(pid: number): number | null {
   try {
@@ -143,12 +150,17 @@ export interface Grant {
 
 export interface GrantLine {
   refused: boolean;
+  /** Answered with what its thread holds instead of being queued or run. */
+  askedBack?: boolean;
   cls?: Verdict | null;
   waitMs: unknown;
   ranMs: unknown;
   peakMb: unknown;
   shared?: boolean;
   pressure?: Pressure | null;
+  /** What the command was expected to take and the room it started in, so the two can be set beside what it took. */
+  needMb?: unknown;
+  roomMb?: unknown;
   command: unknown;
 }
 
@@ -163,6 +175,16 @@ export interface MemoryGateServerOptions {
   ownerOf?: ((session: string) => { item?: unknown; product?: string | null } | null | undefined) | null;
   urgentFor?: ((product: string | null, item: string | null) => unknown) | null;
   readPressure?: () => Promise<PressureReading>;
+  /** How many MB Agentbox has left on this computer and when that was read, or null (main/memory-allowance.mts). */
+  room?: () => { mb: number; at: number } | null;
+  /** This computer's memory, which the light and heavy lines are shares of. Left out, they are the ones measured at 16 GB. */
+  ramMb?: number;
+  /** The thread to ask for memory back, while there is one (main/memory-give-back.mts). */
+  heaviest?: () => Holding | null;
+  /** Whether a pid is a running program now. */
+  running?: (pid: number) => boolean;
+  /** The pids of the workers the app started for a thread: the agent, on a Mac, where a hook's parent may be only its launcher. */
+  agentPids?: (item: string) => number[];
   sampleProcesses?: () => Promise<ProcessSample[]>;
   parentOf?: (pid: number) => number | null;
   pollMs?: number;
@@ -191,6 +213,11 @@ export class MemoryGateServer {
   declare ownerOf: MemoryGateServerOptions['ownerOf'];
   declare urgentFor: MemoryGateServerOptions['urgentFor'];
   declare readPressure: () => Promise<PressureReading>;
+  declare room: () => { mb: number; at: number } | null;
+  declare heaviest: () => Holding | null;
+  declare running: (pid: number) => boolean;
+  declare agentPids: (item: string) => number[];
+  declare askedBack: Map<string, { at: number; mb: number }>;
   declare sampleProcesses: () => Promise<ProcessSample[]>;
   declare parentOf: (pid: number) => number | null;
   declare pollMs: number;
@@ -204,7 +231,7 @@ export class MemoryGateServer {
   declare grants: Map<string, Grant>;
   declare lastPids: Set<number>;
   declare reading: PressureReading;
-  declare counts: { asked: number; waited: number; refused: number; foreign: number };
+  declare counts: { asked: number; waited: number; refused: number; foreign: number; askedBack: number };
   declare dirty: boolean;
   declare stopping?: boolean;
   declare takeoverTimer?: NodeJS.Timeout;
@@ -238,6 +265,11 @@ export class MemoryGateServer {
     // a worker's own request can make its command urgent.
     urgentFor = null,
     readPressure = readMacPressure,
+    room = () => null,
+    ramMb,
+    heaviest = () => null,
+    running = isRunning,
+    agentPids = () => [],
     sampleProcesses = listProcesses,
     parentOf = readParentPid,
     pollMs = 2_000,
@@ -263,16 +295,21 @@ export class MemoryGateServer {
     this.historyFile = historyFile;
     this.grantLogFile = grantLogFile;
     this.grantLogMaxBytes = grantLogMaxBytes;
-    this.history = history ?? loadHistory(historyFile);
+    this.history = history ?? loadHistory(historyFile, ramMb);
     this.clock = clock;
     this.idleReleaseMs = idleReleaseMs;
     this.maxGrantMs = maxGrantMs;
-    this.gate = new MemoryGate({ ...gate, history: this.history, clock });
+    this.gate = new MemoryGate({ heavyMb: this.history.heavyMb, ...gate, history: this.history, clock });
     this.sharedGrantMs = Number.isFinite(sharedGrantMs) ? sharedGrantMs as number : this.gate.maxWaitMs;
     this.scoreFor = scoreFor;
     this.ownerOf = ownerOf;
     this.urgentFor = urgentFor;
     this.readPressure = readPressure;
+    this.room = room;
+    this.heaviest = heaviest;
+    this.running = running;
+    this.agentPids = agentPids;
+    this.askedBack = new Map();
     this.sampleProcesses = sampleProcesses;
     this.parentOf = parentOf;
     this.pollMs = pollMs;
@@ -287,7 +324,7 @@ export class MemoryGateServer {
     // `foreign` is counted apart from `asked` so the figures on the Agents page
     // stay about this app's own work: a Codex session it did not start is let
     // through and is not one of its agents.
-    this.counts = { asked: 0, waited: 0, refused: 0, foreign: 0 };
+    this.counts = { asked: 0, waited: 0, refused: 0, foreign: 0, askedBack: 0 };
     this.dirty = false;
   }
 
@@ -327,7 +364,10 @@ export class MemoryGateServer {
 
   status() {
     const snap = this.gate.snapshot();
-    return { role: this.role, ...snap, freePct: this.reading.freePct, counts: { ...this.counts } };
+    // The Agents page says what the gate is doing, and with no room left it
+    // holds what is known to be big as it does when memory is tight.
+    const pressure: Pressure = snap.pressure === 'normal' && this.gate.room !== null && this.gate.room <= 0 ? 'tight' : snap.pressure;
+    return { role: this.role, ...snap, pressure, freePct: this.reading.freePct, counts: { ...this.counts } };
   }
 
   /* --------------------------- owning the socket --------------------------- */
@@ -485,6 +525,13 @@ export class MemoryGateServer {
     // that is gone before the first sample could walk up through it.
     const ppid = Number(body!.ppid) || null;
     const lineage = this._lineage(ppid);
+    const giveBack = urgent ? null : this._giveBack(whose.item, ppid ? [ppid, ...lineage] : lineage);
+    if (giveBack) {
+      this.counts.askedBack++;
+      this._writeGrant({ refused: false, askedBack: true, cls: this.history.classify(command), waitMs: 0, ranMs: null, peakMb: null, pressure: this.gate.pressure, command });
+      res.end(denyOutput(giveBack));
+      return;
+    }
     let answered = false;
     this.gate.submit({
       id, command, score, urgent, item: whose.item, product: whose.product, session: whose.session ?? null,
@@ -513,6 +560,33 @@ export class MemoryGateServer {
       if (!answered) { this.gate.finish(id); this._pace(); }
     });
     this._pace();
+  }
+
+  /**
+   * THE THREAD HOLDING THE MOST IS TOLD SO, ONCE, IN PLACE OF ITS NEXT COMMAND
+   * (main/memory-give-back.mts). Whatever the command: a thread deep in a test
+   * may ask for nothing heavy for an hour, and it is the telling that matters.
+   * Its command run again is queued or run like any other. `asker` is the pids
+   * above the hook, which are the agent and must never be among what it is
+   * told to stop. A question that throws asks nobody.
+   */
+  _giveBack(item: string | null, asker: number[]): string | null {
+    if (!item) return null;
+    let holding: Holding | null;
+    try { holding = this.heaviest(); } catch { return null; }
+    if (!holding || holding.item !== item) return null;
+    const now = this.clock();
+    if (!mayAskAgain(this.askedBack.get(item), holding, now)) return null;
+    let workers: number[] = [];
+    try { workers = this.agentPids(item) ?? []; } catch { workers = []; }
+    if (askedByANestedAgent(holding, asker, workers)) return null;
+    const ask = giveBackAsk(holding, now, { asker: [...asker, ...workers], running: this.running });
+    if (!ask) return null;
+    // One thread is asked at a time, so only the latest few are worth keeping.
+    if (this.askedBack.size >= 200) this.askedBack.delete(this.askedBack.keys().next().value!);
+    this.askedBack.delete(item);
+    this.askedBack.set(item, { at: now, mb: holding.mb });
+    return ask;
   }
 
   /** The pids above `pid`, nearest first, as far as they can be read. */
@@ -544,6 +618,8 @@ export class MemoryGateServer {
       peakMb: grant?.ambiguous ? null : was.peakMb,
       shared: !!grant?.ambiguous,
       pressure: was.pressureAt,
+      needMb: was.needMb,
+      roomMb: was.roomMb,
       command: was.command,
     });
     // A SHARED READING IS NOT NO READING (w-5601e99977). Every Codex thread of
@@ -580,11 +656,18 @@ export class MemoryGateServer {
     this.pollTimer.unref?.();
   }
 
+  /** A question that throws is not a reason to hold. */
+  _room(): { mb: number; at: number } | null {
+    try { return this.room() ?? null; } catch { return null; }
+  }
+
   async _read() {
     try {
       this.reading = await this.readPressure();
       this.readAt = this.clock();
       this.gate.setPressure(pressureFrom(this.reading, GATE_LINES));
+      const room = this._room();
+      this.gate.setRoom(room?.mb ?? null, room?.at);
       // Processes are only looked at while something is granted: nothing
       // else needs them, and each look costs a `ps`.
       if (this.grants.size) this._sample(await this.sampleProcesses());
@@ -719,7 +802,7 @@ export class MemoryGateServer {
    * Every shell command on the Mac waits on this path, so a write that fails
    * is logged and swallowed rather than returned to the agent.
    */
-  _writeGrant({ refused, cls, waitMs, ranMs, peakMb, shared = false, pressure = null, command }: GrantLine) {
+  _writeGrant({ refused, askedBack = false, cls, waitMs, ranMs, peakMb, shared = false, pressure = null, needMb, roomMb, command }: GrantLine) {
     if (!this.grantLogFile) return;
     try {
       if (this.grantBytes === undefined) {
@@ -741,7 +824,10 @@ export class MemoryGateServer {
         // the slot count; under `tight` nothing heavy starts whatever it is.
         pressure: pressure ?? null,
         ...(shared ? { shared: true } : {}),
+        ...(Number.isFinite(needMb) ? { need: needMb } : {}),
+        ...(Number.isFinite(roomMb) ? { room: roomMb } : {}),
         ...(refused ? { refused: true } : {}),
+        ...(askedBack ? { askedBack: true } : {}),
         cmd: String(command ?? '').slice(0, 300),
       })}\n`;
       fs.appendFileSync(this.grantLogFile, line);
@@ -762,7 +848,7 @@ export class MemoryGateServer {
   }
 }
 
-function loadHistory(file: string | null) {
-  if (!file) return new CommandHistory();
-  try { return CommandHistory.fromJSON(JSON.parse(fs.readFileSync(file, 'utf8'))); } catch { return new CommandHistory(); }
+function loadHistory(file: string | null, ramMb?: number) {
+  if (!file) return new CommandHistory({ ramMb });
+  try { return CommandHistory.fromJSON(JSON.parse(fs.readFileSync(file, 'utf8')), { ramMb }); } catch { return new CommandHistory({ ramMb }); }
 }

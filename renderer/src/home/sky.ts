@@ -47,11 +47,13 @@ const AURORA: Palette = { core: [50, 215, 150], hot: [170, 255, 205], halo: [50,
 
 const DARK_BASE = { y0: 1.0, y1: 0.36, bend: -0.1, dim: 0.95, peak: 0.7, coreW: 0.024, haloW: 0.3, grain: 0.1 };
 
-// The card stays a step off black so rows and text keep their contrast.
+// The same grey as --surface on the dark skies (home.css).
+const DARK_CARD = '#191919';
+
 const DARK_SKIES: Sky[] = [
-  { id: 'dusk', name: 'Dark purple sky', dark: true, art: { ...DARK_BASE, palette: DUSK, bg: '#1a171d' } },
-  { id: 'ember', name: 'Dark orange sky', dark: true, art: { ...DARK_BASE, palette: EMBER, bg: '#1b1917', y0: 0.25, y1: 1.0, peak: 0.3 } },
-  { id: 'aurora', name: 'Dark green sky', dark: true, art: { ...DARK_BASE, palette: AURORA, bg: '#161a19', y0: 0.6, y1: 0.68, bend: -0.55, peak: 0.55, fall: 0.5 } },
+  { id: 'dusk', name: 'Dark purple sky', dark: true, art: { ...DARK_BASE, palette: DUSK, bg: DARK_CARD } },
+  { id: 'ember', name: 'Dark orange sky', dark: true, art: { ...DARK_BASE, palette: EMBER, bg: DARK_CARD, y0: 0.25, y1: 1.0, peak: 0.3 } },
+  { id: 'aurora', name: 'Dark green sky', dark: true, art: { ...DARK_BASE, palette: AURORA, bg: DARK_CARD, y0: 0.6, y1: 0.68, bend: -0.55, peak: 0.55, fall: 0.5 } },
 ];
 
 const light = (palette: Palette, glow: Glow[], over: Partial<SkyArt> = {}): SkyArt => ({
@@ -163,6 +165,7 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
       gx.fillStyle = gr; gx.fillRect(0, 0, W, H);
       g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(gc, 0, 0); g.restore();
     }
+    releaseCanvas(gc);
   }
 
   const q = (v: number, th: number) => { const s = Math.min(1, Math.max(0, v / 255)) * (levels - 1); const f = Math.floor(s); return ((f + (s - f > th ? 1 : 0)) / (levels - 1)) * 255; };
@@ -219,8 +222,20 @@ export function drawSky(canvas: HTMLCanvasElement, art: SkyArt, { from, span, dp
   }
 }
 
+/** A canvas's drawing, given back at once rather than when it is collected: on a 5K screen one sky is 55 MB. */
+export function releaseCanvas(canvas: HTMLCanvasElement | null | undefined): void {
+  if (!canvas) return;
+  canvas.width = 0;
+  canvas.height = 0;
+}
+
 const drawn = new Map<string, HTMLCanvasElement>();
-const KEPT = 3;
+/** The newest sky is always kept; older ones only while all of them fit in this. */
+const KEPT_BYTES = 48 * 1024 * 1024;
+const bytesOf = (c: HTMLCanvasElement) => c.width * c.height * 4;
+
+/** What the kept copies hold, in bytes. */
+export const skyCacheBytes = () => [...drawn.values()].reduce((n, c) => n + bytesOf(c), 0);
 
 /** drawSky, copying a sky already drawn with the same art at the same size instead of drawing it again. */
 export function paintSky(canvas: HTMLCanvasElement, art: SkyArt, opts: Parameters<typeof drawSky>[2]) {
@@ -239,5 +254,9 @@ export function paintSky(canvas: HTMLCanvasElement, art: SkyArt, opts: Parameter
   copy.width = canvas.width; copy.height = canvas.height;
   copy.getContext('2d')?.drawImage(canvas, 0, 0);
   drawn.set(key, copy);
-  for (const old of drawn.keys()) { if (drawn.size <= KEPT) break; drawn.delete(old); }
+  for (const [old, c] of drawn) {
+    if (drawn.size <= 1 || skyCacheBytes() <= KEPT_BYTES) break;
+    drawn.delete(old);
+    releaseCanvas(c);
+  }
 }

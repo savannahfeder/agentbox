@@ -37,6 +37,8 @@ export const ICONS = {
   file: ['M7 4.5h6.5l4 4V19a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z', 'M13.5 4.5v4h4'],
   instructions: ['M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 16h6'],
   search: [circle(10.5, 10.5, 6.5), 'M15.5 15.5 20 20'],
+  // Search with AI: a four-point spark and a small one.
+  ai: ['M10 3.5c.5 3.6 2.4 5.5 6 6-3.6.5-5.5 2.4-6 6-.5-3.6-2.4-5.5-6-6 3.6-.5 5.5-2.4 6-6z', 'M18 14.5c.25 1.7 1.1 2.6 2.8 2.8-1.7.25-2.55 1.1-2.8 2.8-.25-1.7-1.1-2.55-2.8-2.8 1.7-.2 2.55-1.1 2.8-2.8z'],
   // The palette's own.
   plus: ['M12 5v14M5 12h14'],
   compose: ['M11 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5', 'M17.5 3.5l3 3L12 15H9v-3z'],
@@ -97,6 +99,7 @@ const BY_ID: Record<string, IconName> = {
   'projects-page': 'folder',
   search: 'search',
   'all-threads': 'search',
+  'find-by-description': 'ai',
   'view-home': 'home',
   'view-inbox': 'inbox',
   'view-progress': 'progress',
@@ -118,6 +121,7 @@ const BY_ID: Record<string, IconName> = {
   keyhints: 'keyboard',
   'flip-view': 'board',
   'import-agents': 'download',
+  'bring-in': 'download',
   tutorial: 'help',
   'first-run': 'refresh',
   demo: 'spark',
@@ -160,6 +164,7 @@ const BY_ID: Record<string, IconName> = {
 
 // Longest prefix first, so `teammate-pause-` is read before `teammate-`.
 const BY_PREFIX: [string, IconName][] = [
+  ['outside-', 'inbox'],
   ['teammate-pause-', 'pause'],
   ['setting:', 'settings'],
   ['teammate-', 'person'],

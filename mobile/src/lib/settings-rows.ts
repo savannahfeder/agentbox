@@ -4,14 +4,13 @@
 import { ROOMS_SEARCH_ROWS, roomsPageShown } from './rooms-settings';
 
 const ROWS = [
-  'general/Your account', 'general/Counts and crash reports',
+  'general/Your account', 'general/Use AI teammates', 'general/Counts and crash reports',
   'appearance/Theme',
   'phone/Use it on your phone',
-  'alpha/Rooms',
   'claude/Usage', 'claude/Signed in', 'claude/Permission mode',
   'codex/Usage', 'codex/Signed in', 'codex/Permission mode',
   'running/How many run at once', 'running/Hold heavy work when memory is short', 'running/Stop programs agents leave behind',
-  'running/Something felt slow', 'running/Agents you started yourself', 'running/Bring in new chats',
+  'running/Something felt slow', 'running/Terminal sessions', 'running/Bring in new chats',
   'projects/Projects',
   'team/Team',
 ];

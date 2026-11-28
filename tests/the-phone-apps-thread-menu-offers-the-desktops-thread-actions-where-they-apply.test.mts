@@ -66,9 +66,9 @@ describe('Reopen', () => {
     expect(offersOf(item(), facts()).reopen).toBe(false);
     expect(offersOf(item({ status: 'done', agent: { id: 'x' } }), facts()).reopen).toBe(false);
   });
-  it('sends the reopen the computer already takes', () => {
+  it('sends a reopen of a finished thread, which starts nothing (reopen-on-the-phone-starts-nothing-as-the-desktops-does)', () => {
     const plan = planFor({ kind: 'reopen' }, item({ status: 'done' }), NOW);
-    expect(plan.steps).toEqual([{ door: 'reopen', payload: { product: A, id: 'w-1' } }]);
+    expect(plan.steps).toEqual([{ door: 'reopen', payload: { product: A, id: 'w-1', done: true } }]);
     expect(plan.toast).toBe('Reopened: Draw it');
   });
 });

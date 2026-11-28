@@ -121,6 +121,8 @@ export interface PhoneLiveRun {
   since?: unknown;
   where?: string;
   movable?: boolean;
+  /** The computer's memory gate holds its next command. */
+  memoryHeld?: boolean;
   runId?: string;
   doing?: { label?: unknown; startedAt?: unknown }[];
 }
@@ -236,8 +238,23 @@ export interface PhoneState {
 
 type Snapshot = ReturnType<typeof threadSnapshot>;
 type Manifest = ReturnType<ReturnType<typeof createPhoneUploads>['manifest']>;
-type LiveCopy = { since: number; where: 'cloud' | 'mac'; doing: { label: string; startedAt: number }[]; at: number; movable?: boolean; runId?: string };
+type LiveCopy = { since: number; where: 'cloud' | 'mac'; doing: { label: string; startedAt: number }[]; at: number; movable?: boolean; memoryHeld?: true; runId?: string };
 type BuiltCopy = { inputs: string; key: string; live: LiveCopy | null; files: Manifest | null; askKey: string; waitKey: string; changeKey: string; base: Snapshot | null };
+
+// A frozen row is the same object until its thread changes, and a thread's
+// lines are only added to: the same row with as many lines and the same first
+// and last is the same thread, with no need to write it all out again.
+const inputsKept = new WeakMap<object, { lines: number; first: unknown; last: unknown; inputs: string }>();
+/** What a thread's copy is built from, as one short text: the same row and lines give the same one. */
+export function inputsOf(item: unknown, history: unknown): string {
+  const row = typeof item === 'object' && item !== null && Object.isFrozen(item) ? item : null;
+  const lines = Array.isArray(history) ? history : null;
+  const was = row && lines ? inputsKept.get(row) : undefined;
+  if (was && was.lines === lines!.length && was.first === lines![0] && was.last === lines![lines!.length - 1]) return was.inputs;
+  const inputs = crypto.createHash('sha1').update(JSON.stringify(item)).update('\0').update(JSON.stringify(history)).digest('base64');
+  if (row && lines) inputsKept.set(row, { lines: lines.length, first: lines[0], last: lines[lines.length - 1], inputs });
+  return inputs;
+}
 
 export function createPhoneInbox({
   backend,
@@ -349,7 +366,6 @@ export function createPhoneInbox({
   // seconds. A copy is made of the row and its lines and nothing else, so the
   // same row and lines make the same copy.
   const built = new Map<string, BuiltCopy>();
-  const inputsOf = (item: unknown, history: unknown) => crypto.createHash('sha1').update(JSON.stringify(item)).update('\0').update(JSON.stringify(history)).digest('base64');
   // What each running thread's copy last said about the run, by thread.
   const lives = new Map<string, LiveCopy>();
   const liveNow = (sk: string, slug: string, id: string): LiveCopy | null => {
@@ -364,11 +380,12 @@ export function createPhoneInbox({
     const movable = raw.where !== 'cloud' && raw.movable === true;
     const sameRun = was && was.since === raw.since && was.where === raw.where && !!was.movable === movable;
     const runId = raw.runId ?? (sameRun ? was.runId : undefined);
-    const same = sameRun && was.runId === runId;
+    const memoryHeld = raw.memoryHeld === true;
+    const same = sameRun && was.runId === runId && !!was.memoryHeld === memoryHeld;
     const steps = (l: { doing: { label: string }[] }) => JSON.stringify(l.doing.map((d) => d.label));
     if (same && now() - was.at < STEP_EVERY_MS) return was;
     if (same && now() - was.at < STILL_RUNNING_MS && steps(was) === steps({ doing })) return was;
-    const live: LiveCopy = { since: Number(raw.since) || now(), where: raw.where === 'cloud' ? 'cloud' : 'mac', doing, at: now(), ...(movable ? { movable } : {}),
+    const live: LiveCopy = { since: Number(raw.since) || now(), where: raw.where === 'cloud' ? 'cloud' : 'mac', doing, at: now(), ...(movable ? { movable } : {}), ...(memoryHeld ? { memoryHeld: true as const } : {}),
       ...(raw.where === 'cloud' && /^[A-Za-z0-9._-]{1,120}$/.test(runId ?? '') ? { runId } : {}),
     };
     lives.set(sk, live);
@@ -938,7 +955,10 @@ const ROUTES: Record<string, (c: RouteCommand) => Route> = {
   'run-now': (c) => ['zero:run-now', { product: c.project, id: c.item }],
   'move-to-cloud': (c) => ['zero:move-to-cloud', { ids: [c.item] }],
   'send-now': (c) => ['zero:send-now', { product: c.project, id: c.item }],
-  reopen: (c) => ['zero:reopen', { product: c.project, id: c.item }],
+  // As the window's Reopen on a done thread (App.tsx `reopenDone`): the reply it already heard does not run again.
+  reopen: (c) => (c.payload.done === true
+    ? ['zero:answer', { product: c.project, id: c.item, status: 'open', reopen: true }]
+    : ['zero:reopen', { product: c.project, id: c.item }]),
   schedule: (c) => ['zero:schedule', { product: c.project, id: c.item, runAt: c.payload.runAt }],
   approve: (c) => ['zero:approve', { id: c.payload.approval, allow: c.payload.allow === true, ...(typeof c.payload.note === 'string' ? { note: c.payload.note } : {}), card: c.payload.card }],
   new: (c) => ['zero:compose', { product: c.project, title: c.payload.title ?? '', body: c.payload.body ?? '', fromPhone: c.id, ...phoneChoices('new', c.payload) }],

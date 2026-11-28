@@ -10,7 +10,7 @@ import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
 import { api } from '../api';
-import { filesInLines, lineAsThread, marksOf, opensBigInAGroup, otherFilesInLines, threadFiles } from '../../../shared/artifact-marks.mts';
+import { filesInLines, lineAsThread, marksOf, opensBigInAGroup, otherFilesInLines, shownName, threadFiles } from '../../../shared/artifact-marks.mts';
 import { whereAFileOpens } from '../artifact-layout';
 import { ArtifactView, type ArtifactOpen } from '../components/ArtifactView';
 import { markGoesTo, withElsewhere } from '../components/ThreadArtifacts';
@@ -22,6 +22,7 @@ import { docKind } from '../doc-pane';
 import { itemThread } from '../item-thread';
 import { mentionKind } from '../mentions';
 import { artifactUrlTransform, isMediaPath } from '../remark-artifact-paths';
+import { JUST_ITS_NAME } from '../media-row';
 import { firstName, Face, TeamContext } from '../team/people';
 import { FollowContext } from '../team/following';
 import type { LedgerLine } from '../thread-history';
@@ -31,7 +32,7 @@ import { HandOffWhat } from '../team/HandOff';
 import { doneSteps } from '../../../shared/thread-cards.mts';
 import { MessagePerson, TeammateStanding, TeammateSummary, ThreadCrumb } from './Summary';
 import { ThreadMenu } from './ThreadMenu';
-import { aroundTheAnswer, notesWithYourReply, stillOnItsWay, askEndedWords, earlierWords, endWasInView, filesOnThread, notSharedWords, notesOnFile, shownOnTheirThread } from './teammate-thread';
+import { aroundTheAnswer, handBackAsSent, notesWithYourReply, stillOnItsWay, askEndedWords, earlierWords, endWasInView, filesOnThread, notSharedWords, notesOnFile, shownOnTheirThread } from './teammate-thread';
 import { HAND_BACK_EVENT, type AskVerdict } from '../thread-commands';
 import { canContinue } from './continue-thread';
 import { commentsToHand, type HandedComment } from './comments-to-hand';
@@ -201,11 +202,12 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   const md = useMemo(() => {
     const roots = dir ? [dir] : [];
     const components = {
-      a: ({ href, children }: { href?: string; children?: ReactNode }) => {
+      a: ({ href, title, children }: { href?: string; title?: string; children?: ReactNode }) => {
         const connection = connectionLinkOf(href);
         if (connection) return <ConnectionLink id={connection.id}>{children}</ConnectionLink>;
         if (!href || !COPY.test(href)) return <a href={href} target="_blank" rel="noreferrer">{children}</a>;
         const label = typeof children === 'string' ? children : Array.isArray(children) ? children.join('') : undefined;
+        if (title === JUST_ITS_NAME) return <ArtifactLink kind={mentionKind(href)} product={product} src={href} onOpen={() => open(href)}>{children}</ArtifactLink>;
         if (PICTURE.test(href)) return <ArtifactImg key={href} src={href} alt={label} roots={roots} onOpen={open} />;
         if (isMediaPath(href)) return <ArtifactMedia key={href} src={href} label={label} roots={roots} onOpen={open} />;
         return <ArtifactLink kind={mentionKind(href)} product={product} src={href} onOpen={() => open(href)}>{children}</ArtifactLink>;
@@ -332,7 +334,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
   // which stands here until the thread has it.
   const reviewing = ask?.ask?.kind === 'review' && !!onHandBack;
   const held = reviewing && ask ? notesWithYourReply(marks.notes, versionNames, team?.me ?? null, ask.createdAt ?? 0) : null;
-  const [sentBack, setSentBack] = useState<{ at: number; text: string } | null>(null);
+  const [sentBack, setSentBack] = useState<{ at: number; text: string; shown: string } | null>(null);
   useEffect(() => { setSentBack(null); }, [personId, threadId]);
   const send = async (said?: string) => {
     const text = (said ?? draft).trim();
@@ -346,7 +348,9 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
       if (held?.ids.length) void api.teamMarkFile({ personId, threadId, mark: { do: 'sent', on: held.ids } }).catch(() => {});
       setDraft('');
       setBoxOpen(false);
-      setSentBack({ at, text: text || held?.text || '' });
+      const pathOf = (name: string) => copies.find((c) => shownName(c.file) === name)?.path ?? null;
+      const shown = handBackAsSent({ kind: ask?.ask?.kind ?? 'review', words: [text, held?.text].filter(Boolean).join('\n\n'), approvals: marks.approvals, me: team?.me ?? '', since: ask?.createdAt ?? 0, pathOf });
+      setSentBack({ at, text: text || held?.text || '', shown });
       following?.follow(card);
       return;
     }
@@ -446,7 +450,13 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             return out?.ok ? null : out?.error ?? 'That did not save.';
           }}
           editGoes={`Sent to ${owner}.`}
-          onHandToAgent={onContinue ? (files) => { setBig(null); onContinue(commentsToHand(marks.notes, { me: team?.me ?? null, files }), files); } : undefined}
+          onHandToAgent={onContinue ? (files) => {
+            setBig(null);
+            const comments = commentsToHand(marks.notes, { me: team?.me ?? null, files });
+            // Found where this view opens it; a file not here goes by its name alone.
+            const here = files.map((f) => api.resolveDoc({ product, src: f }).then((r) => (r.ok && r.opened ? r.opened : shownName(f)), () => shownName(f)));
+            void Promise.all(here).then((found) => onContinue(comments, found));
+          } : undefined}
           onBeside={(path) => { setBig(null); beside(path); }}
           onClose={() => setBig(null)} />
       )}
@@ -495,7 +505,7 @@ export function TeammateThread({ card, person, now, syncedAt, openAt, onOpenDoc,
             {underAsk.length > 0 && <FileMarkOpener.Provider value={openMark}>
               <Thread events={underAsk} name={`${owner}'s agent`} landOn={`${threadId}:after-ask`} onWhole={() => {}} md={md} />
             </FileMarkOpener.Provider>}
-            {sentBack && stillOnItsWay(events, sentBack) && <Thread events={[{ at: sentBack.at, who: 'you', text: sentBack.text, ...(team?.me ? { by: team.me } : {}) }]}
+            {sentBack && stillOnItsWay(events, sentBack) && <Thread events={[{ at: sentBack.at, who: 'you', text: sentBack.shown, ...(team?.me ? { by: team.me } : {}) }]}
               name={`${owner}'s agent`} landOn={`${threadId}:sent-back`} onWhole={() => {}} md={md} />}
             {(handedToYou || (ended && !ask)) && <p className="th-work-note tp-ask-ended">
               {askEndedWords(firstName(person) || 'Someone', !!handedToYou)}

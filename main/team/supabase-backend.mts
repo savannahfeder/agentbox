@@ -401,10 +401,10 @@ export function supabaseBackend(client: SupabaseClient) {
 
     // YOUR CARDS: one per thread worth showing the team (shared/thread-cards.mts).
     // The ones in `changed` are upserted whole (all of them without it), and
-    // any card of yours the Mac no longer lists is removed, so a thread made
-    // private or finished yesterday leaves the board. A card not marked
+    // the ones in `gone` are removed, so a thread made private or finished
+    // yesterday leaves the board. A card not marked
     // visible never goes up at all, whatever the Mac handed over.
-    async putCards(teamId: string, all: CardToPut[], changed?: ReadonlySet<string>) {
+    async putCards(teamId: string, all: CardToPut[], changed?: ReadonlySet<string>, gone: readonly string[] = []) {
       const me = await myId();
       const cards = all.filter((c) => c.visible === true);
       const writing = changed ? cards.filter((c) => changed.has(c.threadId)) : cards;
@@ -430,9 +430,9 @@ export function supabaseBackend(client: SupabaseClient) {
         if (['PGRST204', '42703'].includes(res.error?.code as string)) res = await put(rows.map(({ shipped_at: _, task: __, ...r }) => r));
         must(res, 'sharing your threads with the team');
       }
-      let stale = client.from('thread_cards').delete().eq('person_id', me);
-      if (cards.length) stale = stale.not('thread_id', 'in', `(${cards.map((c) => `"${c.threadId}"`).join(',')})`);
-      must(await stale, 'clearing threads the team no longer needs to see');
+      const listed = new Set(cards.map((c) => c.threadId));
+      const drop = gone.filter((id) => !listed.has(id));
+      if (drop.length) must(await client.from('thread_cards').delete().eq('person_id', me).in('thread_id', drop), 'clearing threads the team no longer needs to see');
     },
 
     async listCards() {

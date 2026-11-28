@@ -118,6 +118,7 @@ export type WorkItemPatch = {
   signInAnswer?: SignInAnswer;
   ask?: AskPatch;
   verdict?: Verdict;
+  approvedFiles?: string[];
 };
 export type WorkItemField = keyof WorkItemPatch;
 export type PatchInput = { readonly [K in WorkItemField]?: unknown };
@@ -137,7 +138,8 @@ export interface FieldWrite {
   forAgent?: AgentVoice;
 }
 
-export interface TalkLine { by: string; ts: number; text: string; voice?: AgentVoice; forAgent?: AgentVoice }
+/** `cut`: the words ran past what the record keeps, so `text` is their start. */
+export interface TalkLine { by: string; ts: number; text: string; voice?: AgentVoice; forAgent?: AgentVoice; cut?: true }
 export interface TalkThread { by: string; text: string; voice?: AgentVoice; replies: TalkLine[] }
 export interface Talk {
   chat: TalkLine[];
@@ -181,6 +183,7 @@ interface Said {
   crossed?: number;
   voice?: AgentVoice;
   forAgent?: AgentVoice;
+  cut?: true;
 }
 interface Close { by: string; ts: number; done: boolean; spoke: boolean }
 type ArtifactLine = ArtifactMarkPatch & { by: string | null; ts: number; uid: string | null };
@@ -425,6 +428,8 @@ export const WORK_ITEM_FIELDS: readonly WorkItemField[] = [
   // A TASK THAT ASKS FOR HELP OR A REVIEW ON ONE THREAD, and what its holder
   // said when they handed it back (shared/thread-asks.mts).
   'ask', 'verdict',
+  // The files they approved while the ask was on them, by name, on the verdict's line.
+  'approvedFiles',
 ];
 
 // THE SUMMARY IS SHARED BETWEEN THE PERSON AND THE AGENT. Everywhere else the
@@ -832,6 +837,10 @@ function coerceField(field: string, value: Unchecked): PatchValue | undefined {
       return kind && owner && thread && product ? { kind, owner, thread, product, ...(step ? { step } : {}), ...(note ? { note } : {}) } : undefined;
     }
     case 'verdict': return value === 'done' || value === 'yes' || value === 'changes' ? value : undefined;
+    case 'approvedFiles': {
+      if (!Array.isArray(value)) return undefined;
+      return [...new Set(value.map((v) => str(v, MAX_SHORT)).filter(Boolean) as string[])].slice(0, MAX_LABELS);
+    }
     case 'shippedAt': return Number.isFinite(value) && (value as number) >= 0 ? Math.trunc(value as number) : undefined;
     case 'linkComment': {
       if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
@@ -936,7 +945,9 @@ export function finishItem(raw: FoldingItem, now = Date.now()): WorkItem {
     const said = edits?.size ? item.said.flatMap((s) => {
       const e = s.uid ? edits.get(s.uid) : null;
       if (!e) return [s];
-      return e.gone ? [] : [{ ...s, text: e.text!.trim().slice(0, TALK_TEXT) }];
+      if (e.gone) return [];
+      const { text, cut } = talkText(e.text!);
+      return [{ ...s, text, cut }];
     }) : item.said;
     delete item.said;
     if (Array.isArray(item.people) && item.people.length) {
@@ -1034,7 +1045,7 @@ export function foldRawInto(items: Map<string, FoldingItem>, lines: unknown, tou
     if (line.by && words && words.trim() && !told) {
       const close = item.status === 'done' ? item.wrote.status : null;
       const crossed = close?.by && close.by !== line.by && line.ts < close.ts && !item.said?.some((s) => s.uid && s.uid === line.uid);
-      (item.said ??= []).push({ uid: line.uid ?? null, by: line.by, ts: line.ts, text: words.trim().slice(0, TALK_TEXT), inReplyTo: patch.inReplyTo ?? null, body: typeof patch.answer !== 'string', ...(crossed ? { crossed: close.ts } : {}), ...(patch.voice ? { voice: patch.voice } : {}), ...(patch.forAgent ? { forAgent: patch.forAgent } : {}) });
+      (item.said ??= []).push({ uid: line.uid ?? null, by: line.by, ts: line.ts, ...talkText(words), inReplyTo: patch.inReplyTo ?? null, body: typeof patch.answer !== 'string', ...(crossed ? { crossed: close.ts } : {}), ...(patch.voice ? { voice: patch.voice } : {}), ...(patch.forAgent ? { forAgent: patch.forAgent } : {}) });
     }
     // Who closed the chat and when, so `whatWaits` can tell a reopen by your own
     // message (still settled) from an undo of the close (not).
@@ -1151,6 +1162,10 @@ export function foldWorkItems(lines: unknown, now = Date.now()): Map<string, Wor
 const WITHDRAWN = '(withdrawn)';
 // How much of a message the record keeps: enough for a row's one line.
 export const TALK_TEXT = 280;
+const talkText = (words: string): { text: string; cut?: true } => {
+  const all = words.trim();
+  return all.length > TALK_TEXT ? { text: all.slice(0, TALK_TEXT), cut: true } : { text: all };
+};
 // How many of the newest messages the record keeps, in the chat and in each
 // thread. The counts it answers stop at your own newest word, which in a chat
 // you are part of is never this far back.
@@ -1185,6 +1200,12 @@ export const GIVEN_TASK = 'given-task';
 /** The mark on a thread about one piece of work, started with a subject in a message record. */
 export const WORK_THREAD = 'work-thread';
 
+/** A task closed by whoever gave it: taken back. Like a hand-back, words on it after are a message, not the task again. */
+export function takenBack(item: { status?: string; labels?: readonly string[]; assignee?: string | null; wrote?: Record<string, { by?: string } | undefined> }): boolean {
+  const by = item.status === 'done' ? item.wrote?.status?.by : null;
+  return !!by && !!item.assignee && by !== item.assignee && (item.labels ?? []).includes(GIVEN_TASK);
+}
+
 // A reply reopens a closed chat only if its sender's Mac saw the close, since
 // that is what writes the reopen. One that did not (stamped after the close, or
 // before it but reaching this Mac after) reopens it here, or it is on no list.
@@ -1193,6 +1214,7 @@ function reopenIfWrittenPastTheClose(item: FoldingItem, said: Said[]): void {
   if (!close?.by) return;
   // An ask handed back (shared/thread-asks.mts) stays handed back: a thank-you after it is a message, not more work.
   if (item.ask && item.verdict) return;
+  if (takenBack(item)) return;
   const others = said.filter((s) => s.by !== close.by && !s.body);
   const crossed = others.filter((s) => s.crossed === close.ts);
   if (!crossed.length && !others.some((s) => s.ts > close.ts)) return;
@@ -1209,7 +1231,7 @@ function talkOf(said: Said[]): Talk {
   for (const s of lines) {
     // A rename that sends the same opening words again is not a new message.
     if (s.body) { if (bodies.has(s.text)) continue; bodies.add(s.text); }
-    const said1 = { by: s.by, ts: s.ts, text: s.text, ...(s.voice ? { voice: s.voice } : {}), ...(s.forAgent ? { forAgent: s.forAgent } : {}) };
+    const said1: TalkLine = { by: s.by, ts: s.ts, text: s.text, ...(s.voice ? { voice: s.voice } : {}), ...(s.forAgent ? { forAgent: s.forAgent } : {}), ...(s.cut ? { cut: true } : {}) };
     const parent = s.inReplyTo ? parents.get(s.inReplyTo) : null;
     if (parent) {
       (threads[s.inReplyTo!] ??= { by: parent.by, text: parent.text, replies: [], ...(parent.voice ? { voice: parent.voice } : {}) }).replies.push(said1);

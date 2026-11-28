@@ -11,13 +11,14 @@
 // team layout on for every person with no team: the Rooms service reports
 // `on: enabled()` while it is not started, and the window takes that as team
 // mode. Now a missing switch means on only for someone signed in and on a team,
-// and main, the window and the phone read that through one rule.
+// and main, the window and the phone read that through one rule. Since
+// 2026-11-26 (w-11d0017da3) there is no switch at all: a saved one is not read.
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { roomsOn, isOnTeam } from '../shared/rooms-on.mts';
-import { alphaFeatures, setWorkspaceSetting } from '../main/settings.mts';
+import { isOnTeam } from '../shared/rooms-on.mts';
+import { alphaFeatures } from '../main/settings.mts';
 import { roomsSetup } from '../main/team/room-setup.mts';
 import * as disk from '../main/store/work-items.mts';
 import { Store } from '../main/store.mts';
@@ -41,10 +42,10 @@ const roomsService = (config: { alphaRooms?: boolean | null; alphaMultiplayer?: 
 // Rooms as main, the window's snapshot and Settings read it for one person.
 const everywhere = (config: { alphaRooms?: boolean | null }, team: typeof ON_TEAM | typeof NO_TEAM) => {
   const onTeam = isOnTeam(team);
-  return { rule: roomsOn({ saved: config.alphaRooms, onTeam }), service: roomsService(config).enabled({ onTeam }), window: alphaFeatures(config, { onTeam }).rooms };
+  return { service: roomsService(config).enabled({ onTeam }), window: alphaFeatures(config, { onTeam }).rooms };
 };
-const off = { rule: false, service: false, window: false };
-const on = { rule: true, service: true, window: true };
+const off = { service: false, window: false };
+const on = { service: true, window: true };
 
 describe('Rooms with nothing saved', () => {
   it('is off for someone signed out, as before', () => {
@@ -59,27 +60,19 @@ describe('Rooms with nothing saved', () => {
   it('is on for someone on a team', () => {
     expect(everywhere({}, ON_TEAM)).toEqual(on);
   });
-  it('leaves every other alpha default as it was', () => {
-    expect(alphaFeatures({}, { packaged: true })).toEqual({ rooms: false, teammates: false, multiplayer: true, glass: false });
-    expect(alphaFeatures({}, { packaged: true, onTeam: true })).toEqual({ rooms: true, teammates: false, multiplayer: true, glass: false });
+  it('leaves AI teammates and multiplayer on', () => {
+    expect(alphaFeatures({})).toEqual({ rooms: false, teammates: true, multiplayer: true });
+    expect(alphaFeatures({}, { onTeam: true })).toEqual({ rooms: true, teammates: true, multiplayer: true });
   });
 });
 
-describe('Rooms someone set', () => {
-  it('saved on is on with no team, as it was for those who opted in', () => {
-    expect(everywhere({ alphaRooms: true }, SIGNED_OUT)).toEqual(on);
-    expect(everywhere({ alphaRooms: true }, NO_TEAM)).toEqual(on);
+describe('a Rooms switch saved before the switch went', () => {
+  it('saved on is off with no team', () => {
+    expect(everywhere({ alphaRooms: true }, SIGNED_OUT)).toEqual(off);
+    expect(everywhere({ alphaRooms: true }, NO_TEAM)).toEqual(off);
   });
-  it('saved off stays off on a team', () => {
-    expect(everywhere({ alphaRooms: false }, ON_TEAM)).toEqual(off);
-  });
-  it('unticking the switch saves a real false, so it stays off after a restart', () => {
-    const dir = tmp();
-    const world = { config: { appDir: dir } as Record<string, unknown>, supervisor: { onChange() {} }, store: {} };
-    setWorkspaceSetting(world, { key: 'alphaRooms', value: false });
-    const saved = JSON.parse(fs.readFileSync(path.join(dir, 'zero.config.json'), 'utf8'));
-    expect(saved.alphaRooms).toBe(false);
-    expect(alphaFeatures(saved, { onTeam: true }).rooms).toBe(false);
+  it('saved off is on for someone on a team', () => {
+    expect(everywhere({ alphaRooms: false }, ON_TEAM)).toEqual(on);
   });
 });
 
@@ -146,27 +139,16 @@ describe('joining and leaving a team while the app runs', () => {
     expect(dev.roomsShown()).toBe(false);
   });
 
-  it('never starts for someone on a team who turned Multiplayer off', async () => {
+  it('starts for someone on a team who once turned Multiplayer off', async () => {
     const sam = await aMac('sam@solo.test', 'Sam Park', { alphaMultiplayer: false });
     await sam.service.signIn();
     await sam.service.createTeam('Solo');
     await sam.service.syncNow();
     await sam.service.syncNow();
     expect(isOnTeam(sam.service.state())).toBe(true);
-    expect(sam.presence).toEqual([]);
-    expect(sam.service.state().rooms?.on).toBe(false);
+    expect(sam.presence).toContain('here');
+    expect(sam.roomsShown()).toBe(true);
     await sam.service.signOut();
-  });
-});
-
-describe('a person on a team with Multiplayer off', () => {
-  it('gets no Rooms with nothing saved for it', () => {
-    expect(alphaFeatures({ alphaMultiplayer: false }, { onTeam: true }).rooms).toBe(false);
-    expect(roomsService({ alphaMultiplayer: false }).enabled({ onTeam: true })).toBe(false);
-  });
-  it('keeps Rooms they turned on themselves, as before', () => {
-    expect(alphaFeatures({ alphaMultiplayer: false, alphaRooms: true }, { onTeam: true }).rooms).toBe(true);
-    expect(roomsService({ alphaMultiplayer: false, alphaRooms: true }).enabled({ onTeam: true })).toBe(true);
   });
 });
 

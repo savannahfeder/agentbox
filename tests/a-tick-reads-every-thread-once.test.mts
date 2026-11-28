@@ -74,6 +74,23 @@ describe('one tick', () => {
     expect(sup.seen.map((i) => i.id)).toContain(thread.id);
   });
 
+  // AI teammates went on for everyone (w-db46e3fcfd) and their pass read every
+  // thread a second time on each tick: 2 reads where this test wants 1.
+  it('hands the teammates pass that one read, and reads again only when it wrote', async () => {
+    const sup = supervisor();
+    let handed = null;
+    sup.serveTeammates = async (_now, items) => { handed = items; };
+    await sup.tick();
+    expect(reads).toBe(1);
+    expect(handed.map((i) => i.id)).toContain(thread.id);
+
+    reads = 0;
+    sup.serveTeammates = async () => { disk.updateWorkItem(dir, thread.id, { note: 'A teammate run was made.' }, { source: 'system' }); };
+    await sup.tick();
+    expect(reads).toBe(2);
+    expect(sup.seen.find((i) => i.id === thread.id).note).toBe('A teammate run was made.');
+  });
+
   it('reads again when it resolved a comment, so the rest of the pass sees it resolved', async () => {
     disk.updateWorkItem(dir, thread.id, { result: `Done: designs/${thread.id}/plan-v2.md` }, { source: 'agent' });
     const sup = supervisor();

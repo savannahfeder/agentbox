@@ -8,11 +8,12 @@
 // Git runs it in the private checkout with `<local ref> <local sha> <remote
 // ref> <remote sha>` lines on stdin. The way past it: git push --no-verify.
 
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scan } from './check-before-public.mjs';
 import { gateFor } from './lib/tests-the-push-runs.mjs';
+import { runSandboxed } from './lib/branch-sandbox.mjs';
 
 const ZERO = /^0+$/;
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
@@ -75,9 +76,10 @@ if (tests.length) {
   if (!fs.existsSync(vitest)) refuse('the skill tests need the public checkout\'s packages; run npm ci there');
   const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
   console.error(`private push: running the ${tests.length} skill test file(s) this push reaches.`);
-  const run = spawnSync(vitest, ['run', '--passWithNoTests', ...tests.map((f) => path.join(owner.rel, f))], {
-    cwd: owner.root, env, stdio: ['ignore', 2, 2], timeout: TESTS_MS, killSignal: 'SIGKILL',
+  // A worker may have written these tests, so they run as the public push runs a branch's.
+  const status = runSandboxed(vitest, ['run', '--passWithNoTests', ...tests.map((f) => path.join(owner.rel, f))], {
+    cwd: owner.root, env, stdio: ['ignore', 2, 2], timeout: TESTS_MS,
   });
-  if (run.status !== 0) refuse(`the skill tests failed (${tests.join(', ')})`);
+  if (status !== 0) refuse(`the skill tests failed (${tests.join(', ')})`);
 }
 console.error('private push: checked.');

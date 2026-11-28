@@ -57,7 +57,7 @@ import { gitHubPushSignIn } from './github-push-sign-in.mts';
 import { liveAddress } from './team/live-room.mts';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mts';
-import { alphaFeatures } from './settings.mts';
+import { alphaFeatures, multiplayerWasOff } from './settings.mts';
 import { appHome, carryMisplacedMachinery, carryMovedStoreMachinery, storeRootEnv } from './store/home.mts';
 import { keepAnswerModesIn } from './answer-modes.mts';
 
@@ -232,7 +232,6 @@ export function answerWhatOnlyTheWindowAnswered(ipcMain: CollectingIpcMain) {
   ipcMain.handle('zero:take-shared-file', () => null);
   ipcMain.handle('zero:crash', (_e, payload) => { reportFromRenderer(payload ?? {}); return null; });
   ipcMain.handle('zero:blank-check', () => null);
-  ipcMain.handle('zero:glass-tone', () => null);
   ipcMain.handle('zero:window-buttons', () => null);
   // The phone door belongs to the desktop app (main/phone-link.mts); a tab is told there is none.
   ipcMain.handle('zero:phone-link', () => null);
@@ -307,6 +306,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
     shareSite: cloudConfig.phoneSite ?? null,
     ownMates: () => matesForTheTeam(store, config),
     sharing: () => alphaFeatures(config).multiplayer,
+    sharedFromNow: () => multiplayerWasOff(config),
     tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),
     rooms: roomsSetup({ config, store, supervisor, userDir }),
   }) : null;

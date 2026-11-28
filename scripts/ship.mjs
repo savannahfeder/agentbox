@@ -26,10 +26,12 @@
 // the public main by fast-forward, on its own; a script writing into it is the
 // habit that put unshipped work there.
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { racedWithAnotherPush, notReadyToShip, runsEveryTest, startedWhenBusy } from './lib/ship-rules.mjs';
 import { deployAfterShip } from './lib/web-app-deploy.mjs';
+import { signedGit } from './lib/push-sign-in.mjs';
 import { pushPrivateFolder } from './lib/private-folder.mjs';
 
 // THE FOLDER IT SHIPS IS THE ONE IT RUNS IN. `npm run ship` runs in the
@@ -66,11 +68,26 @@ const drained = (stream) => new Promise((resolve) => stream.write('', resolve));
 const exit = async (code) => { await drained(process.stdout); await drained(process.stderr); process.exit(code); };
 const stop = (msg) => { console.error(`\nship: ${msg}\n`); return exit(1); };
 
+// THE GITHUB SIGN-IN COMES ON STDIN, and the app sends it only to a script
+// that carries this line: agentbox-push-sign-in: stdin
+// It stays in this process's memory, out of every environment, because the
+// push hook runs the branch's own tests as the user, and they can list the
+// environment of every process the user runs.
+const token = process.env.AGENTBOX_PUSH_SIGN_IN === 'stdin' ? fs.readFileSync(0, 'utf8').trim() : '';
+const site = process.env.AGENTBOX_PUSH_SITE || 'https://github.com';
+const signed = signedGit({ token, site });
+const signedIn = (args, opts = {}) => startedWhenBusy(() => signed(args, { cwd: root, remote: PUBLIC, pushing: args.includes('push'), ...opts }));
+const fetchPublic = () => {
+  const r = signedIn([...OWN_SETTINGS_ONLY, 'fetch', PUBLIC, '--quiet']);
+  if (r.error) throw r.error;
+  if (r.status !== 0) throw new Error(`git fetch ${PUBLIC} --quiet failed (${r.status}):\n${r.stderr ?? ''}`);
+};
+
 const gitDir = git('rev-parse', '--absolute-git-dir');
 const commonDir = git('rev-parse', '--path-format=absolute', '--git-common-dir');
 const branch = git('rev-parse', '--abbrev-ref', 'HEAD');
 
-git('fetch', PUBLIC, '--quiet');
+fetchPublic();
 
 const why = notReadyToShip({
   isPrimaryWorktree: gitDir === commonDir,
@@ -80,7 +97,7 @@ const why = notReadyToShip({
 });
 if (why) await stop(why);
 
-const privately = pushPrivateFolder(root, { message: `Changes from ${branch}`, trusted: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..') });
+const privately = pushPrivateFolder(root, { message: `Changes from ${branch}`, signIn: signed, trusted: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..') });
 if (privately.pushed) say(`pushed ${privately.commits} commit(s) in ${privately.path} to its own repository.`);
 else if (privately.why) say(`${privately.why}. Push it from there by hand.`);
 
@@ -106,7 +123,7 @@ for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
   // ship has is the hook's, inside this push, so this buffer now carries every
   // failure anybody will read: node's default is a megabyte, and a truncated
   // one returns no status at all and would be read as a refusal with no reason.
-  const pushed = runGit(['push', PUBLIC, 'HEAD:main'], { cwd: root, maxBuffer: 64 * 1024 * 1024 });
+  const pushed = signedIn(['push', PUBLIC, 'HEAD:main'], { maxBuffer: 64 * 1024 * 1024 });
   // In that order, so git's own refusal and this script's come after the test run.
   process.stdout.write(pushed.stdout ?? '');
   await drained(process.stdout);
@@ -117,14 +134,14 @@ for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
     say('the app folder follows on its own: git fetch origin && git merge --ff-only refs/remotes/origin/main');
     say(`check the run: gh run list -R savannahfeder/agentbox -L 3`);
     // Shipped whatever happens here; a deploy that did not work says so.
-    try { await deployAfterShip({ root, say, until: shipEndsBy }); } catch (err) { say(`the web app was not updated: ${err?.message ?? err}. Put it up with: npm run phone:deploy`); }
+    try { await deployAfterShip({ root, say, until: shipEndsBy, trusted: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..') }); } catch (err) { say(`the web app was not updated: ${err?.message ?? err}. Put it up with: npm run phone:deploy`); }
     await exit(0);
   }
   if (!racedWithAnotherPush(`${pushed.stdout ?? ''}${pushed.stderr ?? ''}`)) {
     await stop('that push was refused rather than raced, so nothing was retried. The reason is above.');
   }
   say('somebody pushed first. Fetching what they did and going round again.');
-  git('fetch', PUBLIC, '--quiet');
+  fetchPublic();
 }
 
 await stop(`${ATTEMPTS} attempts and main moved every time. Something is pushing constantly; try again in a minute.`);

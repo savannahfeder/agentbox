@@ -10,13 +10,14 @@ import { REST_HEADING, URGENT_HEADING, clickIntent, rowSummary, rowTitle } from 
 import { isUrgentRow } from '../urgent-arrival';
 // THE SAME PREDICATE THE PANE USES, not a second copy of the rule. The row and
 // the pane disagreeing about one fact on one screen is what this import fixes.
-import { cameBackEmpty, cannotStartLine, runningSince } from '../live-line';
+import { cameBackEmpty, cannotStartLine, cannotStartWord, runningSince } from '../live-line';
 import { agentAtWork, engineWordFor } from '../byline';
 import { DEFAULT_ENGINE } from '../../../shared/engines.mts';
 import { isTroubleRow } from '../trouble-row';
 import { isUpdateRow } from '../update-row';
 import { IMPORT_KEYS, JUST_IMPORTED_WORD, NOT_IMPORTED_HEADING, NOT_IMPORTED_KEYS, isImportRow, isNotImportedRow, justImported, type ImportChoice } from '../import-row';
 import { Hits } from './Hits';
+import { useLetGoWhenGone } from '../threads/steady-rows';
 import type { ThreadSearchDetails } from '../threads/search';
 import { nextRunWords, repeatRow, repeatTag } from '../repeat-words';
 import { Face, TeamRowEnd, firstName, type TeamView } from '../team/people';
@@ -219,6 +220,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
   const waiting = useContext(WaitingContext);
   const fleet = useContext(FleetContext);
   const drag = useRowDrag(table ? onReorder : undefined);
+  useLetGoWhenGone(pointer);
   // The hover does not move while a row is carried: each row crossed would
   // redraw the whole app under the drag (w-6e5b532a95).
   const onHover = (id: string | null) => { if (!drag.carrying()) hoverTo?.(id); };
@@ -336,7 +338,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
         onClick={() => onOpenRepeat?.(rule)}>
         <span className="mark" aria-hidden="true" />
         <RowCells status={running?.live ? running : laterCell(null)}
-          lead={<RepeatMark />} title={rule.title} aside={repeatTag(rule)} where={rule.productName}
+          lead={<RepeatMark />} title={rule.title} line={{ text: repeatRow(rule, last).last }} aside={repeatTag(rule)} where={rule.productName}
           person={withPerson ? personCell?.(team?.me ?? null) : undefined}
           priority={shownPriority(rule)} updatedAt={rule.updatedAt ?? rule.createdAt}
           when={nextRunWords(rule)} now={Date.now()} />
@@ -410,6 +412,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                 <div key={key} className={`row th-their-row${selectedCard === key ? ' selected' : ''}`} onClick={() => onOpenCard?.(c)}>
                   <span className="mark" aria-hidden="true" />
                   <RowCells status={cardStatus(c.state, team?.byId.get(c.personId)?.name?.split(/\s+/)[0])} who={{ face: <Face person={team?.byId.get(c.personId) ?? null} />, name: team?.byId.get(c.personId)?.name ?? undefined }} title={c.title ?? 'Private thread'} where={cardPlace(c)} person={personCell?.(c.personId)}
+                    line={c.problem ? { who: team?.byId.get(c.personId)?.name ?? undefined, text: c.problem } : null}
                     priority={c.priority} updatedAt={c.updatedAt} now={Date.now()} />
                 </div>
               );
@@ -702,7 +705,7 @@ export function List({ items, view, keyView, hoveredId, selected, seen, unread, 
                         : shipping?.includes(item.id)
                           ? <span className="time" title="The app is shipping this. It comes back to you once it is live, or goes back to its agent if it fails.">shipping</span>
                         : queued?.includes(item.id) && cannotStart?.[item.id] && cannotStartLine(cannotStart[item.id])
-                          ? <span className="time" title={cannotStartLine(cannotStart[item.id])!}>not started</span>
+                          ? <span className="time" title={cannotStartLine(cannotStart[item.id])!}>{cannotStartWord(cannotStart[item.id]).toLowerCase()}</span>
                         : queued?.includes(item.id)
                           ? <span className="time">queued</span>
                           : paused && tab === 'progress'

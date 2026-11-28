@@ -23,6 +23,7 @@ import { taskWords } from '../team/company';
 import { shownTitle } from '../../../shared/thread-title.mts';
 import { localDate } from '../local-dates';
 import { isCause, waitingOn, causeWhere } from '../../../shared/causes.mts';
+import { agentLayout } from '../../../shared/agents.mts';
 
 export type PageId = 'inbox' | 'team';
 export type UpdatedWindow = 'today' | 'week' | 'any';
@@ -724,7 +725,9 @@ export function cellUnderTab(word: string, tab: string | undefined, { fromPeople
 }
 
 /** The agent's newest word is a question with no options to pick, so only your words answer it. */
-export function asksForYourWords(item: Pick<WorkItem, 'result' | 'note' | 'body'> & { wrote?: Record<string, { ts: number } | undefined> }): boolean {
+export function asksForYourWords(item: Pick<WorkItem, 'result' | 'note' | 'body'> & { wrote?: Record<string, { ts: number } | undefined>; agent?: WorkItem['agent'] }): boolean {
+  // A session started outside Agentbox asks in its own words, laid out by its own rules.
+  if (item.agent) return agentLayout(item.agent).kind === 'asks';
   const said = (item.wrote?.note?.ts ?? 0) > (item.wrote?.result?.ts ?? 0) ? item.note : item.result;
   // A chat whose agent stopped, choices and all: nobody answered.
   if (followsWord(said)) return true;
@@ -1051,6 +1054,16 @@ export function taskHandedFrom<T extends TeamRow & { id: string; body?: string |
     const giver = taskGiver(t);
     return (!me || giver === me) && handedFrom(t.body, giver)?.id === threadId;
   }) ?? null;
+}
+
+/** Who has a thread you handed over, as its row and its card say it; null on one not handed over. `items` is null with no team. */
+export function handedOnWord<T extends TeamRow & { id: string; body?: string | null }>(item: { id: string; status?: string; answer?: string | null }, items: readonly T[] | null, me: string | null): string | null {
+  const name = handedTo(item);
+  if (!name) return null;
+  const first = name.split(/\s+/)[0];
+  const task = items ? taskHandedFrom(items, item.id, me) : null;
+  if (task?.status === 'done' && task.wrote?.status?.by === task.assignee) return `${first} finished it`;
+  return task && task.status !== 'done' ? `With ${first}` : `Handed to ${first}`;
 }
 
 /** "Dev, Maya": the conversation itself is named for who is in it, unless someone renamed it. */

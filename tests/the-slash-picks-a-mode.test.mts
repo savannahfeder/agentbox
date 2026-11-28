@@ -549,7 +549,7 @@ describe('the way back', () => {
      both set a permission mode there anyway. Same rule as the paragraph above,
      one level up: the list and the KEYS have to be decided off one answer. */
   it('decides open-or-shut off the same rows it draws', () => {
-    expect(focus).toContain('const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames);');
+    expect(focus).toContain("const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames).filter((row) => canSetMode || row.kind === 'command');");
     expect(focus).toContain('const slashOpen = menuRows.length > 0;');
     expect(focus).not.toContain('const slashRows =');
   });

@@ -25,6 +25,8 @@ export interface SignInAnswer { id: string; said: SignInSaid; url?: string; code
 
 const SAID: readonly string[] = ['signed-in', 'landed', 'code', 'skipped', 'replied'];
 const ID = /^s-[a-z0-9]{6,24}$/;
+// What the cloud machine's own sign-in takes (cloud/sandbox/server.mjs `signin-code`).
+const MAX_CODE = 4096;
 const text = (v: unknown, max: number): string | null => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
 const link = (v: unknown): string | null => {
   if (typeof v !== 'string' || v.length > 4000) return null;
@@ -87,8 +89,9 @@ export function cleanSignInAnswer(value: unknown): SignInAnswer | undefined {
     out.url = url;
   }
   if (v.said === 'code') {
-    const code = text(v.code, 80);
-    if (!code) return undefined;
+    // Whole or not at all: AWS's codes run to hundreds of characters, and a cut one can only fail.
+    const code = text(v.code, Infinity);
+    if (!code || code.length > MAX_CODE) return undefined;
     out.code = code;
   }
   return out;

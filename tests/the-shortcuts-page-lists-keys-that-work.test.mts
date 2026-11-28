@@ -156,6 +156,8 @@ const HANDLED = {
   // Into the task the toast is about, on the list and inside a task alike
   // (w-f0bfe32859). Gated on the toast in toast-parts.ts, which has its own test.
   '⌘/': [[selectionBar, "window.addEventListener('keydown', key, true);"], [selectionBar, 'if (!isCommentChord(e, MAC)) return;']],
+  // The sidebar's own button, from the keyboard (tests/a-button-in-the-sidebar-keeps-it-open).
+  '⌘\\': [[chords, "(e.metaKey || e.ctrlKey) && e.key === '\\\\' && !onPhone()"], [chords, 'keepOpenPressed();']],
   'O': [[chords, 'const goesTo = opensTheToast(e.key, toast, focused ? { product: focused.product, id: focused.id } : null);'], [chords, 'openToastRow(goesTo);'], [chords, 'openToastRow(lastGoesTo);']],
 };
 

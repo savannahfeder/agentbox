@@ -4,6 +4,7 @@ import { closesTheTask, bareOption } from '../../shared/closes-the-task.mts';
 import { readMoment } from './when-words';
 import { localDate } from './local-dates';
 import { handedBackBy } from '../../shared/thread-asks.mts';
+import { rememberedFor } from '../../shared/remembered.mts';
 // Time and grouping, Superhuman-style: terse, scannable, never a full date
 // where "3m" will do.
 
@@ -160,7 +161,10 @@ interface HasFields {
 
 const writtenAt = (item: HasFields, field: OptionsField) => item.wrote?.[field]?.ts ?? 0;
 
-export function optionsFrom(item: HasFields): OptionsField {
+// Asked of every thread each time a list is drawn, and a thread that changes
+// is a new object (tests/the-inbox-reads-each-threads-words-once).
+export const optionsFrom = rememberedFor(fieldOffering);
+function fieldOffering(item: HasFields): OptionsField {
   const inResult = parseOptions(item.result).length > 0;
   const inNote = parseOptions(item.note).length > 0;
   if (inResult && inNote) return writtenAt(item, 'note') > writtenAt(item, 'result') ? 'note' : 'result';
@@ -227,7 +231,8 @@ export function stripOptionsSection(body: string): string {
 // EXCEPT THE APP'S OWN "SHIPPED TO MAIN" NOTE (w-639fc3b3a5). A run that ships
 // writes its offer and then the ship queue writes that note, so it always comes
 // last. It answers an offer only when the offer asked whether to ship.
-export function offerIsLive(item: HasFields & { answer?: string }): boolean {
+export const offerIsLive = rememberedFor(offerStillOpen);
+function offerStillOpen(item: HasFields & { answer?: string }): boolean {
   const options = itemOptions(item);
   if (!options.length) return false;
   const field = optionsFrom(item);
@@ -495,6 +500,8 @@ export function dayAndTime(ts: number, now = Date.now()): string {
 function flatten(body: string, headings: 'drop' | 'keep'): string {
   return body
     .replace(/^#{1,4}\s.*$/gm, (line) => (headings === 'keep' ? line.replace(/^#{1,4}\s*/, '') : ''))
+    // A line that is only a picture is drawn as the picture in the thread.
+    .replace(/^\s*[\w.~/-]+\.(?:png|jpe?g|gif|webp|svg)\s*$/gim, (line) => (headings === 'keep' ? line : ''))
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     // A cloud run's key ask reads as what it asks for (shared/cloud-keys.mts).

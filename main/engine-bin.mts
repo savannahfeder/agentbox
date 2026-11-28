@@ -246,7 +246,9 @@ export const ENGINES = {
    * The Claude desktop app keeps its own copy, one folder per version, and it
    * shares the CLI's sign-in, so someone who only uses Claude Code inside that
    * app has nothing else. It is tried last because it updates with the app and
-   * lags a real install.
+   * lags a real install. The editor extension carries one too, at
+   * resources/native-binary/claude (read off its real package, 2.1.331), for
+   * someone who only runs Claude Code from VS Code or Cursor.
    */
   claude: engine({
     bin: 'claude',
@@ -258,10 +260,22 @@ export const ENGINES = {
     ],
     appCopies: (home, readdir = defaultReaddir) => {
       const dir = path.join(home, 'Library/Application Support/Claude/claude-code');
-      return readdir(dir)
+      const desktop = readdir(dir)
         .filter((v) => /^\d+(\.\d+)*$/.test(v))
         .sort(newestFirst)
         .map((v) => path.join(dir, v, 'claude.app/Contents/MacOS/claude'));
+      const editors = ['.vscode', '.cursor', '.windsurf', '.vscode-insiders', '.vscode-oss'].flatMap((editor) => {
+        const extensions = path.join(home, editor, 'extensions');
+        const versions = new Map<string, string>();
+        for (const folder of readdir(extensions)) {
+          const v = /^anthropic\.claude-code-(\d+(?:\.\d+)*)(?:-[a-z0-9-]+)?$/i.exec(folder)?.[1];
+          if (v) versions.set(folder, v);
+        }
+        return [...versions.keys()]
+          .sort((a, b) => newestFirst(versions.get(a)!, versions.get(b)!))
+          .map((folder) => path.join(extensions, folder, 'resources/native-binary/claude'));
+      });
+      return [...desktop, ...editors];
     },
     // Any one of these means Claude Code has run on this machine.
     evidence: (home) => [

@@ -1,6 +1,7 @@
 // What a thread's messages called a file: the short line a message put beside
 // it ("Before:", "Option 2: faces only"), so the big view can show it.
 import type { ThreadLine } from './artifact-marks.mts';
+import { isHandBack } from './thread-asks.mts';
 
 const EXT = 'png|jpe?g|gif|webp|svg|mp4|mov|m4v|webm|pdf|md|markdown|pptx|html?|csv|tsv';
 const PATHISH = String.raw`(?:\.?\/)?[\w.~-]+(?:\/[\w.~-]+)*\.(?:${EXT})`;
@@ -22,19 +23,30 @@ const samePath = (a: string, b: string): boolean => {
   return x === y || x.endsWith(`/${y}`) || y.endsWith(`/${x}`);
 };
 
-interface Read { paths: string[]; words: string }
+/** `prose`: a name was taken out of a sentence, from its middle or after its end. */
+interface Read { paths: string[]; words: string; prose: boolean }
+
+const MARKS = /[\s*_`"'“”‘’()]+/g;
+const holeAt = (line: string, from: number, to: number): boolean => {
+  const before = line.slice(0, from).replace(MARKS, ' ').trim();
+  const after = line.slice(to).replace(MARKS, ' ').trim();
+  return /[.!?]$/.test(before) || (/\p{L}/u.test(before) && /^[\p{L}\p{N}.,;!?]/u.test(after));
+};
 
 /** One line: the files it names, and its words with those names taken out (a link's own words kept, unless they are a file name). */
 function readLine(line: string): Read {
   const paths: string[] = [];
-  const words = line.replace(MENTION, (_m, _bang: string, said: string | undefined, link: string | undefined, quoted: string | undefined, bare: string | undefined) => {
+  let prose = false;
+  const words = line.replace(MENTION, (_m, _bang: string, said: string | undefined, link: string | undefined, quoted: string | undefined, bare: string | undefined, at: number) => {
     const path = link ?? quoted ?? bare ?? '';
     const isFile = new RegExp(String.raw`\.(?:${EXT})$`, 'i').test(path.split(/[?#]/)[0]);
     if (isFile) paths.push(path);
-    if (said !== undefined) return FILE_NAME.test(said.trim()) || (!said.trim() && isFile) ? '' : said;
+    const gone = said !== undefined ? FILE_NAME.test(said.trim()) || (!said.trim() && isFile) : isFile;
+    if (gone && holeAt(line, at, at + _m.length)) prose = true;
+    if (said !== undefined) return gone ? '' : said;
     return isFile ? '' : _m;
   });
-  return { paths, words: tidy(words) };
+  return { paths, words: tidy(words), prose };
 }
 
 function tidy(words: string): string {
@@ -55,7 +67,9 @@ function labelIn(text: string, paths: readonly string[]): string | null {
   const ours = rows.findIndex((r) => r.paths.some((p) => paths.some((q) => samePath(p, q))));
   if (ours < 0) return null;
   const own = rows[ours].words;
-  if (own) return isLabel(own) ? own : null;
+  // Words on a line that names another file too are a sentence about both, with a hole where each name was.
+  const another = rows[ours].paths.some((p) => !paths.some((q) => samePath(p, q)));
+  if (own) return isLabel(own) && !another && !rows[ours].prose ? own : null;
   // The nearest line of words above or below a line that only names files, never past another file.
   const near = (i: number, by: 1 | -1): string | null => {
     let j = i + by;
@@ -83,7 +97,8 @@ export function labelSaidFor(lines: readonly (ThreadLine | null | undefined)[] |
   for (const l of [...all.filter((x) => x.source === 'agent'), ...all.filter((x) => x.source !== 'agent')]) {
     for (const field of ['result', 'answer', 'note', 'body'] as const) {
       const text = l.patch?.[field];
-      if (typeof text !== 'string') continue;
+      // A hand-back names the files it approved; that is a verdict, not what anyone called them.
+      if (typeof text !== 'string' || (field === 'answer' && isHandBack(text))) continue;
       const found = labelIn(text, wanted);
       if (found) return found;
     }

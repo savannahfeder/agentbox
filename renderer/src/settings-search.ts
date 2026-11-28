@@ -11,7 +11,7 @@
 // second word narrows rather than widens.
 
 export type SettingsPageId =
-  | 'general' | 'appearance' | 'shortcuts' | 'phone' | 'alpha' | 'rooms'
+  | 'general' | 'appearance' | 'shortcuts' | 'phone' | 'rooms'
   | 'claude' | 'codex' | 'running' | 'cloud' | 'instructions'
   | 'projects' | 'files' | 'team';
 
@@ -22,7 +22,6 @@ export const SETTINGS_PAGES: Array<{ id: SettingsPageId; label: string; group: '
   { id: 'appearance', label: 'Appearance', group: 'Personal' },
   { id: 'shortcuts', label: 'Shortcuts', group: 'Personal' },
   { id: 'phone', label: 'Phone', group: 'Personal' },
-  { id: 'alpha', label: 'Alpha features', group: 'Personal' },
   { id: 'claude', label: 'Claude Code', group: 'Agents' },
   { id: 'codex', label: 'Codex', group: 'Agents' },
   { id: 'running', label: 'Running', group: 'Agents' },
@@ -67,7 +66,7 @@ const ENTRIES: Entry[] = [
   { page: 'appearance', label: 'Blur and darkness', anchor: 'tune', words: 'tint dim glass transparency' },
   { page: 'shortcuts', label: 'Keyboard shortcuts', words: 'keys hotkeys keybindings' },
   { page: 'phone', label: 'Use it on your phone', anchor: 'phone', words: 'phone mobile qr code scan remote tailscale wifi home screen app' },
-  { page: 'alpha', label: 'Rooms', anchor: 'alpha', words: 'alpha beta early try team teammates friends multiplayer people chat' },
+  { page: 'general', label: 'Use AI teammates', anchor: 'teammates', words: 'teammate teammates ai agent agents standing job employee hire auto routing' },
   { page: 'rooms', label: 'Show my full name', anchor: 'rooms-name', words: 'name last surname initial' },
   { page: 'rooms', label: 'What you are working on', anchor: 'rooms-card', words: 'card thread private wall' },
   { page: 'rooms', label: 'Your activity on your page', anchor: 'rooms-card', words: 'activity board inbox profile page hide' },
@@ -93,7 +92,7 @@ const ENTRIES: Entry[] = [
   { page: 'running', label: 'Hold heavy work when memory is short', anchor: 'at-once', words: 'ram tests builds slow memory' },
   { page: 'running', label: 'Stop programs agents leave behind', anchor: 'at-once', words: 'leftovers left running finished dev servers background jobs processes cleanup kill ram memory' },
   { page: 'running', label: 'Something felt slow', anchor: 'at-once', words: 'slow fewer agents throttle struggling' },
-  { page: 'running', label: 'Agents you started yourself', anchor: 'outside', words: 'terminal outside sessions inbox your own' },
+  { page: 'running', label: 'Terminal sessions', anchor: 'outside', words: 'agents you started yourself terminal outside sessions inbox your own' },
   { page: 'running', label: 'Bring in new chats', anchor: 'outside', words: 'import chats conversations automatic' },
   { page: 'instructions', label: 'Instructions for every agent', words: 'rules prompt claude.md how agents write to you' },
   { page: 'projects', label: 'Projects', words: 'order priority archive new project' },

@@ -69,7 +69,7 @@ export default function NewTeammate() {
               ? <Pickable style={{ fontSize: 14, color: color.dim }} onPress={() => setSheet(true)}>{where?.name ?? 'Pick a project'}</Pickable>
               : <T style={{ fontSize: 14, color: color.dim }}>{where?.name ?? 'No project on your phone yet'}</T>}
           </View>
-          {!team && <T style={{ marginTop: 18, fontSize: 14, lineHeight: 21, color: color.dim }}>Your computer has not sent your teammates yet. Turn on AI teammates there, in Settings, Alpha features.</T>}
+          {!team && <T style={{ marginTop: 18, fontSize: 14, lineHeight: 21, color: color.dim }}>Your computer has not sent your teammates yet. Turn on AI teammates there, in Settings, General.</T>}
           {error && <T style={{ marginTop: 14, fontSize: 13, color: color.dim }}>{error}</T>}
         </ScrollView>
         <MateComposer mate={null} placeholder="Answer your new teammate" send={(text) => make({ text })} />

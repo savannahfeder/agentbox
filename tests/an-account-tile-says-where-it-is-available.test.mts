@@ -74,7 +74,7 @@ describe('where an account is available', () => {
 
   it('must NOT offer the cloud to an account not signed in here yet: that comes first', () => {
     const t = accountTile(account({ cloud: null, here: here({ signedIn: false, email: null }) }), acts());
-    expect(t.about).toEqual(['Finish signing in to use it']);
+    expect(t.about).toEqual([]);
     expect(tags(t)).toEqual([]);
   });
 });
@@ -119,7 +119,7 @@ describe('the cloud’s sign-in, opened from the tile', () => {
 
   it('starts the sign-in and opens the cloud screen over Settings', () => {
     const app = read('renderer/src/App.tsx');
-    expect(app).toMatch(/onCloudSignIn=\{\(key, email\) => \{[\s\S]{0,200}api\.cloudSignIn\(\{ action: 'start', engine: 'claude', key \}\)[\s\S]{0,200}setCloudSetupOpen\(true\)/);
+    expect(app).toMatch(/onCloudSignIn=\{\(key, email, engine = 'claude'\) => \{[\s\S]{0,200}api\.cloudSignIn\(\{ action: 'start', engine, key \}\)[\s\S]{0,200}setCloudSetupOpen\(true\)/);
     expect(app).toMatch(/<CloudSetup[\s\S]{0,200}signInAs=\{cloudSignInAs\}/);
   });
 

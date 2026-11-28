@@ -1,5 +1,5 @@
 // A command is an operation, never prose asking a model to imitate a CLI.
-import { CLAUDE_COMMANDS, commandWords } from './claude-commands.mts';
+import { CLAUDE_COMMANDS, INTERACTIVE_ONLY, commandWords } from './claude-commands.mts';
 import type { ClaudeCommand } from './claude-commands.mts';
 import { harnessDefinition } from './harness-definitions.mts';
 const command = (name: string, description: string, argumentHint: string | null = null, aliases: string[] = []): ClaudeCommand => ({ name, description, menuDescription: null, whole: true, argumentHint, aliases });
@@ -69,6 +69,5 @@ export function reviewTarget(args: string = ''): ReviewTarget {
 export function nativeCommandNames(input: unknown): string[] | null {
  const frame = input as Record<string, unknown> | null | undefined;
  if(frame?.type!=='system'||frame?.subtype!=='init'||!Array.isArray(frame.slash_commands))return null;
- const blocked=new Set(['add-dir','auto-mode-setup','clear','color','config','import','design-consent','design-revoke','heapdump','exit','stop','__remote-workflow','workflow-launch-exec','usage-credits','extra-usage']);
- return [...new Set(frame.slash_commands.filter((n: unknown): n is string=>typeof n==='string'&&/^[a-z][a-z0-9:_-]*$/i.test(n)&&!blocked.has(n)))];
+ return [...new Set(frame.slash_commands.filter((n: unknown): n is string=>typeof n==='string'&&/^[a-z][a-z0-9:_-]*$/i.test(n)&&!INTERACTIVE_ONLY.has(n)))];
 }

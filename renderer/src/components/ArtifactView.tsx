@@ -347,8 +347,9 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     setGo({ place: note.place, at: Date.now() });
   };
 
-  const send = async (now = false) => {
-    const typed = words.trim();
+  // `typedNow`: the words as a key just finished them, before the box has redrawn.
+  const send = async (now = false, typedNow?: string) => {
+    const typed = (typedNow ?? words).trim();
     if ((!typed && !pictures.length) || !version || sending || attaching.length) return;
     // "Sofia, approved v4" names Sofia as surely as @Sofia does: it reaches her, not the agent.
     const others = people.filter((p) => p.id !== me);
@@ -357,7 +358,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     const mentions = withYourReply ? [] : [...new Set([...(to ? [to] : []), ...(goes.to === 'person' ? [goes.person] : []), ...named.filter((p) => p.id !== me && typed.includes(`@${firstName(p)}`)).map((p) => p.id)])];
     const id = newId();
     const withIt = now ? sentWithTheNote(goes, unsent.ids, id) : [];
-    const went = noteSentWords(withIt.length ? 'Send to your agent' : sendWords);
+    const typedSendWords = typedNow === undefined || withYourReply ? sendWords : noteSendWords({ ...noteTo, text: typedNow, nameOf });
+    const went = noteSentWords(withIt.length ? 'Send to your agent' : typedSendWords);
     setSending(true);
     let links = '';
     try { links = await persistAttachments(product, pictures); } catch (err) {
@@ -738,15 +740,17 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     ...(canTag && 'agent'.startsWith(asking.query.toLowerCase()) ? [YOUR_AGENT] : []),
     ...people.filter((p) => p.id !== me && firstName(p).toLowerCase().startsWith(asking.query.toLowerCase())),
   ].slice(0, 5) : [];
-  const nameInto = (p: Person) => {
-    if (!asking) return;
+  const nameInto = (p: Person): string => {
+    if (!asking) return words;
     const el = box.current;
     const caret = el?.selectionStart ?? words.length;
     const name = p === YOUR_AGENT ? '@agent ' : `@${firstName(p)} `;
-    setWords(`${words.slice(0, asking.start)}${name}${words.slice(caret)}`);
+    const filled = `${words.slice(0, asking.start)}${name}${words.slice(caret)}`;
+    setWords(filled);
     if (p !== YOUR_AGENT) setNamed((was) => (was.some((x) => x.id === p.id) ? was : [...was, p]));
     setAsking(null);
     requestAnimationFrame(() => { const to = asking.start + name.length; el?.focus(); el?.setSelectionRange(to, to); });
+    return filled;
   };
   const onWords = (value: string, caret: number) => {
     setWords(value);
@@ -777,7 +781,13 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
     if (asking && askingFor.length) {
       if (e.key === 'ArrowDown') { e.preventDefault(); setAsking({ ...asking, sel: (asking.sel + 1) % askingFor.length }); return; }
       if (e.key === 'ArrowUp') { e.preventDefault(); setAsking({ ...asking, sel: (asking.sel - 1 + askingFor.length) % askingFor.length }); return; }
-      if ((e.key === 'Enter' && !e.metaKey && !e.ctrlKey) || e.key === 'Tab') { e.preventDefault(); nameInto(askingFor[asking.sel]); return; }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        // ⌘↵ finishes the name too, or "@Pri" names nobody and the note goes to the agent.
+        const filled = nameInto(askingFor[asking.sel]);
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing) void send(true, filled);
+        return;
+      }
     }
     const does = noteBoxKey({ key: e.key, chord: e.metaKey || e.ctrlKey, shift: e.shiftKey, composing: e.nativeEvent.isComposing, typed: !!words.trim() || !!pictures.length, waiting: unsent.ids.length });
     if (does === 'leave') return;
@@ -931,8 +941,8 @@ export function ArtifactView({ product, project = null, thread, draftsAcross, sh
                 </button>
               )}
               {handable && <button type="button" className="av-btn" onClick={() => onHandToAgent!([family!.versions.at(-1)!.path])}><NoteGlyph name="agent" />Hand to an agent</button>}
-              {/* In a review your reply is the answer, so there is no approving a picture on its own. */}
-              {offers.approve && !withYourReply && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
+              {/* In a review too: the hand-back names the files you approved. */}
+              {offers.approve && <button type="button" className={`av-btn${mineApproved ? ' is-on' : ''}`} aria-pressed={mineApproved} onClick={() => void approve()}><NoteGlyph name="check" />{mineApproved ? 'Approved' : 'Approve'}</button>}
             </div>
           )}
           <div className="av-list">

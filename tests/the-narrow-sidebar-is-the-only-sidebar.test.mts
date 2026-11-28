@@ -11,6 +11,12 @@
 // a team or Groups. Without Groups it holds Threads, then Feedback and Settings
 // at its foot. A phone keeps its own top bar. Nothing opens or shuts it: the
 // collapse button, the \ key, the ⌘K row and the remembered state are gone.
+//
+// 2026-11-23: the owner asked for a way to keep it open from the sidebar itself
+// and approved a button after the New thread pencil, with ⌘\ for it
+// (tests/a-button-in-the-sidebar-keeps-it-open). It flips the one setting the
+// Settings switch has. What stays gone is everything named above: a collapse
+// button at the sidebar's head, the bare \ key, and a state of its own.
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, it, expect } from 'vitest';
@@ -60,8 +66,9 @@ describe('every install gets the narrow sidebar', () => {
 });
 
 describe('without Groups it holds Inbox, Feedback and Settings', () => {
-  it('draws exactly those three with no team, no teammates and no Groups', () => {
-    expect(labels(nav())).toEqual(['Inbox', 'Feedback', 'Settings']);
+  // The pencil beside the name starts a thread; it is not a place (2026-11-23).
+  it('draws exactly those three places with no team, no teammates and no Groups', () => {
+    expect(labels(nav())).toEqual(['New thread', 'Inbox', 'Feedback', 'Settings']);
   });
 
   it('puts no Groups row under Threads unless Groups is on, and Chats only for teammates', () => {
@@ -90,8 +97,11 @@ describe('nothing opens or shuts it', () => {
     }
   });
 
-  it('has no key, command or hint for it', () => {
-    expect(app).not.toMatch(/e\.key === '\\\\'/);
+  it('has no bare key, no command and no collapse hint for it', () => {
+    // The bare key stays gone: every backslash the app answers is held with ⌘ or Ctrl.
+    const backslashes = app.split('\n').filter((l) => /e\.key === '\\\\'/.test(l));
+    expect(backslashes.length).toBeLessThanOrEqual(1);
+    for (const l of backslashes) expect(l).toContain("(e.metaKey || e.ctrlKey) && e.key === '\\\\'");
     expect(palette).not.toMatch(/Collapse sidebar|Expand sidebar|onTogglePanel/);
     expect(HINTS.sidebar).toBeUndefined();
     expect(everyKey()).not.toContain('\\');

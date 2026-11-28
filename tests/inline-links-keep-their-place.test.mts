@@ -76,7 +76,9 @@ describe('quoted filenames keep every word', () => {
 // waits for the thing itself and names itself when it does not come. The two
 // checks that nothing happened keep their fixed wait, where waiting too little
 // can only let them pass.
-it.skipIf(process.platform !== 'darwin')('keeps mounted links and exhausted previews through five parent updates', async () => {
+// Electron aborts without the service that also opens apps, which the sandbox a
+// ship runs tests in keeps from them (scripts/lib/branch-sandbox.mjs).
+it.skipIf(process.platform !== 'darwin' || process.env.AGENTBOX_BRANCH_SANDBOX === '1')('keeps mounted links and exhausted previews through five parent updates', async () => {
   // Loaded here, not at the top: importing 'electron' downloads its binary
   // when it is missing, and a failed download would fail the parser tests on
   // every platform this test skips.

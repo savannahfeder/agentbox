@@ -42,7 +42,7 @@ import { readDraft, readDraftAttachments, saveDraft, saveDraftAttachments } from
 import { Face } from '../people';
 import { cardName, chatWidth, mentionsIn, readChatWidth, writeChatWidth } from './room-rules';
 import { clockOf } from '../../teammates/chat-lines';
-import { attachedName, drawnRoots, holdsRead, madeOnce, mentionMarkdown, myNewest, newLineAt, opensInTheReview, quickOnBar, roomReader, storedName, wordsLeftAfterSend } from './room-chat-rules';
+import { attachedName, drawnRoots, holdsRead, madeOnce, mentionMarkdown, myNewest, newLineAt, opensInTheReview, quickOnBar, replyBoxWords, roomReader, storedName, wordsLeftAfterSend } from './room-chat-rules';
 
 export type ChatPerson = { id: string; name: string; avatarUrl: string | null; me: boolean };
 
@@ -315,7 +315,7 @@ export function RoomChat({ room, messages, people, meId, now, onInvite, onExpand
       })}
     </div></div>
     <Composer key={`${room.id}:${thread ?? ''}`} roomId={room.id} threadId={thread} takesTyping={folded ? !!thread : full || !!thread} folds={folded && !thread} people={others}
-      placeholder={root ? `Reply to ${nameOf(root.by)}` : `Message ${room.kind === 'group' ? others.map((p) => p.name.split(' ')[0]).join(', ') || room.name : room.name}`}
+      placeholder={root ? replyBoxWords(root, meId, nameOf) : `Message ${room.kind === 'group' ? others.map((p) => p.name.split(' ')[0]).join(', ') || room.name : room.name}`}
       onPutFile={calls.onPutFile} onPutFileFrom={calls.onPutFileFrom} sending={calls.sending} onNotice={onNotice}
       onEditLast={() => { const mine = myNewest(messages, meId, root?.id ?? null); if (mine) setEditing(mine.id); }}
       onSend={(body) => onSend(body, { inReplyTo: root?.id ?? null, mentions: mentionsIn(body, others) })} />

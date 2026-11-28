@@ -2,6 +2,24 @@
 // teammates and your other chats, in the order you dragged them into.
 import { voiceName } from '../../../../shared/agent-voice.mts';
 import { faceSeed } from '../../../../shared/teammate-face.mts';
+import { rowTitle } from '../../list-rules';
+import { rowName } from '../../teammates/chat-lines';
+
+/**
+ * The room's copy of you, with the thread your agent is on named as its row
+ *  is now. Main rebuilds that copy once a minute, so a rename reached the list
+ *  first and Home a minute later. */
+export function withMyThreadNamed<C extends { me: boolean; workingOn: string | null; workingThread?: string | null }>(
+  wall: readonly C[] | null,
+  items: readonly ({ id: string } & Parameters<typeof rowTitle>[0])[],
+): C[] | null {
+  if (!wall) return null;
+  return wall.map((c) => {
+    const item = c.me && c.workingThread ? items.find((i) => i.id === c.workingThread) : undefined;
+    const name = item ? rowTitle(item) : '';
+    return name ? { ...c, workingOn: name } : c;
+  });
+}
 
 export type MemberKind = 'me' | 'person' | 'mate' | 'chat';
 
@@ -112,7 +130,7 @@ export function buildMembers({ me, people = [], wall = null, cards = [], tasksHe
     // A run under way outranks Paused, which stops nothing already going.
     const paused = t.paused && !t.running;
     const now = t.status === 'draft' && !t.waiting?.length ? 'Setting up' : paused ? 'Paused' : t.now;
-    out.push({ key: `mate:${t.id}`, kind: 'mate', name: t.name, letter: t.letter || t.name.slice(0, 1), face: faceSeed(t), role: t.role, agents, starting: !!t.running && !agents, now, ...(paused ? { paused: true } : {}) });
+    out.push({ key: `mate:${t.id}`, kind: 'mate', name: rowName(t), letter: t.letter || t.name.slice(0, 1), face: faceSeed(t), role: t.role, agents, starting: !!t.running && !agents, now, ...(paused ? { paused: true } : {}) });
   }
   for (const t of theirMates) {
     const owner = people.find((p) => p.id === t.owner)?.name ?? '';

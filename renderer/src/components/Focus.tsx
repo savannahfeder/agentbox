@@ -41,7 +41,7 @@ import { MessageMarkdown } from './MessageMarkdown';
 import { ConnectionLink } from '../connections/ConnectionsPlace';
 import { connectionLinkOf } from '../connections/connections-shown';
 import remarkGfm from 'remark-gfm';
-import type { AgentTurn, AnswerMode, CodexModeId, FileMarkLink, PermissionMode, RunningSession, WorkItem } from '../types';
+import type { AgentMode, AgentTurn, AnswerMode, CodexModeId, FileMarkLink, PermissionMode, RunningSession, WorkItem } from '../types';
 import type { ReplyPick } from '../reply-pick';
 import {
   MENU_TITLE, MODE_ORDER, MODE_STATUS, MODE_WORDS, exactClear, exactMode, nextMode, slashQuery,
@@ -122,13 +122,16 @@ import { optionIsClipped, optionPeek } from '../option-peek';
 import { agentSaidNotReady, changedFiles, FOLDER_SETTLES_MS, folderMayStillMove, onlyNamedFiles, saidNotToShip, shipOfferFor, shipOfferLive, standingFrom, UNREAD, type ChangedFile, type Standing } from '../ship-offer';
 import { THE_OPTIONS_MOVED, clickLandsOnTheRowYouSaw, stripUnderThePointer } from '../pick-settles';
 import { askHeading, askFull, askIsClipped } from '../ask-line';
-import { replyIsSwallowed, replyReaches } from '../../../shared/agents.mts';
+import { answeredWhereItRuns, replyIsSwallowed, replyReaches } from '../../../shared/agents.mts';
 import { recapFor } from '../recap';
 import type { LedgerLine } from '../thread-history';
 import type { LiveFacts } from '../live-line';
 import { offersRunNow } from '../run-now';
 import { AttachRow } from './AttachRow';
 import { AgentThread } from './AgentThread';
+import { BRING_IN, canMoveIn } from '../outside-agents';
+import { Name } from '../../../shared/product-name.mjs';
+import { chord } from '../this-keyboard';
 import { Live } from './Live';
 import { SidebarIcon } from './SidebarIcon';
 import { Byline, ConversationAside } from './Byline';
@@ -757,7 +760,11 @@ export function ArtifactEmbed({ product, path, fallback, open, onOpen }: {
 /** Which threads' choices are folded, kept on this machine. */
 const CHOICES_FOLDED = 'one.choicesFoldedOn';
 
-export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
+const goIcon = <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4h6v6" /><path d="m20 4-9 9" /><path d="M18 14v5H5V6h5" /></svg>;
+/** An arrow going in through a door: into here. The arrow has to read at 15 points. */
+const inIcon = <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4" /><path d="m9 16 4-4-4-4" /><path d="M13 12H3" /></svg>;
+
+export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlot, inlineArtifacts, headerTarget, cornerHeaderTarget, crumbFrom, item, parent, blockedBy, filed = [], runningMode, engineChoice, runningEngine, codexModels, codexModelDefault, engines, items, session, live, stoppable: stoppableIn, productDir, repoDir, selectedOption, returnedFromSnooze, scheduledUntil, scheduledByAgent, replyOpen, sending, stalled, openDoc, resumeAt, onScrolled, onOpenDoc, onCloseDoc, onRedeliver, onTryAgain, onUnschedule, onClose, onResolve, onCloseTask, onPick, onReply, onReplySend, onReplyClose, onStop, onRunNow, onPin, place: runsIn = null, onPlace, onReopen, onReopenDone, onMove, onPriority, outside = 'all', onOutside, onBringIn, onSnooze, onReveal, onOpenItem, onApproveFiled, onHereFiled, onDismissFiled, onStartAllFiled, onDismissAllFiled, closeAsk, onNotice, onHandToAgent, onAddPeople, onShare, giveTo = [], onGive, onAsk, asksCorner = null, shippedMark = null, onShipped, waitChoices = [], waitNow = null, waitEndedWords = null, onWait, repeat = null, pageAsk = null, onAsked, onShown, aboveDock, questions, queue = null, onePage = false, inChats = false, openAt = null, cloudKeys = null, outOfUsage }: {
   /** `supervisor.outOfUsage`, for the reply box's model chip. */
   outOfUsage?: Record<string, { tool: string; until: number }>;
   /** One thing at a time (w-65bcefb857): this thread's place in Needs you and the arrows that walk it. */
@@ -948,6 +955,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   onMove?: () => void;
   /** Sets the thread's level, from the thread's own menu. */
   onPriority?: (value: number) => void;
+  /** How many sessions started outside Agentbox the inbox takes, changed from one of their pages. */
+  outside?: AgentMode;
+  onOutside?: (mode: AgentMode) => void;
+  /** Makes a session started outside Agentbox one of its threads. */
+  onBringIn?: () => void;
   // Putting something off had no button anywhere in the app: S, and only S.
   // Every other verb in this footer is clickable, so the one verb that is not
   // is the one a hand that has never read a shortcut list cannot reach.
@@ -1031,6 +1043,16 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   // 2026-08-17. The only agent a message really is swallowed by is the one
   // frozen on a permission prompt, and that is now the only one without a box.
   const replyBlocked = agent ? replyIsSwallowed(agent) : false;
+  // Codex working on her message in its own window: nothing here to answer, so no box at all.
+  const codexAtWork = agent?.engine === 'codex' && !agent.approval && answeredWhereItRuns(agent);
+  // Pressing it takes her there: the Codex app, or the very terminal tab or editor the session is in.
+  // Only a session with a project to go to and an id to file it under can move here.
+  const bringIn = agent?.product && agent.sessionId && onBringIn ? onBringIn : null;
+  // The bar offers it beside Respond in terminal; only a session without that bar has it in ⋯.
+  const barBringsIn = !!bringIn && !update && !trouble && replyBlocked && !codexAtWork && !!onReveal;
+  // A Claude Code session its terminal still holds: a reply from here moves it in.
+  const movesIn = !!bringIn && canMoveIn(agent);
+  const respondIn = agent?.app === 'Codex app' ? 'Respond in Codex' : agent?.app === 'Codex in your editor' ? 'Respond in your editor' : 'Respond in terminal';
 
   // A SUMMARISED THREAD is work with a ledger: not a message between two people
   // (main/team/projects.mts makeDirect), and not a running agent's row, the
@@ -1525,7 +1547,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         const value = String(children ?? '');
         if (!className && ticketReference(value)) return <code>{children}</code>;
         const source = !className && sourceReference(value);
-        if (source) return <ArtifactLink kind="code" product={product} src={source} fallback={resolveSrc(source)} onOpen={(click, from) => openHref(source, from, click)}>{mentionName(value)}</ArtifactLink>;
+        if (source) return <ArtifactLink kind="code" product={product} src={source} fallback={resolveSrc(source)} onOpen={(click, from) => openHref(source, from, click)}>{mentionName(shortPath(value.trim(), null, taskFolder(repoDir, item.id)) ?? value)}</ArtifactLink>;
         // Written out in full into this product's folder, or the thread's own,
         // counts as the short path it names, as a full path in a sentence does.
         const shown = value.trim();
@@ -1989,7 +2011,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onAddPeople={onAddPeople ? (person) => onAddPeople(item, person) : undefined}
       /* A PHONE HAS NO TERMINAL AND NO ⌘J (QA batch 005, F-118), and it is the
          only way it has of putting a thread off (F-117). */
-      terminal={direct || onPhone() ? null : terminalOpen ? 'open' : 'closed'}
+      // A session started outside Agentbox: ⌘J goes to its own terminal, the bar's Respond in terminal.
+      terminal={direct || onPhone() || agent ? null : terminalOpen ? 'open' : 'closed'}
       onToggleTerminal={() => window.dispatchEvent(new Event('task-terminal-toggle'))}
       onFinish={canFinish ? onResolve : null}
       // An ask is answered by handing it back, so it offers no second way to end it.
@@ -2024,6 +2047,9 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
       onMove={canFinish && !agent && !direct ? onMove ?? null : null}
       priority={priorityIdOf(shownPriority(item))}
       onPriority={canFinish && !agent && !direct && onPriority ? (id) => onPriority(priorityValueOf(id)) : undefined}
+      outside={agent ? outside : null}
+      onOutside={agent ? onOutside : undefined}
+      onBringIn={barBringsIn ? null : bringIn}
     />
   );
 
@@ -2283,12 +2309,11 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
          */}
         {agent && (
           <AgentThread
-            pid={agent.pid}
-            sessionId={agent.sessionId}
-            cwd={agent.cwd}
-            name={agent.name}
+            agent={agent}
+            title={agent.about?.trim() || item.title}
             movedAt={agent.lastActiveAt ?? 0}
             md={md}
+            onPick={onPick}
           />
         )}
 
@@ -2532,7 +2557,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
        */}
       {((item.start === 'later' && !!onUnschedule)
         || (scheduledHere && !!onUnschedule)
-        || (!!agent && !agentTakesReply && !!onReveal)) && (
+        || (!!agent && !agentTakesReply && !!onReveal && agent.engine !== 'codex')) && (
       <div className="focus-actions">
         {/* ADDED TO LATER (w-afb66e6661): it has no moment to read back, so
             the line says the one thing there is to say and the press starts
@@ -2585,12 +2610,10 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
         {/* Offered on any agent that has not stopped for her, which since
             w-9348b8d148 includes ones she can also write to: a quiet session
             takes a message AND is sometimes just the thing she wants to go sit
-            in. This is honestly named: it brings the APPLICATION the session is
-            running inside to the front, which is the whole of what is actually
-            available. Nothing public focuses one pane inside another app. */}
-        {agent && !agentTakesReply && onReveal && (
-          <><button className="focus-stop" onClick={onReveal}>Take me to it</button>
-          <span className="focus-when">Opens the app it is running in</span></>
+            in. It brings up the very tab the session runs in (main/bring-to-front.mts),
+            in the words the bar under a session uses. */}
+        {agent && !agentTakesReply && onReveal && agent.engine !== 'codex' && (
+          <button className="focus-stop" onClick={onReveal}>Respond in terminal</button>
         )}
         {/* A blocked thread has no buttons here: its reply goes to the agent,
             as on every thread, and asking someone is in Share. "Send back to
@@ -2678,17 +2701,33 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                THIS IS THE ONLY ONE. A quiet agent used to get this pill too,
                saying there was nothing there to answer, and that was false: it
                is sitting at its prompt and it is listening. w-9348b8d148. */
+            /* The two places it can be answered, side by side: where it runs, or here. */
+            codexAtWork ? null : onReveal ? (
+              <div className="dock-split">
+                <button type="button" className="dock-pill dock-pill-go" onClick={onReveal}>
+                  <span className="dock-pill-icon">{goIcon}</span>
+                  <span className="dock-pill-text">{agent?.engine === 'codex' ? respondIn : 'Respond in terminal'}</span>
+                  <span className="dock-pill-key"><kbd>{chord('⌘J')}</kbd></span>
+                </button>
+                {bringIn && <button type="button" className="dock-pill dock-pill-go" onClick={bringIn}>
+                  <span className="dock-pill-icon">{inIcon}</span>
+                  <span className="dock-pill-text">{BRING_IN}</span>
+                  <span className="dock-pill-key"><kbd>{chord('R')}</kbd></span>
+                </button>}
+              </div>
+            ) : (
             <div className="dock-pill dock-pill-static">
               <span className="dock-pill-text">
                 Answer this one in its own window. A message from here would wait behind the box it is stuck on.
               </span>
             </div>
+            )
           ) : replyOpen ? (
             /* THE STOP RIDES IN THE COMPOSER'S OWN FOOTER, beside Send, rather
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} onItsWay={pickOnItsWay(sending)} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} outOfUsage={outOfUsage} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
+            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} onItsWay={pickOnItsWay(sending)} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} outOfUsage={outOfUsage} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} movesIn={movesIn} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
@@ -2878,7 +2917,7 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false, f
   );
 }
 
-function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codexModels = [], codexModelDefault = null, engines, items = [], onSend, onClose, onNotice, stop, openModel = false, talkTo = null, talkWord = 'Reply to', answering = null, outOfUsage }: {
+function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codexModels = [], codexModelDefault = null, engines, items = [], onSend, onClose, onNotice, stop, openModel = false, talkTo = null, talkWord = 'Reply to', answering = null, outOfUsage, movesIn = false }: {
   item: WorkItem;
   outOfUsage?: Record<string, { tool: string; until: number }>;
   /** The pick of a reply still on its way here, until the row carries it. */
@@ -2929,6 +2968,8 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   /** She opened the box by pressing the model word on the folded box, so the
    *  model drawer opens with it (w-e731ca9376). */
   openModel?: boolean;
+  /** A Claude Code session in a terminal that a reply from here moves into Agentbox. */
+  movesIn?: boolean;
 }) {
   // A CONVERSATION WITH A PERSON ASKS FOR A REPLY TO THEM, not for the
   // agent's next step. Set on the box itself so the one literal sentence the
@@ -3134,7 +3175,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   const [nativeNames, setNativeNames] = useState<string[]>([]);
   // While the box starts with a slash, not only while the menu is open: once
   // she types past /loop the box still has to know /loop is a command.
-  const discoveringCommands = !item.agent && !talkTo?.length && (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE && text.startsWith('/');
+  const discoveringCommands = (!item.agent || movesIn) && !talkTo?.length && (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE && text.startsWith('/');
   useEffect(() => {
     setNativeNames([]);
     if (!discoveringCommands) return;
@@ -3342,7 +3383,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   const canSetMode = !item.agent && ownControls;
   // Commands are provider-specific; canSetMode still gates every permission path.
   // A reply that goes to people reaches no agent, so it offers none of an agent's commands.
-  const toAgent = !item.agent && !talkTo?.length && ownControls;
+  const toAgent = (!item.agent || movesIn) && !talkTo?.length && ownControls;
   const query = toAgent ? slashQuery(text) : null;
   /*
    * ONE LIST, AND IT IS THE ONE THE MENU DRAWS. This was `modeMatches(query)`
@@ -3359,7 +3400,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
      six modes: `/context` is not a word Codex knows, and `--permission-mode` is
      not a flag it takes. On a Codex row this list is empty and `slashOpen`
      below is therefore false, which is the whole of the behaviour. */
-  const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames);
+  const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames).filter((row) => canSetMode || row.kind === 'command');
   // OPENED BY THE SLASH AND BY NOTHING ELSE, since 2026-08-26. It used to open
   // from the footer chip too; the chip is gone (see the note where it stood)
   // and with it went `chipOpen` and the click-away that shut it.
@@ -3745,7 +3786,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
             exactly the footer it had. */}
         {talkTo?.length ? <FormatBar box={ref} onChange={changeText} onAttach={pickFiles} marksAt={marksAt} onFromFiles={(f) => setAttachments((a) => [...a, f])} onVoice={addVoice} onNotice={onNotice}
           voiceKey={`direct:${item.product}:${item.id}`} voice={voiceCtl} onRecording={setRecording} /> : null}
-        {item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : <span className="dock-chips" ref={chipsRef}>
+        {item.agent ? <span className="compose-clauses"><span className="dim">{movesIn ? `Moves this session into ${Name} and runs it here.` : `Goes straight into ${item.agent.name}.`}</span></span> : talkTo?.length ? null : <span className="dock-chips" ref={chipsRef}>
             <PriorityPicker variant="chip" value={shown} set={!!prio} onChange={setPrio} title="Priority" />
             {repeat && <WhenPicker value={{ runAt: 0, repeat }} onChange={(v) => setRepeat(v.repeat)} only="repeat" empty="Runs once" />}
             {canSetMode && (

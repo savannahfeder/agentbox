@@ -1,20 +1,23 @@
 // Pure rules for what each list shows, and what a click on a row or its select
 // box means.
 import { instructionOf, isCleanRun } from '../../shared/repeats.mts';
-import { teammateIdOf } from '../../shared/teammates.mts';
+import { asksSomething, teammateIdOf } from '../../shared/teammates.mts';
 import { answerSettled, filedByThePerson, wakesItselfAt, wordWaits } from '../../shared/answers.mts';
 import { saysARunGotNowhere } from '../../shared/spawn-trouble.mts';
 import { asksToClose } from '../../shared/asks-to-close.mts';
+import { rememberedFor } from '../../shared/remembered.mts';
 import { notShippedLine } from '../../shared/not-shipped.mts';
 import { closedByItsShip } from '../../shared/ship-closes-its-thread.mts';
 import { setByPerson } from '../../shared/thread-waits.mts';
 import { isTaskRow } from '../../shared/team-rules.mts';
 import { shownTitle } from '../../shared/thread-title.mts';
-import { firstRealLine, offerIsLive, previewText, searchText } from './format';
+import { closesTheTask, firstRealLine, itemOptions, offerIsLive, previewText, searchText } from './format';
 import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
 import { isCause } from '../../shared/causes.mts';
 import { heldOutside } from '../../shared/carried-on-outside.mts';
+import { handBackWaits } from '../../shared/thread-asks.mts';
+import { takenBack } from '../../shared/work-items.mts';
 
 /**
  * A thread put in Later and not begun. The window's copy of `notStarted` in
@@ -28,6 +31,8 @@ export interface InboxItem {
   labels?: string[];
   answer?: string;
   result?: string;
+  note?: string;
+  body?: string;
   answeredThrough?: number;
   runAt?: number;
   snoozedUntil?: number;
@@ -135,10 +140,9 @@ export function gaveUpOnTheAnswer(i: InboxItem): boolean {
 }
 
 // Her last words asked for the close and the agent's done came after them:
-// that done is hers, as if she had pressed E.
-function closedAsSheAsked(i: InboxItem): boolean {
-  return asksToClose(liveAnswer(i)) && (i.wrote?.status?.ts ?? 0) >= (i.wrote?.answer?.ts ?? Infinity);
-}
+// that done is hers, as if she had pressed E. Kept per thread, as optionsFrom is.
+const closedAsSheAsked = rememberedFor((i: InboxItem): boolean => (
+  asksToClose(liveAnswer(i)) && (i.wrote?.status?.ts ?? 0) >= (i.wrote?.answer?.ts ?? Infinity)));
 
 // Who deferred a row decides what the deferral means. A future runAt an agent
 // wrote stops workers respawning (`isDue` in shared/work-items.mts) but does
@@ -175,8 +179,18 @@ function putAwayByThem(i: InboxItem, legacySnooze = 0): number {
   const mine = i.wrote?.runAt?.source === 'founder' && !spokeSince ? i.runAt ?? 0 : 0;
   // A pick lifts Later with no write of its own, so an answer after it lifts it here.
   const answered = !!liveAnswer(i) && (i.wrote?.answer?.ts ?? 0) > (i.wrote?.snoozedUntil?.ts ?? 0);
-  const reminder = i.wrote?.snoozedUntil?.source === 'founder' && !answered ? i.snoozedUntil ?? 0 : 0;
+  const asked = askedSince(i, i.wrote?.snoozedUntil?.ts ?? Infinity);
+  const reminder = i.wrote?.snoozedUntil?.source === 'founder' && !answered && !asked ? i.snoozedUntil ?? 0 : 0;
   return Math.max(mine, reminder, legacySnooze);
+}
+
+// The agent's last answer came after `since` and asks the person something:
+// in words, or with a pick that is more than closing.
+function askedSince(i: InboxItem, since: number): boolean {
+  const r = i.wrote?.result;
+  if (!r || r.source === 'founder' || (r.ts ?? 0) <= since || (i.wrote?.note?.ts ?? 0) > r.ts) return false;
+  const options = itemOptions(i);
+  return options.length ? offerIsLive(i) && !options.every((o) => closesTheTask(o.text)) : asksSomething(i.result);
 }
 
 /**
@@ -188,6 +202,19 @@ function putAwayByThem(i: InboxItem, legacySnooze = 0): number {
  */
 export function askPutOff(i: InboxItem, asking: boolean, now = Date.now()): boolean {
   return asking && putAwayByThem(i) > now;
+}
+
+/**
+ * You put it in Later yourself, so it is in Later even with its agent still
+ * running. `hiddenUntil` is the caller's, which a start being made lifts.
+ */
+export function inLaterByThem(i: InboxItem, hiddenUntil: number, now = Date.now()): boolean {
+  return hiddenUntil > now && putAwayByThem(i) > now;
+}
+
+/** A person closed it, so a run still winding down on it is not In progress. */
+export function closedByThem(i: InboxItem): boolean {
+  return i.status === 'done' && i.wrote?.status?.source === 'founder';
 }
 
 /** What a person said this thread waits on has ended, and they have not acted on it since. */
@@ -233,6 +260,9 @@ export function belongsInInbox(
   // A teammate's words wait for you whatever the thread is doing, a running
   // agent included (`waitingComments`, shared/work-items.mts).
   if (wordsWait(i, seen)) return true;
+  // So does a teammate's hand-back, held for your yes while the run that asked
+  // for help is still open (shared/thread-asks.mts).
+  if (i.status !== 'done' && handBackWaits(i)) return true;
   // In Later and not begun: it waits for a person, not a clock, so it is in
   // Later and nowhere else.
   if (notStarted(i)) return false;
@@ -329,11 +359,13 @@ export function waitsInLater(i: InboxItem, waitingOn: readonly string[]): boolea
 }
 
 /**
- * Later holds a put-off or waiting row only once no run is on it or queued for
- *  it. Until then it is In progress, which is "running or queued", so it is
- *  counted in one tab (tests/a-queued-thread-put-off-stays-in-progress-until-its-run-ends).
+ * Later holds a row you put off at once, and a row put off by its agent or
+ * waiting on another only once no run is on it or queued for it. Until then
+ * that one is In progress, so it is counted in one tab
+ * (tests/a-thread-you-close-or-put-in-later-leaves-in-progress-at-once).
  */
 export function putOffInLater(i: InboxItem, { hiddenUntil, now, waitingOn, runOnIt }: { hiddenUntil: number; now: number; waitingOn: readonly string[]; runOnIt: boolean }): boolean {
+  if (inLaterByThem(i, hiddenUntil, now)) return true;
   return (hiddenUntil > now || waitsInLater(i, waitingOn)) && !runOnIt;
 }
 
@@ -342,10 +374,11 @@ export function putOffInLater(i: InboxItem, { hiddenUntil, now, waitingOn, runOn
  * hiding a thread is the dangerous direction. Not a wait: a blocker that is
  * done, one this window cannot see (another project, archived, past the 8 MB
  * read), the thread itself, and a loop of threads that only wait on each
- * other, since nothing would ever resume them. A blocker counts when it is not
- * itself waiting, or when one of its own waits counts.
+ * other, since nothing would ever resume them, and a proposal, which ends
+ * only when a person says yes. A blocker counts when it is not itself
+ * waiting, or when one of its own waits counts.
  */
-export function waitsThatCanEnd<T extends Pick<InboxItem, 'status' | 'blockedBy'> & { id: string }>(
+export function waitsThatCanEnd<T extends InboxItem & { id: string }>(
   i: T,
   byId: ReadonlyMap<string, T>,
   path: ReadonlySet<string> = new Set([i.id]),
@@ -355,6 +388,7 @@ export function waitsThatCanEnd<T extends Pick<InboxItem, 'status' | 'blockedBy'
   return live(i).filter((id) => {
     if (path.has(id)) return false;
     const blocker = byId.get(id)!;
+    if (isProposal(blocker)) return false;
     if (!live(blocker).length) return true;
     return waitsThatCanEnd(blocker, byId, new Set(path).add(id)).length > 0;
   });
@@ -406,12 +440,13 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
  * Whether an action held for Z starts an agent on the row it holds: a reply, an
  * approval or a pick on that row. Only those read as In progress while held; a
  * close starts nothing, and "do it in this thread" starts the parent instead.
+ * Nor does a reply on a task its giver took back, which stays closed.
  */
 export function heldRowStarts(
-  row: { product: string; id: string },
+  row: { product: string; id: string } & Parameters<typeof takenBack>[0],
   goes: { product: string; id: string } | null | undefined,
 ): boolean {
-  return !!goes && goes.id === row.id && goes.product === row.product;
+  return !!goes && goes.id === row.id && goes.product === row.product && !takenBack(row);
 }
 
 /** The `live` the list rules take: threads with a run, or with one being started (Try again). */
@@ -431,8 +466,9 @@ export function belongsInProgress(
 ): boolean {
   // A thread in Later waits for the user to say go, so no worker is coming.
   if (notStarted(i)) return false;
-  // A live session keeps the promise whatever the status says, until it exits.
-  if (live) return true;
+  // A live session keeps the promise whatever the status says, until it exits,
+  // unless a person closed it and the run is only winding down.
+  if (live) return !closedByThem(i);
   // So does the ship queue still owing this row a ship.
   if (shipping) return true;
   if (deferredUntil > now) return false;
@@ -505,7 +541,10 @@ export function belongsOnTheRail(
 // a blocked or done row reopens it, or the reply never reaches a worker. A
 // claimed row is left alone: its worker reads the reply when it exits, and
 // reopening would spawn a second one.
-export function statusForReply(status: string): 'open' | undefined {
+// A task its giver took back stays closed: a reply on it is a message, not the
+// task again (`takenBack`, shared/work-items.mts).
+export function statusForReply(status: string, wasTakenBack = false): 'open' | undefined {
+  if (status === 'done' && wasTakenBack) return undefined;
   return status === 'blocked' || status === 'done' ? 'open' : undefined;
 }
 

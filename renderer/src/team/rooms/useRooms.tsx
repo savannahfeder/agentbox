@@ -6,10 +6,11 @@ import { api } from '../../api';
 import type { ArtifactMark, Person, Room, RoomCard, RoomMention, RoomMessage, RoomsState, TeamMessageFile } from '../../types';
 import { listedIn, oneConversation, pairRooms } from '../../../../shared/pair-room.mts';
 import './rooms.css';
-import { boardPeople, boardPicked, cardName, chatPeople, groupInTab, mentionRows, noticeShown, personOpens, roomTitle, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
+import { boardPeople, boardPicked, cardName, chatPeople, groupInTab, mentionLine, mentionRows, noticeShown, personOpens, roomTitle, readBoardLater, readBoardPicks, readNoticeSeen, readRoomTab, withMe, writeBoardLater, writeBoardPicks, writeNoticeSeen, writeRoomTab } from './room-rules';
 import { OpenGroupNotice } from './OpenGroupNotice';
 import { RoomViewButton } from './RoomView';
 import { landed, sameMessages, storedName, withFileLinks } from './room-chat-rules';
+import { revealLine } from '../../reveal-line';
 import { RoomPage, type RoomPane } from './RoomPage';
 import { FirstChatBox, RoomChat, type ChatAlong, type RoomChatCalls } from './RoomChat';
 import type { RoomFileOpening } from './RoomFileView';
@@ -430,6 +431,8 @@ export function useRooms({ rooms, on, meId, myName, fullName = '', hasTeam, team
   const openMention = (m: RoomMention, from: 'inbox' | null = null) => {
     if (m.note || m.file) setOpeningFile({ roomId: m.roomId, note: m.note, file: m.file, at: Date.now() });
     openRoom(m.roomId, from);
+    const line = mentionLine(m);
+    if (line) revealLine(line);
   };
 
   // A chat drawn somewhere other than Groups: a person's place on the home.

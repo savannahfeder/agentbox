@@ -6,6 +6,8 @@
 // every put-off thread. It now leaves out a put-off thread while a session or
 // the ship queue has it, as it already did for one waiting on another thread;
 // it moves to Later when the run ends, where the board already puts it.
+// Since 2026-11-27 a thread you put off yourself goes to Later at once
+// (tests/a-thread-you-close-or-put-in-later-leaves-in-progress-at-once).
 import { it, expect } from 'vitest';
 import fs from 'node:fs';
 
@@ -13,7 +15,7 @@ const app = fs.readFileSync(new URL('../renderer/src/App.tsx', import.meta.url),
 const later = app.slice(app.indexOf('const snoozed = useMemo(() => ['), app.indexOf('].sort((a, b) => whenShown(a) - whenShown(b))', app.indexOf('const snoozed = useMemo(() => [')));
 
 it('leaves a put-off thread out of Later while its agent works or it ships', () => {
-  expect(later).toMatch(/putOffInLater\(i, \{ hiddenUntil: hiddenAt\(i\), now, waitingOn: waitingOn\(i\), runOnIt: liveIds\.has\(i\.id\)[^}]*shippingIds\.has\(i\.id\)/);
+  expect(later).toMatch(/putOffInLater\(i, \{ hiddenUntil: hiddenAt\(i\), now: listNow, waitingOn: waitingOn\(i\), runOnIt: liveIds\.has\(i\.id\)[^}]*shippingIds\.has\(i\.id\)/);
 });
 
 it('still takes threads not started yet and proposals, running or not', () => {

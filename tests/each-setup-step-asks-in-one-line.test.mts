@@ -18,6 +18,7 @@ describe('the headings of the setup', () => {
       'Add your recent agents.',
       'Pick a folder for your first project.',
       'Add your own AI teammates.',
+      'Your agents.',
       'Pick your agent.',
       'Pick your look.',
       'You’re set up.',

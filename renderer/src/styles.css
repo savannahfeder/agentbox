@@ -2559,6 +2559,18 @@ body {
    waiting agent, but it is a sentence and not a control: there is nothing to
    click, because a message here would not reach it. */
 .dock-pill-static { cursor: default; }
+/* Takes her to the window the session runs in, so it is pressed, not typed into. */
+.dock-pill-go { cursor: pointer; }
+.dock-pill-go .dock-pill-key { color: var(--text-faint); }
+.dock-pill-go:hover .dock-pill-text, .dock-pill-go:hover .dock-pill-key { color: var(--text-dim); }
+/* Two halves of one bar, each a whole target: where it runs, and here. */
+.dock-split { display: flex; align-items: stretch; width: 100%; }
+.dock-split > .dock-pill { flex: 1 1 0; min-width: 0; }
+.dock-split > .dock-pill + .dock-pill { border-left: 1px solid var(--line); }
+/* Icon, words, key: the order a menu row reads in. */
+.dock-pill-go .dock-pill-icon { display: flex; align-items: center; padding-left: 16px; color: var(--text-faint); }
+.dock-pill-go .dock-pill-icon + .dock-pill-text { padding-left: 10px; }
+.dock-pill-go:hover .dock-pill-icon { color: var(--text-dim); }
 .dock-pill-static .dock-pill-text { padding-right: 16px; }
 /* THE BOX GROWS AS SHE WRITES. The height is written by dock-height.ts on every
    render, because the ceiling is 40% of the PANE and no stylesheet can read
@@ -4184,8 +4196,28 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
 .palette-k .palette-query svg { width: 18px; height: 18px; flex: none; color: var(--text-faint); }
 .palette-k .palette-input { flex: 1; min-width: 0; width: auto; border: none; padding: 0; font-size: 17px; caret-color: var(--accent); }
 .palette-k .palette-input::placeholder { color: var(--agent-ink); }
+/* Words scrolled out of the bar fade at that edge rather than being cut mid-letter. */
+.palette-k .palette-input.clip-start { mask-image: linear-gradient(to right, transparent, #000 32px); }
+.palette-k .palette-input.clip-end { mask-image: linear-gradient(to left, transparent, #000 32px); }
+.palette-k .palette-input.clip-start.clip-end { mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent); }
 .palette-k .palette-esc { flex: none; cursor: pointer; line-height: 1; }
 .palette-k .palette-esc:hover { color: var(--text); }
+.palette-k .palette-ai-ask {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 4px 0 8px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim); font-size: 12.5px; cursor: pointer;
+}
+.palette-k .palette-ai-ask svg { width: 14px; height: 14px; color: currentColor; }
+.palette-k .palette-ai-ask .palette-key { margin-left: 2px; height: 18px; min-width: 0; }
+.palette-k .palette-ai-ask:hover:not(:disabled) { color: var(--text); border-color: var(--line-strong); }
+.palette-k .palette-ai-ask:disabled { opacity: .55; cursor: default; }
+/* The wait for an AI answer: a light sweeps across the row's words. */
+.palette-k .palette-shimmer .palette-label {
+  background: linear-gradient(90deg, var(--text-faint) 0%, var(--text-faint) 35%, var(--text) 50%, var(--text-faint) 65%, var(--text-faint) 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: palette-shimmer 1.6s linear infinite;
+}
+@keyframes palette-shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+@media (prefers-reduced-motion: reduce) { .palette-k .palette-shimmer .palette-label { animation-duration: 3s; } }
 .palette-k .palette-item { justify-content: flex-start; align-items: center; gap: 12px; height: 38px; padding: 0 18px; font-size: 14.5px; color: var(--text-dim); }
 .palette-k .palette-item.selected { color: var(--text); }
 .palette-k .palette-glyph { flex: none; width: 18px; height: 18px; display: grid; place-items: center; color: var(--text-faint); }
@@ -4632,6 +4664,8 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
 /* A message with no task: its sentence is the whole card. */
 .toast-plain { width: auto; max-width: 360px; display: flex; gap: 12px; padding: 11px 16px; }
 .toast-plain .toast-line { font-size: 13.5px; color: var(--text); white-space: normal; }
+/* A warning is read whole, or it warns of nothing. */
+.toast-warns .toast-line { white-space: normal; }
 /* An agent's message in its Undo seconds: who it goes to over the words. */
 .agent-sending { display: grid; grid-template-columns: 1fr auto; column-gap: 14px; row-gap: 3px; align-items: center; }
 .agent-sending .toast-title { grid-column: 1; font-size: 12px; color: var(--text-faint); }
@@ -9445,6 +9479,8 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .picture-view { position: fixed; inset: 0; z-index: 9400; outline: none; overflow: hidden;
   background: var(--read-ground); color: var(--read-paper); animation: pv-in .22s ease-out;
   -webkit-app-region: no-drag; touch-action: none; }
+/* Over the new thread box, which goes to 9480 while any picture is open; under the ⌘F box. */
+.picture-view.pv-over-its-box { z-index: 9490; }
 /* Fingers belong to the view (PictureView.tsx fingerDown); only the strip of pictures scrolls. */
 .pv-strip { touch-action: pan-x; }
 .pv-chrome button, .pv-tools button { touch-action: manipulation; }
@@ -9536,6 +9572,9 @@ button.code-skip:hover::after, button.code-skip:hover::before { background: var(
 .cloud-plans-terms { color: var(--text-dim); }
 .cloud-plans-terms a { color: var(--text); text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 3px; }
 
+/* Under a hand-back, the question it answers. */
+.msg-asked { color: var(--text-dim); }
+
 /* What a message is, beside its time: Comment, Checkpoint, Note on a file. */
 .msg-kind { display: inline-flex; align-items: baseline; gap: 6px; margin-left: 8px; padding: 1px 7px; border: 1px solid var(--line, rgba(255,255,255,.12)); border-radius: var(--tag-radius); background: none; font: 11px var(--mono); letter-spacing: .02em; color: var(--text-dim); text-align: left; }
 /* In a narrow column the label drops under the name whole, lined up with it, rather than breaking inside its box. */
@@ -9569,3 +9608,6 @@ span.comment-on-file { cursor: default; }
 .handed-note { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); margin-left: 6px; }
 /* A thread you handed over, in place of the reply box while they have it. */
 .dock-handed { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 10px 10px 18px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--text-dim); font-size: 14px; }
+
+/* Nothing to answer here, as while Codex works on her message in its own window: no empty box. */
+.dock-card:empty { display: none; }

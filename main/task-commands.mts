@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { providerCommand, providerCommands, reviewTarget } from '../shared/provider-commands.mts';
+import { INTERACTIVE_ONLY } from '../shared/claude-commands.mts';
 import { harnessFor } from './harnesses.mts';
 import type { HarnessSupervisor } from './harnesses/common.mts';
 import { NAME } from '../shared/product-name.mjs';
@@ -150,7 +151,9 @@ export async function taskCommand(sup: TaskCommandSupervisor, productSlug: strin
  if(!item||item.agent)return publish('failed','This task is not available.');
  const engine=sup._engineFor(item), harness=harnessFor(engine), op=providerCommand(text,engine);
  if(!op)return publish('failed','Enter a slash command.');
- if(harness.capabilities.nativeCommands && op.route === 'unavailable' && (sup._nativeCommands?.[id]?.includes(op.name) || (op.name === 'review' && sup._nativeCommands?.[id]?.includes('code-review')))) return publish('forward');
+ const native = sup._nativeCommands?.[id] ?? sup._nativeCommands?.[`project:${productSlug}`] ?? null;
+ // No list reported yet: Claude Code knows its own commands and answers for a wrong one.
+ if(harness.capabilities.nativeCommands && op.route === 'unavailable' && (native ? native.includes(op.name) || (op.name === 'review' && native.includes('code-review')) : !INTERACTIVE_ONLY.has(op.name))) return publish('forward');
  if(op.route==='unavailable')return publish('failed',`/${op.name} is not supported in ${NAME} yet. Your draft has been kept. Use the native ${harness.label} client for this command.`,op.name);
  if(op.route==='remote'){if(op.args)return publish('failed','Run /remote-control on its own.',op.name);sup.remoteControl(productSlug,id,'toggle').catch(()=>{});return publish('done','',op.name);}
  if(op.route==='fork')return forkTask(sup,productSlug,id,item,engine,op,publish);

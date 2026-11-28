@@ -71,6 +71,14 @@ those files still counts as a change to the look. Never move the fingerprints in
 `tests/fixtures/the-trays-approved-look.json` without that approval. Taking
 those pictures puts windows on their screen, so ask before you do it.
 
+The glass is drawn by the Mac, not by the page. A picture taken anywhere else
+(the cloud, Linux, a browser on the page's `?demo=` view) shows the page's
+plain fallback and is not the approved look, so never show one for approval
+and never change the look to match one. A change to what the list says or
+offers leaves the glass, tint, ink and light-or-dark files alone; check that
+only the parts you meant to change fail the approved-look test, then take the
+pictures on the Mac (2026-11-15: this mistake had cost hours of rework).
+
 ## THE DESIGN IS ROUNDED (2026-11-10)
 
 A button, card, tip, key cap or ring with a border has rounded corners. Square
@@ -173,10 +181,11 @@ anywhere else. `--ide` is the user's to switch on, never ours.
 
 Nor does an agent start the person's Google Chrome headless: the Mac files that
 copy as their Chrome, and their own Chrome then opens no window. Every hidden
-browser comes from `shared/hidden-browser.mjs` (Chrome for Testing or
-Playwright's headless shell), and
-`tests/no-agent-browser-is-the-persons-own-chrome.test.mjs` fails if any other
-file names Google Chrome's binary.
+browser comes from `shared/hidden-browser.mts` (Playwright's headless shell,
+else Chrome for Testing) and starts with its `KEEPS_OFF_THE_KEYCHAIN` flags,
+even a one-off from the shell; without them it asks for the person's keychain
+password. `tests/no-agent-browser-is-the-persons-own-chrome.test.mts` fails if
+any other file names Google Chrome's binary.
 
 ## Billing
 

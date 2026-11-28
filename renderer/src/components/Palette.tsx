@@ -3,7 +3,8 @@
 
 import { cloudCommands, type CloudMode, type CloudStatus } from '../cloud-menu';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import type { Product, ThreadStateWord, View } from '../types';
+import type { AgentMode, Product, ThreadStateWord, View } from '../types';
+import { BRING_IN, outsideCommands } from '../outside-agents';
 import { commandKeys } from '../palette-keys';
 import { keptPick, nameRank, namesIt, pointerMoved, titleFirst } from '../palette-pick';
 import { emptyLine, escapeClosesThePalette, lookRows, matchesQuery, pageRows, rankMatches, walkRows } from '../palette-rows';
@@ -16,6 +17,7 @@ import { NAME } from '../../../shared/product-name.mjs';
 import { CHECK_SAY, MOVE_SAY } from '../update-row';
 import { closesOnPress } from '../press';
 import { besideCommands } from '../palette-settings';
+import { chord } from '../this-keyboard';
 
 export interface Command {
   id: string;
@@ -49,8 +51,9 @@ export interface InsideSection { key: string; label: string; rows: Command[] }
 /** The sections, and the threads opened lately the words are inside, which join the threads found. */
 export interface PaletteInside { sections: InsideSection[]; threads?: ReadonlyMap<string, string> }
 const NOTHING_INSIDE: PaletteInside = { sections: [] };
+const NONE_FOUND: Command[] = [];
 
-export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, skyThemes = [], onSkyTheme, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, onHome, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, findThreads, findChats, findInside, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onDemo, onClose, findSettings, cloud = null, onCloudMode, open = true, phone = false, typed = '' }: {
+export function Palette({ products, supervisorPaused, itemCommands = [], batch = false, order = [], look, machine = 'dark', onSetLook, skyThemes = [], onSkyTheme, staleFiles = [], updateReady = null, onInstallUpdate, onCheckUpdate, moveToApplications = false, onMoveToApplications, filtering = false, onOpenFilter, onClearFilter, onView, teamLayout = false, onPause, onResume, onRankFirst, onOpenProjects, onNewProject, onNewThread, onStanding, onSettings, onUsage, onShortcuts, roomsOn = false, groups = [], onGroups, onPickGroup, teamLists, filePages, onConnections, onHome, teammates = null, onTeammates, onPauseTeammate, boardUp = false, onFlipView, keyHints, onSetKeyHints, findThreads, findChats, findInside, findByDescription, onSearchFor, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onDemo, onClose, findSettings, cloud = null, onCloudMode, outside = null, onOutside, onBringIn = null, open = true, phone = false, typed = '' }: {
   products: Product[];
   supervisorPaused: boolean;
   itemCommands?: Command[];
@@ -134,6 +137,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   findChats?: (query: string) => Command[];
   /** Lines, files, comments and decisions a query finds, a few of each, shown after the threads. */
   findInside?: (query: string) => Promise<PaletteInside>;
+  /** A small AI reads the threads and names the ones a sentence describes. Absent, the box does not offer it. */
+  findByDescription?: (description: string) => Promise<DescribedAnswer>;
   /** Opens the thread search with this query already typed. */
   onSearchFor?: (query: string) => void;
   /** Walks the welcome screen again on this install, to test the first run. */
@@ -148,6 +153,11 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
   /** The cloud, when this Mac is set up for it; null hides its rows. */
   cloud?: CloudStatus | null;
   onCloudMode?: (mode: CloudMode) => void;
+  /** How many sessions started outside Agentbox the inbox takes. */
+  outside?: AgentMode | null;
+  onOutside?: (mode: AgentMode) => void;
+  /** On a session started outside Agentbox: makes it a thread here. */
+  onBringIn?: (() => void) | null;
   /** Drawn only while open. */
   open?: boolean;
   /** Words already in the box when it opens (a menu row that means ⌘K's Move to rows). */
@@ -201,6 +211,8 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       keywords: 'cloud where threads run mac overflow everything move on off',
       run: () => onCloudMode(r.mode),
     })) : []),
+    ...(outside && onOutside ? outsideCommands(outside).map((r) => ({ ...r, run: () => onOutside(r.to) })) : []),
+    ...(onBringIn ? [{ id: 'bring-in', label: BRING_IN, hint: 'this session', keywords: 'import bring in move pull thread session terminal codex claude code continue here', run: onBringIn }] : []),
     // Namespaced so they cannot share an id with an item command such as
     // 'done'. Ids become React keys, and a duplicate kept a stale row alive
     // through the filter (../palette-keys).
@@ -346,7 +358,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       id: 'settings',
       label: 'Settings…',
       hint: 'workspace and every project',
-      keywords: 'settings preferences options usage limits accounts account sign in theme appearance look phone cloud permissions agents rooms groups alpha codex claude',
+      keywords: 'settings preferences options usage limits accounts account sign in theme appearance look phone cloud permissions agents rooms groups codex claude',
       run: onSettings,
     },
     // Opens the Shortcuts page itself, not Settings' front page. The keywords
@@ -418,10 +430,10 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       run: () => onSetKeyHints(!keyHints),
     },
 
-  ], [itemCommands, batch, projects, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, skyThemes, onSkyTheme, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onDemo, cloud, onCloudMode]);
+  ], [itemCommands, batch, projects, supervisorPaused, order, onNewProject, onNewThread, filtering, onOpenFilter, onClearFilter, onView, teamLayout, onPause, onResume, onRankFirst, onOpenProjects, onStanding, onSettings, onShortcuts, look, machine, onSetLook, skyThemes, onSkyTheme, staleFiles, updateReady, onInstallUpdate, moveToApplications, onMoveToApplications, boardUp, onFlipView, keyHints, onSetKeyHints, onFirstRun, onTutorial, onEndTutorial, onImportAgents, onDemo, cloud, onCloudMode, outside, onOutside, onBringIn]);
   // The walkthrough's ⌘K is a short list, with the rest a word away.
   const drawn = useMemo(() => (onEndTutorial ? walkRows(commands) : commands), [onEndTutorial, commands]);
-  return open ? <PaletteBox commands={drawn} findThreads={findThreads} findChats={findChats} findInside={findInside} findSettings={findSettings} onSearchFor={onSearchFor} onClose={onClose} phone={phone} typed={typed} /> : null;
+  return open ? <PaletteBox commands={drawn} findThreads={findThreads} findChats={findChats} findInside={findInside} findByDescription={findByDescription} findSettings={findSettings} onSearchFor={onSearchFor} onClose={onClose} phone={phone} typed={typed} /> : null;
 }
 
 /** How many threads the box lists under the commands before "See all". */
@@ -453,6 +465,49 @@ export function peopleLead(query: string, people: readonly Command[], threads: r
   return p < t || (p === t && p <= 1);
 }
 
+/** What the AI asked to find a described thread answered, as rows. */
+export type DescribedAnswer = { ok: true; rows: Command[] } | { ok: false; error: string };
+type Asked = { query: string; at: number } & ({ state: 'looking' } | { state: 'found'; rows: Command[] } | { state: 'failed'; error: string });
+
+const ASK_ROW = 'find-by-description';
+
+/**
+ * Whether the idle Ask AI row is in the list. On a computer the bar's button
+ * offers it, so the row comes only when the words found no thread and Enter
+ * would otherwise do nothing. A phone has no button.
+ */
+export function offersAgent(query: string, threadsFound: number, phone = false): boolean {
+  if (!query.trim()) return false;
+  return phone || threadsFound === 0;
+}
+
+/** Which ends of the search bar hide words, as classes that fade them. */
+export function clippedEnds(scrollLeft: number, clientWidth: number, scrollWidth: number): string {
+  const start = scrollLeft > 1;
+  const end = scrollLeft + clientWidth < scrollWidth - 1;
+  return `${start ? ' clip-start' : ''}${end ? ' clip-end' : ''}`;
+}
+
+const quoted = (query: string) => { const q = query.trim(); return q.length > 48 ? `“${q.slice(0, 47)}…”` : `“${q}”`; };
+
+/** The row that searches with AI, in each of its states. */
+export function agentRow(asked: Asked | null, now: number, ask: () => void, { phone = false, query = '', key = chord('⌘↵') }: { phone?: boolean; query?: string; key?: string } = {}): Command {
+  const row = { id: ASK_ROW };
+  if (!asked) return { ...row, label: `Ask AI about ${quoted(query)}`, ...(phone ? {} : { keyHint: key }), run: ask };
+  if (asked.state === 'looking') {
+    const seconds = Math.floor((now - asked.at) / 1000);
+    return { ...row, label: 'AI is reading your threads', ...(seconds >= 1 ? { hint: `${seconds}s` } : {}), run: () => {} };
+  }
+  if (asked.state === 'failed') return { ...row, label: asked.error, hint: 'Try again', run: ask };
+  return { ...row, label: 'AI found no thread that fits', run: () => {} };
+}
+
+/** The threads the words found, less those the AI already named above them. */
+export const withoutPicked = (rows: Command[], picks: readonly Command[]) => {
+  const named = new Set(picks.map((p) => p.id));
+  return named.size ? rows.filter((r) => !named.has(r.id)) : rows;
+};
+
 /** The rows in the order drawn, and the label over the row each section starts
  *  at. A phone searches threads more than it runs commands, so they go first. */
 // These replace the whole screen, so a word that merely touches a hidden keyword
@@ -460,6 +515,16 @@ export function peopleLead(query: string, people: readonly Command[], threads: r
 const ASKED_FOR_BY_NAME = new Set(['first-run']);
 
 export function paletteOrder(all: Command[], threads: Command[], phone = false, query = '', chats = 0): { rows: Command[]; labels: Map<number, string> } {
+  // The AI row alone is no thread found: it goes under every command, so Enter
+  // never starts a search the words were not asking for.
+  const ask = threads.find((t) => t.id === ASK_ROW);
+  if (ask && threads.length === chats + 1) {
+    const rest = paletteOrder(all, threads.filter((t) => t !== ask), phone, query, chats);
+    if (rest.rows.length) {
+      rest.labels.set(rest.rows.length, 'Threads');
+      return { rows: [...rest.rows, ask], labels: rest.labels };
+    }
+  }
   const labels = new Map<number, string>();
   // The first `chats` of `threads` are the people and groups found.
   const people = threads.slice(0, chats);
@@ -468,9 +533,11 @@ export function paletteOrder(all: Command[], threads: Command[], phone = false, 
     ? [{ rows: people, label: 'People and groups' }, { rows: rest, label: 'Threads' }]
     : [{ rows: rest, label: 'Threads' }, { rows: people, label: 'People and groups' }];
   const found = sections.flatMap((s) => s.rows);
+  // The AI row alone, with nothing else listed, needs no heading: it says what it is.
+  const loneAsk = found.length === 1 && found[0].id === ASK_ROW;
   const heads = (at: number) => {
     for (const s of sections) {
-      if (s.rows.length) labels.set(at, s.label);
+      if (s.rows.length && !loneAsk) labels.set(at, s.label);
       at += s.rows.length;
     }
   };
@@ -485,7 +552,11 @@ export function paletteOrder(all: Command[], threads: Command[], phone = false, 
   const said = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
   const namedTitles = found.filter((t) => namesIt(query, t.label)).map((t) => said(t.label));
   const carriesANamedTitle = (c: Command) => namedTitles.some((t) => said(c.label).includes(t));
-  const ahead = (c: Command) => named(c) && (!carriesANamedTitle(c) || said(c.label).startsWith(said(query)));
+  // A word several sky themes share ("dark") is more likely a thread's: they go
+  // first only when the words pick one out or ask for a theme.
+  const skies = matched.filter((c) => c.id.startsWith('theme-sky-') && named(c));
+  const sharedSky = (c: Command) => skies.length > 1 && skies.includes(c) && !/\b(?:themes?|sky|skies)\b/i.test(query);
+  const ahead = (c: Command) => named(c) && !sharedSky(c) && (!carriesANamedTitle(c) || said(c.label).startsWith(said(query)));
   if (!phone) {
     // A command the words only touch by keyword comes after the threads they found.
     if (found.length && query.trim()) {
@@ -514,7 +585,7 @@ function RowIcon({ row }: { row: Command }) {
 }
 
 // The box itself, mounted fresh each time ⌘K opens, so it starts empty and focused.
-function PaletteBox({ commands, findThreads, findChats, findInside, findSettings, onSearchFor, onClose, phone = false, typed = '' }: { commands: Command[]; findThreads?: (q: string, inside?: ReadonlyMap<string, string>) => Command[]; findChats?: (q: string) => Command[]; findInside?: (q: string) => Promise<PaletteInside>; findSettings?: (q: string) => Command[]; onSearchFor?: (q: string) => void; onClose: () => void; phone?: boolean; typed?: string }) {
+function PaletteBox({ commands, findThreads, findChats, findInside, findByDescription, findSettings, onSearchFor, onClose, phone = false, typed = '' }: { commands: Command[]; findThreads?: (q: string, inside?: ReadonlyMap<string, string>) => Command[]; findChats?: (q: string) => Command[]; findInside?: (q: string) => Promise<PaletteInside>; findByDescription?: (description: string) => Promise<DescribedAnswer>; findSettings?: (q: string) => Command[]; onSearchFor?: (q: string) => void; onClose: () => void; phone?: boolean; typed?: string }) {
   const [query, setQuery] = useState(typed);
   const [pickedKey, setPickedKey] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -523,6 +594,10 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findSettings
   const byKey = useRef(false);
 
   useEffect(() => inputRef.current?.focus(), []);
+  const [clipped, setClipped] = useState('');
+  const measureClip = () => { const el = inputRef.current; if (el) setClipped(clippedEnds(el.scrollLeft, el.clientWidth, el.scrollWidth)); };
+  // The caret scrolls the text after the value lands, so measure on the next frame.
+  useEffect(() => { const f = requestAnimationFrame(measureClip); return () => cancelAnimationFrame(f); }, [query]);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   useEffect(() => escapeClosesThePalette(window, () => closeRef.current()), []);
@@ -550,18 +625,54 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findSettings
     const timer = setTimeout(() => { void askInside.current?.(q).then((got) => { if (live) setInside(got); }).catch(() => {}); }, 90);
     return () => { live = false; clearTimeout(timer); };
   }, [query]);
-  const threads = useMemo(() => {
+  const listed = useMemo(() => {
     const find = findThreads && ((q: string) => findThreads(q, inside.threads));
-    return [...chats, ...titleFirst(threadRows(query, find, onSearchFor), query)];
-  }, [chats, query, findThreads, onSearchFor, inside.threads]);
+    return titleFirst(threadRows(query, find, onSearchFor), query);
+  }, [query, findThreads, onSearchFor, inside.threads]);
+
+  // A described thread, found by AI on request (⌘↵, its button or its row).
+  const [asked, setAsked] = useState<Asked | null>(null);
+  const askedNow = asked && asked.query === query.trim() ? asked : null;
+  const [tick, setTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (askedNow?.state !== 'looking') return undefined;
+    const t = setInterval(() => setTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [askedNow?.state]);
+  const askAgent = () => {
+    const q = query.trim();
+    if (!q || !findByDescription || askedNow?.state === 'looking') return;
+    const at = Date.now();
+    setAsked({ query: q, at, state: 'looking' });
+    setTick(at);
+    void findByDescription(q)
+      .catch((err: unknown): DescribedAnswer => ({ ok: false, error: String((err as Error)?.message ?? err) }))
+      .then((a) => setAsked((was) => (was?.at !== at ? was : a.ok ? { query: q, at, state: 'found', rows: a.rows } : { query: q, at, state: 'failed', error: a.error })));
+  };
+  const looking = askedNow?.state === 'looking';
+  const aiFound = askedNow?.state === 'found' ? askedNow.rows : NONE_FOUND;
+  // Once asked, the answer and the wait for it sit on top, above the words' threads.
+  const picks = useMemo(
+    () => (!askedNow ? NONE_FOUND : aiFound.length ? aiFound : [agentRow(askedNow, tick, askAgent, { phone, query })]),
+    // askAgent reads the state it is drawn with.
+    [askedNow, aiFound, tick, phone, query], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const offerAgent = !!findByDescription && !askedNow && offersAgent(query, listed.length, phone);
+  const threads = useMemo(
+    () => [...chats, ...withoutPicked(listed, aiFound)].concat(offerAgent ? [agentRow(null, tick, askAgent, { phone, query })] : []),
+    [chats, listed, aiFound, offerAgent, tick, phone, query], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const { rows: found, labels: foundLabels } = useMemo(() => paletteOrder(matched, threads, phone, query, chats.length), [matched, threads, phone, query, chats.length]);
-  const filtered = useMemo(() => [...found, ...inside.sections.flatMap((s) => s.rows)], [found, inside.sections]);
+  const sections = inside.sections;
+  const filtered = useMemo(() => [...picks, ...found, ...sections.flatMap((s) => s.rows)], [picks, found, sections]);
   const labels = useMemo(() => {
-    const all = new Map(foundLabels);
-    let at = found.length;
-    for (const s of inside.sections) { all.set(at, s.label); at += s.rows.length; }
+    const all = new Map<number, string>();
+    if (aiFound.length) all.set(0, 'Found by AI');
+    for (const [at, label] of foundLabels) all.set(at + picks.length, label);
+    let at = picks.length + found.length;
+    for (const s of sections) { all.set(at, s.label); at += s.rows.length; }
     return all;
-  }, [foundLabels, found, inside.sections]);
+  }, [picks, aiFound, foundLabels, found, sections]);
   const isThread = (c: Command) => c.id.startsWith('thread-') || c.id === 'all-threads';
 
   // Unique keys, so two lists sharing an id cannot leave a stale row alive
@@ -592,9 +703,11 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findSettings
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.6" /><path d="M10.4 10.4L14 14" /></svg>
           <input
             ref={inputRef}
-            className="palette-input"
+            className={`palette-input${clipped}`}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onScroll={measureClip}
+            onSelect={measureClip}
             placeholder={phone ? 'Search' : findThreads ? 'Search threads or type a command…' : 'Type a command…'}
             enterKeyHint="go"
             onKeyDown={(e) => {
@@ -602,9 +715,16 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findSettings
               // there is no last row to stop at and Math.min alone walks to -1.
               if (e.key === 'ArrowDown') { e.preventDefault(); byKey.current = true; pick(Math.max(0, Math.min(selected + 1, filtered.length - 1))); }
               if (e.key === 'ArrowUp') { e.preventDefault(); byKey.current = true; pick(Math.max(0, selected - 1)); }
+              if (e.key === 'Enter' && findByDescription && (e.metaKey || e.ctrlKey)) { e.preventDefault(); askAgent(); return; }
               if (e.key === 'Enter' && filtered[selected]) filtered[selected].run();
             }}
           />
+          {!phone && findByDescription && (
+            <button type="button" className="palette-ai-ask" disabled={!query.trim() || looking} onClick={() => { askAgent(); inputRef.current?.focus(); }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" aria-hidden="true">{ICONS.ai.map((d) => <path key={d} d={d} />)}</svg>
+              Ask AI<span className="palette-key">{chord('⌘↵')}</span>
+            </button>
+          )}
           {phone
             ? <button type="button" className="palette-cancel" onClick={onClose}>Cancel</button>
             : <button type="button" className="palette-esc" aria-label="Close" onClick={onClose}>esc</button>}
@@ -614,7 +734,7 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findSettings
           {filtered.map((c, i) => (<Fragment key={keys[i]}>
             {labels.has(i) && <div className="palette-section">{labels.get(i)}</div>}
             <div
-              className={`palette-item ${isThread(c) ? 'palette-thread ' : ''}${c.found ? 'palette-found ' : ''}${!phone && c.sub ? 'palette-two ' : ''}${i === selected ? 'selected' : ''}`}
+              className={`palette-item ${isThread(c) ? 'palette-thread ' : ''}${c.found ? 'palette-found ' : ''}${looking && c.id === ASK_ROW ? 'palette-shimmer ' : ''}${!phone && c.sub ? 'palette-two ' : ''}${i === selected ? 'selected' : ''}`}
               role="option"
               aria-selected={i === selected}
               onClick={c.run}
@@ -636,6 +756,9 @@ function PaletteBox({ commands, findThreads, findChats, findInside, findSettings
                 </span>
                 : phone
                 ? <span className="palette-text"><span className="palette-label">{c.label}</span>{isThread(c) && c.hint && <span className="palette-sub">{c.hint}</span>}</span>
+                : c.sub && i < picks.length
+                // The AI's reason is its own words, not where the typed ones were found.
+                ? <span className="palette-text"><span className="palette-label">{c.label}</span><span className="palette-sub">{c.sub}</span></span>
                 : c.sub
                 ? <span className="palette-text"><span className="palette-label">{c.label}</span><span className="palette-sub">{markedWords(c.sub, query.trim()).map((run, j) => (run.hit ? <b className="hit" key={j}>{run.text}</b> : <span key={j}>{run.text}</span>))}</span></span>
                 : <span className="palette-label">{c.label}</span>}

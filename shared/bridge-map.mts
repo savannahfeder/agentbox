@@ -68,6 +68,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   // Lines, files and comments inside threads that a query finds, and the call that reads them ahead.
   findInThreads: 'zero:find-in-threads',
   warmFindInThreads: 'zero:warm-find-in-threads',
+  findByDescription: 'zero:find-by-description',
   teamComment: 'zero:team-comment',
   teamContinueBrief: 'zero:team-continue-brief',
   teamContinued: 'zero:team-continued',
@@ -213,12 +214,12 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   stageAttachmentPart: 'zero:stage-attachment-part',
   crash: 'zero:crash',
   blankCheck: 'zero:blank-check',
-  // The appearance the desktop window's glass is drawn in; a tab has no glass.
-  glassTone: 'zero:glass-tone',
   windowButtons: 'zero:window-buttons',
   track: 'zero:track',
   // How long the window's own thread held (renderer/src/window-holds.ts).
   windowHeld: 'zero:window-held',
+  // And how held it was over the last minute (renderer/src/window-lag.ts). Main takes it from the desktop window only.
+  windowLag: 'zero:window-lag',
   sessionTrace: 'zero:session-trace',
   itemHistory: 'zero:item-history',
   openArtifact: 'zero:open-artifact',
@@ -246,6 +247,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   saveRailNote: 'zero:save-rail-note',
   agentReply: 'zero:agent-reply',
   agentReveal: 'zero:agent-reveal',
+  bringInSession: 'zero:bring-in-session',
   agentConversation: 'zero:agent-conversation',
   scheduleAgent: 'zero:schedule-agent',
   closeAgent: 'zero:close-agent',
@@ -278,7 +280,6 @@ export const PUSH_CHANNELS: Readonly<Record<string, string>> = {
   onThreadLink: 'zero:thread-link',
   onSharedFile: 'zero:shared-file',
   onOpenItem: 'zero:open-item',
-  onOpenSettings: 'zero:open-settings',
   onScreenDetail: 'zero:screen-detail',
   onEscapeBrowser: 'zero:escape-browser',
   onKeyInTheFile: 'zero:key-in-the-file',

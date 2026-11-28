@@ -85,24 +85,36 @@ interface ChangeSeen {
   knowsYou?: unknown;
 }
 
+// The phone's pass asks for every carried thread's change each time, and a
+// saved change is the same object until its file is rewritten
+// (main/code-change.mts readChangeSummary): read for secrets once, by home.
+const phoneChanges = new WeakMap<object, Map<string, PhoneChange | null>>();
+
 /** A saved change (main/code-change.mts readChangeSummary) as the phone gets it, or null when it touched no files. */
 export function phoneChangeOf(summary: ChangeSeen | null | undefined, { home = null }: Ctx = {}): PhoneChange | null {
   if (!summary || typeof summary !== 'object' || !Array.isArray(summary.files)) return null;
+  let byHome = phoneChanges.get(summary);
+  if (!byHome) phoneChanges.set(summary, byHome = new Map());
+  const made = byHome.get(home ?? '');
+  if (made !== undefined) return made;
   const count = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.round(Number(v)) : 0);
   const flag = (v: unknown) => (typeof v === 'boolean' ? v : null);
-  const files = (summary.files as ({ path?: unknown; plus?: unknown; minus?: unknown } | null)[])
-    .filter((f) => f && typeof f.path === 'string' && f.path)
+  const named = (summary.files as ({ path?: unknown; plus?: unknown; minus?: unknown } | null)[])
+    .filter((f) => f && typeof f.path === 'string' && f.path);
+  // Only the paths that are kept: a generated change names thousands.
+  const files = named.slice(0, PHONE_CHANGE_FILES)
     .map((f) => ({ path: hideSecrets(f!.path, { home }), plus: count(f!.plus), minus: count(f!.minus) }));
-  if (!files.length) return null;
-  return {
+  const change: PhoneChange | null = files.length ? {
     plus: count(summary.plus),
     minus: count(summary.minus),
-    files: files.slice(0, PHONE_CHANGE_FILES),
-    ...(files.length > PHONE_CHANGE_FILES ? { more: files.length - PHONE_CHANGE_FILES } : {}),
+    files,
+    ...(named.length > PHONE_CHANGE_FILES ? { more: named.length - PHONE_CHANGE_FILES } : {}),
     committed: flag(summary.committed),
     uncommitted: flag(summary.uncommitted),
     knowsYou: flag(summary.knowsYou),
-  };
+  } : null;
+  byHome.set(home ?? '', change);
+  return change;
 }
 
 /** A row's fields as this file reads them, before they are picked. */
@@ -153,6 +165,8 @@ export interface PhoneWait {
   state: string;
   tool?: string;
   until?: number;
+  /** Queued while its folder is made: it reads as a run. An older phone passes over it and says Queued. */
+  settingUp?: true;
 }
 
 /** What the Mac's own status (Supervisor#status) says about the queue. */
@@ -163,6 +177,7 @@ export interface StatusSeen {
   atLimit?: Record<string, { tool?: unknown; until?: unknown } | null>;
   runNow?: string[];
   queued?: string[];
+  settingUp?: string[];
   paused?: boolean;
 }
 
@@ -248,18 +263,22 @@ const SECRETS = [
 // third reviews): `AWS_SECRET_ACCESS_KEY=...`, `password: hunter22`,
 // `PASSWORD=12345678`, `password="correct horse battery staple"`. The name
 // stays, so the sentence still reads; a quoted value goes whole.
-const STRONG = '[A-Za-z0-9_.-]*(?:passw(?:or)?d|passphrase|secret|api[_-]?key|access[_-]?key|private[_-]?key|credentials?|authorization|(?:auth|access|refresh|session|bearer|id)[_-]?token)[A-Za-z0-9_.-]*';
+// The name is a whole run of name characters, from its first letter or digit,
+// with a secret's word in it. Taken whole and read back once, it costs a run
+// its length: tried from every dot or dash, it cost the square, and 50 KB of
+// dotted hex took 1.7 s.
+const STRONG = '(?<=(?:^|[^A-Za-z0-9_.-])[.-]*)(?=([A-Za-z0-9_][A-Za-z0-9_.-]*))\\1(?<=(?:passw(?:or)?d|passphrase|secret|api[_-]?key|access[_-]?key|private[_-]?key|credentials?|authorization|(?:auth|access|refresh|session|bearer|id)[_-]?token)[A-Za-z0-9_.-]*)';
 // "token" alone is a word people use ("token: unexpected identifier"), so it
 // counts only as an ENV_STYLE name, or before a long run that looks like a key.
 const WEAK = '(?:[A-Z0-9_]*TOKEN[A-Z0-9_]*|token)';
 // A quoted value goes whole, however long, escaped quotes and all; a bare one
 // is everything up to a space, brackets included (Codex's fourth review).
 const VALUE = '(?:"((?:[^"\\\\\\n]|\\\\.)*)"|\'((?:[^\'\\\\\\n]|\\\\.)*)\'|([^\\s"\',;]+))';
-const NAMED_STRONG = new RegExp(`\\b(${STRONG})(["']?\\s*[:=]\\s*)${VALUE}`, 'gi');
+const NAMED_STRONG = new RegExp(`${STRONG}(["']?\\s*[:=]\\s*)${VALUE}`, 'gi');
 const NAMED_WEAK = new RegExp(`\\b(${WEAK})(["']?\\s*[:=]\\s*)${VALUE}`, 'g');
 type Quoted = string | undefined;
 const hidden = (name: string, sep: string, dq: Quoted, sq: Quoted, bare: Quoted): string => `${name}${sep}${dq !== undefined ? '"[hidden]"' : sq !== undefined ? "'[hidden]'" : '[hidden]'}`;
-function hideNamed(text: string): string {
+export function hideNamed(text: string): string {
   let out = text.replace(NAMED_STRONG, (m: string, name: string, sep: string, dq: Quoted, sq: Quoted, bare: Quoted) => (bare === '[hidden]' ? m : hidden(name, sep, dq, sq, bare)));
   out = out.replace(NAMED_WEAK, (m: string, name: string, sep: string, dq: Quoted, sq: Quoted, bare: Quoted) => {
     const value = dq ?? sq ?? bare ?? '';
@@ -273,20 +292,60 @@ function hideNamed(text: string): string {
 }
 // AND A LONG RUN OF LETTERS AND DIGITS THAT LOOKS LIKE NOTHING BUT A KEY: 32 or
 // more, upper and lower case and digits all present. A commit id or a uuid is
-// one case of hex and is left alone.
-const KEYLIKE = /\b(?=[A-Za-z0-9_-]{32,}\b)(?=[A-Za-z0-9_-]*[a-z])(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*[0-9])[A-Za-z0-9_-]{32,}\b/g;
+// one case of hex and is left alone. Each run is read once, dashes at its ends
+// aside: tried from every dash, 300 KB of dashed hex took 107 s.
+const KEY_RUN = /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{32,}/g;
+export const hideKeyShaped = (text: string): string => text.replace(KEY_RUN, (run: string) => {
+  const from = run.search(/[^-]/);
+  if (from < 0) return run;
+  let to = run.length;
+  while (run[to - 1] === '-') to -= 1;
+  const key = run.slice(from, to);
+  return key.length >= 32 && /[a-z]/.test(key) && /[A-Z]/.test(key) && /[0-9]/.test(key) ? `${run.slice(0, from)}[hidden]${run.slice(to)}` : run;
+});
 // A file's path is not a key, however long its name: a saved picture is a
 // random prefix joined to the file's own name, and hidden, its link leads nowhere.
-// Bounded so a long run with no extension costs little.
-const FILE_PATH = /[\w./~-]{0,300}\.(?:png|jpe?g|gif|webp|heic|svg|mp4|mov|webm|m4a|mp3|wav|pdf|txt|md|html?|csv|json|zip)(?![\w])/gi;
+// A path is up to PATH_REACH of the characters paths are written in, then an
+// ending. Found from the endings back, not as one pattern: that one was tried
+// forward and back from every character, and megabytes of hex froze the app.
+const PATH_REACH = 300;
+const PATH_ENDING = /\.(?:png|jpe?g|gif|webp|heic|svg|mp4|mov|webm|m4a|mp3|wav|pdf|txt|md|html?|csv|json|zip)(?![\w])/gi;
+const PATH_CHAR = new Uint8Array(128);
+for (const c of 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_./~-') PATH_CHAR[c.charCodeAt(0)] = 1;
+const pathChars = (text: string, from: number, to: number): boolean => {
+  for (let i = from; i < to; i += 1) if (PATH_CHAR[text.charCodeAt(i)] !== 1) return false;
+  return true;
+};
+/** Each file path in `text`, as [start, end): from as far back as the reach allows to the last ending within it. */
+export function filePathSpans(text: string): [number, number][] {
+  const spans: [number, number][] = [];
+  const endings = [...text.matchAll(PATH_ENDING)];
+  let from = 0;
+  for (let i = 0; i < endings.length;) {
+    const dot = endings[i]!.index;
+    const floor = Math.max(from, dot - PATH_REACH);
+    let start = dot;
+    while (start > floor && PATH_CHAR[text.charCodeAt(start - 1)] === 1) start -= 1;
+    let last = i;
+    let end = dot + endings[i]![0].length;
+    while (last + 1 < endings.length && endings[last + 1]!.index <= start + PATH_REACH && pathChars(text, end, endings[last + 1]!.index)) {
+      last += 1;
+      end = endings[last]!.index + endings[last]![0].length;
+    }
+    spans.push([start, end]);
+    from = end;
+    i = last + 1;
+  }
+  return spans;
+}
 function hideKeyLike(text: string): string {
   let out = '';
   let at = 0;
-  for (const m of text.matchAll(FILE_PATH)) {
-    out += text.slice(at, m.index).replace(KEYLIKE, '[hidden]') + m[0];
-    at = m.index + m[0].length;
+  for (const [start, end] of filePathSpans(text)) {
+    out += hideKeyShaped(text.slice(at, start)) + text.slice(start, end);
+    at = end;
   }
-  return out + text.slice(at).replace(KEYLIKE, '[hidden]');
+  return out + hideKeyShaped(text.slice(at));
 }
 export function hideSecrets(text: unknown, { home = null }: Ctx = {}): string {
   let out = String(text);
@@ -535,7 +594,8 @@ export function phoneWaitsOf(status: StatusSeen | null | undefined): { byId: Rec
   for (const [id, tool] of Object.entries(status.signInNeeded ?? {})) set(id, { state: 'signin', tool: String(tool) });
   for (const [id, l] of Object.entries(status.atLimit ?? {})) set(id, { state: 'limit', tool: String(l?.tool ?? ''), until: Number(l?.until) || 0 });
   const next = new Set(status.runNow ?? []);
-  for (const id of status.queued ?? []) set(id, { state: next.has(id) ? 'next' : 'queued' });
+  const settingUp = new Set(status.settingUp ?? []);
+  for (const id of status.queued ?? []) set(id, { state: next.has(id) ? 'next' : 'queued', ...(settingUp.has(id) ? { settingUp: true as const } : {}) });
   return { byId, paused: !!status.paused };
 }
 

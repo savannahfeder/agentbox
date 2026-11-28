@@ -215,14 +215,18 @@ async function approvalToItsAgent({ store, supervisor, product, id, mark }: {
   if (!mark.file || store.listProducts().find((p) => p.slug === product)?.team?.direct) return false;
   const item = store.readItem(product, id);
   if (!item || item.status === 'done' || heldByAPerson(item)) return false;
-  const families = filesTheThreadShows(store, product, id, item);
-  const version = families.flatMap((f) => f.versions).find((v) => v.id === mark.file);
+  const versions = filesTheThreadShows(store, product, id, item).find((f) => f.versions.some((v) => v.id === mark.file))?.versions ?? [];
+  const version = versions.find((v) => v.id === mark.file);
   if (typeof version?.agent !== 'string') return false;
   const given = (item.artifacts?.approvals ?? []).filter((a) => a.file === mark.file).sort((a, b) => b.ts - a.ts)[0];
   if (!given) return false;
   // A teammate's version is theirs to act on; approving it tells this agent nothing.
   if (version.by && version.by !== given.by && version.by !== (item.runner ?? item.createdBy ?? null)) return false;
-  const text = `Approved ${version.path}. Proceed as you proposed.`;
+  const newest = versions.at(-1)!;
+  // "As you proposed" points the agent at its latest proposal, which an older version is not.
+  const text = newest === version
+    ? `Approved ${version.path}. Proceed as you proposed.`
+    : `Approved version ${version.n} of ${versions.length} (${version.path}). It is older than the newest, version ${newest.n} (${newest.path}). Go ahead with version ${version.n}, not version ${newest.n}.`;
   // fromNotes keeps the thread from drawing this reply beside the approval it already shows.
   await submitReply(supervisor, { product, id, answer: text }, () => store.answerItem(product, id, { answer: text, fromNotes: [approvalId(given)] }));
   supervisor.liftBrakeForHer?.();

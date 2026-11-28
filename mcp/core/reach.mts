@@ -8,6 +8,7 @@ import { readOutbox, readTeamView, writeOutbox, newOutId } from '../../main/stor
 import { readItemHistory, readWorkItem, readWorkItems, updateWorkItem } from '../../main/store/work-items.mts';
 import { baseName, carriedNotes, familyOfName, filesInLines, marksOf, nextVersionName, otherFilesInLines, placeWords, reviewKind, shownName, threadFiles } from '../../shared/artifact-marks.mts';
 import { lineGap, mergeThree } from '../../shared/doc-merge.mts';
+import { asWrittenFile } from '../../shared/as-written.mts';
 import { VIEW_FRESH_MS, groupTurn, mayGoNow, saidToSendTo } from '../../shared/teammate-reach.mts';
 import { CHAT_LABEL, tooLongForAChat } from '../../shared/teammates.mts';
 import { PLAIN_AGENT } from '../../shared/agent-voice.mts';
@@ -262,10 +263,6 @@ function namedElsewhere(dir: string, asked: string, ownFolder: string): string |
   return found.sort((a, b) => top(b) - top(a))[0] ?? null;
 }
 
-// Beside the product's documents, out of every listing (they skip dot folders).
-const AS_WRITTEN = '.as-written';
-const asWrittenFile = (dir: string | null | undefined, rel: string | null | undefined): string | null => (!dir || !rel || path.isAbsolute(rel) || rel.split(/[\\/]/).includes('..') ? null : path.join(dir, AS_WRITTEN, rel));
-
 function asWritten(dir: string | null | undefined, rel: string | null | undefined): string | null {
   const file = asWrittenFile(dir, rel);
   try { return file ? fs.readFileSync(file, 'utf8') : null; } catch { return null; }
@@ -282,8 +279,15 @@ export function keepAsWritten(product: string | null | undefined, rel: string | 
   } catch { /* the document itself is saved; only the merge loses its base */ }
 }
 
+// Only inside the documents: a thread's lines can name any path, a teammate's
+// reply among them, and what is read here is saved as the newest version.
 const readVersion = (dir: string, v: { path: string }): string | null => {
-  try { return fs.readFileSync(path.isAbsolute(v.path) ? v.path : path.join(dir, v.path), 'utf8'); } catch { return null; }
+  try {
+    const root = fs.realpathSync(dir);
+    const file = fs.realpathSync(path.resolve(root, v.path));
+    if (!file.startsWith(root + path.sep)) return null;
+    return fs.readFileSync(file, 'utf8');
+  } catch { return null; }
 };
 
 /**
@@ -298,20 +302,23 @@ const readVersion = (dir: string, v: { path: string }): string | null => {
  */
 function keepWhatOthersWrote(known: KnownFile, content: string | null): { content: string; merged: string } | null {
   if (typeof content !== 'string' || !known.dir) return null;
-  // Only when this thread can see every version: a copy elsewhere may hold one it cannot read.
-  if (!known.chain.length || known.chain.length !== known.versions) return null;
-  const head = known.chain[known.chain.length - 1];
-  if (reviewKind(head.path) !== 'markdown') return null;
-  const headText = readVersion(known.dir, head);
-  if (headText == null || headText === content) return null;
+  const dir = known.dir;
+  // The newest version on this Mac. A thread also names copies that are not
+  // (a cloud run's scratch copy), and Files counts versions it holds elsewhere:
+  // neither is a reason to save over the edits this one holds.
+  const texts = known.chain.map((v) => (reviewKind(v.path) === 'markdown' ? readVersion(dir, v) : null));
+  const at = texts.findLastIndex((t) => t != null);
+  if (at < 0) return null;
+  const head = known.chain[at];
+  const headText = texts[at]!;
+  if (headText === content) return null;
   // A save this thread's own agent names carries no voice, teammate or not.
   const itsOwn = !head.edited && (head.agent === '' || head.agent === known.voice);
   // The document beside a thread saves typing over the file, so only the copy
   // kept at write time tells the agent's words from the person's.
   const wrote = itsOwn ? asWritten(known.dir, head.path) : null;
   if (itsOwn && (wrote == null || wrote === headText)) return null;
-  const dir = known.dir;
-  const older = known.chain.slice(0, -1).map((v) => readVersion(dir, v));
+  const older = texts.slice(0, at);
   return mergeOverNewest(head, headText, wrote != null ? [...older, wrote] : older, content);
 }
 

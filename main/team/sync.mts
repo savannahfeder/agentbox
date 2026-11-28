@@ -104,8 +104,8 @@ export interface SyncBackend {
   listProjects(): Promise<CloudProject[]>;
   pushLines(projectId: string, lines: LedgerLine[]): Promise<number>;
   pullLines(projectId: string, afterSeq: number, limit: number): Promise<{ seq: number; line: LedgerLine | null }[]>;
-  /** Every card still listed, and the ones among them to write; all of them when `changed` is left out. */
-  putCards(teamId: string, cards: SyncCard[], changed?: ReadonlySet<string>): Promise<void>;
+  /** Every card still listed, the ones among them to write (all of them when `changed` is left out), and the threads whose cards to take down. */
+  putCards(teamId: string, cards: SyncCard[], changed?: ReadonlySet<string>, gone?: readonly string[]): Promise<void>;
   hasFiles?(projectId: string, names: string[]): Promise<string[]>;
   getFile?(projectId: string, name: string): Promise<unknown>;
   putFile?(projectId: string, name: string, data: string): Promise<boolean>;
@@ -134,8 +134,8 @@ export interface TeamSyncOptions {
   listCards?: () => SyncCard[] | null | undefined;
   teamIdOf?: () => string | null | undefined;
   files?: SyncFiles;
-  /** Runs after the cards: the cloud takes a thread's work only while it has a card. */
-  threadShare?: { pass(teamId: string | null | undefined): unknown } | null;
+  /** Runs after the cards: the cloud takes a thread's work only while it has a card. It is handed the cards this pass read. */
+  threadShare?: { pass(teamId: string | null | undefined, cards?: readonly SyncCard[]): unknown } | null;
   /** What on this Mac a name in a message may mean. */
   findFile?: ((ask: { ref: string; project: SharedProjectRef; meant: boolean }) => unknown) | null;
   /** Options for each conversation's file carrier (tests make its waits short). */
@@ -481,18 +481,24 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
   // YOUR THREADS AS THE TEAM SEES THEM. Only the cards that changed are
   // written, because every row written is a realtime message to each Mac
   // listening, and a running thread's card changes each time it checks in.
+  // The cards as this pass read them, for the threads' work that follows: the list is every thread, worked out once.
+  let passCards: SyncCard[] | undefined;
   async function publishCards() {
+    passCards = undefined;
     const teamId = teamIdOf?.();
     if (!teamId) return false;
-    const cards = (listCards() || []).slice().sort((a, b) => a.threadId.localeCompare(b.threadId));
+    passCards = listCards() || [];
+    const cards = passCards.slice().sort((a, b) => a.threadId.localeCompare(b.threadId));
     const before = state.getCardsSent();
     const had = before?.teamId === teamId ? before.cards : null;
     const now: Record<string, string> = {};
     for (const c of cards) if (c.visible === true) now[c.threadId] = crypto.createHash('sha256').update(JSON.stringify(c)).digest('hex');
     const changed = new Set(Object.keys(now).filter((id) => had?.[id] !== now[id]));
-    const gone = !had || Object.keys(had).some((id) => !(id in now));
-    if (!changed.size && !gone) return false;
-    await backend.putCards(teamId, cards, changed);
+    // Only cards this copy sent: another copy signed in as the same person
+    // lists other threads, and taking theirs down made the two fight.
+    const gone = had ? Object.keys(had).filter((id) => !(id in now)) : [];
+    if (had && !changed.size && !gone.length) return false;
+    await backend.putCards(teamId, cards, changed, gone);
     state.setCardsSent({ teamId, cards: now });
     return true;
   }
@@ -522,7 +528,7 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
 
     report.cards = await publishCards();
     // After the cards: the cloud takes a thread's work only while it has a card.
-    await threadShare?.pass(teamIdOf?.());
+    await threadShare?.pass(teamIdOf?.(), passCards);
     return report;
   }
 

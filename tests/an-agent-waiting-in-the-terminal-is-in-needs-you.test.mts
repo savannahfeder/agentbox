@@ -359,7 +359,8 @@ describe('a new chat, brought in while its agent waits in the terminal', () => {
     startedAt: NOW - 3600e3, when: NOW - QUIET_MS - 60e3, firstSaid: 'Fix it.', lastSaid: '', waiting: false, ask: '', ...over,
   });
   const scan = (t: ReturnType<typeof chat>, state: { status: string; waitingFor: string; folder?: string } | null) => scanNewChats({
-    store: s, config: { importNew: true, importNewSince: NOW - 2 * 3600e3 }, now: NOW,
+    // With terminal sessions shown, an open chat is already a row of its own (w-34f79ab66e), so these read it with them off.
+    store: s, config: { importNew: true, importNewSince: NOW - 2 * 3600e3, outsideAgents: 'off' }, now: NOW,
     readThreads: async () => [t], isOpen: () => !!state, stateOf: () => state,
   } as never);
 

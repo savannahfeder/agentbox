@@ -84,16 +84,19 @@ describe('new chats from Claude Code and Codex', () => {
   // open in its terminal for hours, so "nothing has it open" kept their chats
   // out for good. A reply here to a chat still open carries on a copy
   // (Supervisor#importedThreadFor), so the two never write over each other.
+  // With "Show while they run" off; on, which is the default since 2026-11-23,
+  // the open chat already has its live row (the next case).
   it('come in once quiet even while Claude Code still has the chat open', async () => {
     const w = await world();
+    w.config.outsideAgents = 'off';
     const out = await scan(w, [chat('open', w.folder)], { isOpen: (t) => t.id === 'open' });
     expect(out.brought).toBe(1);
   });
 
   it('leave an open chat to "Show while they run" when that setting shows it live', async () => {
-    for (const mode of ['all', 'waiting']) {
+    for (const mode of [undefined, 'all', 'waiting']) {
       const w = await world();
-      w.config.outsideAgents = mode;
+      if (mode) w.config.outsideAgents = mode;
       expect((await scan(w, [chat('open', w.folder)], { isOpen: () => true })).brought).toBe(0);
       expect((await scan(w, [chat('closed', w.folder)], { isOpen: () => false })).brought).toBe(1);
     }
