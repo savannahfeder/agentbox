@@ -500,18 +500,6 @@ function Instructions() {
   );
 }
 
-function Alpha() {
-  const s = useSettings();
-  const w = s.settings?.workspace;
-  if (!w) return <Aside>{NOT_YET}</Aside>;
-  return (
-    <Group>
-      <SettingSwitch first label="Rooms" desc="See the people you work with and their agents, with a chat beside them. Needs a team sign-in." k="alphaRooms" copy={w.alpha.rooms} />
-      <SettingSwitch label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in." k="alphaMultiplayer" copy={!!w.alpha.multiplayer} />
-    </Group>
-  );
-}
-
 /** The computer's projects in its running order, with a reorder, rename or archive still on its way laid over them. */
 export function useRunningOrder() {
   const s = useSettings();
@@ -576,7 +564,7 @@ function Rooms() {
   );
 }
 
-export type PageId = 'general' | 'appearance' | 'phone' | 'alpha' | 'claude' | 'codex' | 'running' | 'instructions' | 'projects' | 'team' | 'rooms';
+export type PageId = 'general' | 'appearance' | 'phone' | 'claude' | 'codex' | 'running' | 'instructions' | 'projects' | 'team' | 'rooms';
 export interface SettingsPageDef { id: PageId; label: string; group: 'Personal' | 'Agents' | 'Workspace'; lede?: string; Body: ComponentType; shown: (s: SettingsState) => boolean }
 
 const hasComputer = (s: SettingsState) => !!s.settings;
@@ -584,7 +572,6 @@ const ALL_PAGES: SettingsPageDef[] = [
   { id: 'general', label: 'General', group: 'Personal', Body: General, shown: () => true },
   { id: 'appearance', label: 'Appearance', group: 'Personal', Body: Appearance, shown: () => true },
   { id: 'phone', label: 'Phone', group: 'Personal', lede: 'Read and reply from your phone, even with your computer closed.', Body: Phone, shown: () => true },
-  { id: 'alpha', label: 'Alpha features', group: 'Personal', lede: 'Early features you can try before they are finished. They may change or go away.', Body: Alpha, shown: hasComputer },
   { id: 'claude', label: 'Claude Code', group: 'Agents', Body: Claude, shown: hasComputer },
   { id: 'codex', label: 'Codex', group: 'Agents', Body: Codex, shown: (s) => !!s.settings && (s.settings.workspace.engines.includes('codex') || s.settings.workspace.codex.found) },
   { id: 'running', label: 'Running', group: 'Agents', Body: Running, shown: hasComputer },
@@ -594,6 +581,6 @@ const ALL_PAGES: SettingsPageDef[] = [
   { id: 'rooms', label: 'Rooms', group: 'Workspace', lede: 'What people in your rooms see of you. Private threads never show.', Body: Rooms, shown: (s) => roomsPageShown(s.settings) },
 ];
 // Left out here, the store build's Settings, Search and page addresses never reach them.
-const NOT_IN_STORE = new Set(['alpha', 'team']);
+const NOT_IN_STORE = new Set(['team']);
 export const SETTINGS_PAGES = STORE_BUILD ? ALL_PAGES.filter((p) => !NOT_IN_STORE.has(p.id)) : ALL_PAGES;
 export const GROUPS = ['Personal', 'Agents', 'Workspace'] as const;

@@ -98,8 +98,8 @@ export function teamConfigOnThisMac(home = os.homedir()): string {
 // (`bakedTeam` in its package.json), never to a key on the Mac: the first
 // download opened on a team's sign-in page because its Mac kept one
 // (tests/the-installed-app-is-the-single-person-app). The sign-in is for the
-// phone; the team version shows only with Alpha features › Multiplayer on
-// (tests/multiplayer-is-an-alpha-feature-in-the-installed-app).
+// phone, and the team version is on for everyone
+// (tests/settings-has-no-alpha-features-and-the-window-no-glass).
 // AND SO IS ⌘K's NEW-USER WINDOW (w-9f6975906c, 2026-10-05). It runs from her
 // checkout, which holds a team key, so it opened on the same sign-in page:
 // "when i run this command i got the login screen again ... this was the

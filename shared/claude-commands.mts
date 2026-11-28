@@ -40,6 +40,9 @@
 
 import { CLAUDE_COMMANDS as GENERATED_COMMANDS, READ_FROM, READ_AT } from './claude-commands.generated.mts';
 
+/** Claude Code's commands that only an interactive session can run, or that end it. */
+export const INTERACTIVE_ONLY = new Set(['add-dir', 'auto-mode-setup', 'clear', 'color', 'config', 'import', 'design-consent', 'design-revoke', 'heapdump', 'exit', 'stop', '__remote-workflow', 'workflow-launch-exec', 'usage-credits', 'extra-usage']);
+
 export interface ClaudeCommand {
   name: string;
   description: string;

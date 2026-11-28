@@ -687,7 +687,9 @@ describe('the wiring from the reply box is present in the source', () => {
     expect(focus).toContain('const canSetMode = !item.agent && ownControls;');
     expect(focus).toContain('const claudeCode = (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;');
     // The slash menu: no query means no rows means no menu.
-    expect(focus).toContain('const toAgent = !item.agent && !talkTo?.length && ownControls;');
+    // A terminal session that can move in opens it too; its modes are filtered out below.
+    expect(focus).toContain('const toAgent = (!item.agent || movesIn) && !talkTo?.length && ownControls;');
+    expect(focus).toContain(".filter((row) => canSetMode || row.kind === 'command');");
     expect(focus).toContain('const query = toAgent ? slashQuery(text) : null;');
     // And Claude Code's own Shift+Tab.
     expect(focus).toContain("e.key === 'Tab' && e.shiftKey && canSetMode");

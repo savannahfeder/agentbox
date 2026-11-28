@@ -1200,6 +1200,12 @@ export const GIVEN_TASK = 'given-task';
 /** The mark on a thread about one piece of work, started with a subject in a message record. */
 export const WORK_THREAD = 'work-thread';
 
+/** A task closed by whoever gave it: taken back. Like a hand-back, words on it after are a message, not the task again. */
+export function takenBack(item: { status?: string; labels?: readonly string[]; assignee?: string | null; wrote?: Record<string, { by?: string } | undefined> }): boolean {
+  const by = item.status === 'done' ? item.wrote?.status?.by : null;
+  return !!by && !!item.assignee && by !== item.assignee && (item.labels ?? []).includes(GIVEN_TASK);
+}
+
 // A reply reopens a closed chat only if its sender's Mac saw the close, since
 // that is what writes the reopen. One that did not (stamped after the close, or
 // before it but reaching this Mac after) reopens it here, or it is on no list.
@@ -1208,6 +1214,7 @@ function reopenIfWrittenPastTheClose(item: FoldingItem, said: Said[]): void {
   if (!close?.by) return;
   // An ask handed back (shared/thread-asks.mts) stays handed back: a thank-you after it is a message, not more work.
   if (item.ask && item.verdict) return;
+  if (takenBack(item)) return;
   const others = said.filter((s) => s.by !== close.by && !s.body);
   const crossed = others.filter((s) => s.crossed === close.ts);
   if (!crossed.length && !others.some((s) => s.ts > close.ts)) return;

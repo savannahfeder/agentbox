@@ -16,6 +16,8 @@ import { TROUBLE_ID } from './trouble-row';
 import { DONE } from './done-word';
 import { isCause } from '../../shared/causes.mts';
 import { heldOutside } from '../../shared/carried-on-outside.mts';
+import { handBackWaits } from '../../shared/thread-asks.mts';
+import { takenBack } from '../../shared/work-items.mts';
 
 /**
  * A thread put in Later and not begun. The window's copy of `notStarted` in
@@ -258,6 +260,9 @@ export function belongsInInbox(
   // A teammate's words wait for you whatever the thread is doing, a running
   // agent included (`waitingComments`, shared/work-items.mts).
   if (wordsWait(i, seen)) return true;
+  // So does a teammate's hand-back, held for your yes while the run that asked
+  // for help is still open (shared/thread-asks.mts).
+  if (i.status !== 'done' && handBackWaits(i)) return true;
   // In Later and not begun: it waits for a person, not a clock, so it is in
   // Later and nowhere else.
   if (notStarted(i)) return false;
@@ -435,12 +440,13 @@ export function threadsOwedAnAnswer<T extends InboxItem & { id: string; parent?:
  * Whether an action held for Z starts an agent on the row it holds: a reply, an
  * approval or a pick on that row. Only those read as In progress while held; a
  * close starts nothing, and "do it in this thread" starts the parent instead.
+ * Nor does a reply on a task its giver took back, which stays closed.
  */
 export function heldRowStarts(
-  row: { product: string; id: string },
+  row: { product: string; id: string } & Parameters<typeof takenBack>[0],
   goes: { product: string; id: string } | null | undefined,
 ): boolean {
-  return !!goes && goes.id === row.id && goes.product === row.product;
+  return !!goes && goes.id === row.id && goes.product === row.product && !takenBack(row);
 }
 
 /** The `live` the list rules take: threads with a run, or with one being started (Try again). */
@@ -535,7 +541,10 @@ export function belongsOnTheRail(
 // a blocked or done row reopens it, or the reply never reaches a worker. A
 // claimed row is left alone: its worker reads the reply when it exits, and
 // reopening would spawn a second one.
-export function statusForReply(status: string): 'open' | undefined {
+// A task its giver took back stays closed: a reply on it is a message, not the
+// task again (`takenBack`, shared/work-items.mts).
+export function statusForReply(status: string, wasTakenBack = false): 'open' | undefined {
+  if (status === 'done' && wasTakenBack) return undefined;
   return status === 'blocked' || status === 'done' ? 'open' : undefined;
 }
 

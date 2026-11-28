@@ -71,11 +71,11 @@ describe('nothing a person sees offers it', () => {
   it('the switch can no longer be written', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'no-neo-'));
     const world = { config: { appDir: dir }, supervisor: { onChange() {} }, store: {} };
-    setWorkspaceSetting(world, { key: 'alphaRooms', value: true });
+    setWorkspaceSetting(world, { key: 'adhdMode', value: true });
     try { setWorkspaceSetting(world, { key: 'alphaNeo', value: true }); } catch {}
     const saved = JSON.parse(fs.readFileSync(path.join(dir, 'zero.config.json'), 'utf8'));
     expect(saved.alphaNeo).toBeUndefined();
-    expect(saved.alphaRooms).toBe(true);
+    expect(saved.adhdMode).toBe(true);
     fs.rmSync(dir, { recursive: true, force: true });
   });
 

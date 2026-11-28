@@ -474,7 +474,6 @@ export function previewCloud(now = () => Date.now()) {
       w.productOrder = order;
       settings.settings.projects.sort((a, b) => (order.indexOf(a.slug) + 1 || 1e9) - (order.indexOf(b.slug) + 1 || 1e9));
     }
-    else if (key === 'alphaRooms') w.alpha.rooms = value;
     else if (key === 'memoryGate') w.memoryGate.on = value;
     else if (key === 'memoryGateSlots') w.memoryGate.slots = value;
     else if (key === 'cleanupLeftovers') w.leftovers.on = value;
