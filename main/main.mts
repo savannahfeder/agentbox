@@ -10,7 +10,7 @@ import type { TeamSession } from './team/index.mts';
 import { startConnections } from './connections/start.mts';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mts';
-import { alphaFeatures } from './settings.mts';
+import { alphaFeatures, multiplayerWasOff } from './settings.mts';
 import { loadCloudConfig, supabaseSession } from './team/session.mts';
 import { liveAddress } from './team/live-room.mts';
 // MY WORKSPACE IS NOT A TEAM FEATURE ANY MORE (w-f8d123be62), even though it
@@ -567,6 +567,7 @@ async function createWindow() {
     wontStart: () => supervisor.status(),
     ownMates: () => matesForTheTeam(store, config),
     sharing: () => alphaFeatures(config).multiplayer,
+    sharedFromNow: () => multiplayerWasOff(config),
     tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done
     // through the window's own handlers, filed below once the window exists.

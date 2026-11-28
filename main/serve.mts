@@ -57,7 +57,7 @@ import { gitHubPushSignIn } from './github-push-sign-in.mts';
 import { liveAddress } from './team/live-room.mts';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mts';
-import { alphaFeatures } from './settings.mts';
+import { alphaFeatures, multiplayerWasOff } from './settings.mts';
 import { appHome, carryMisplacedMachinery, carryMovedStoreMachinery, storeRootEnv } from './store/home.mts';
 import { keepAnswerModesIn } from './answer-modes.mts';
 
@@ -306,6 +306,7 @@ export async function bootHeadless({ dataDir = repoRoot, appDir = repoRoot, user
     shareSite: cloudConfig.phoneSite ?? null,
     ownMates: () => matesForTheTeam(store, config),
     sharing: () => alphaFeatures(config).multiplayer,
+    sharedFromNow: () => multiplayerWasOff(config),
     tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),
     rooms: roomsSetup({ config, store, supervisor, userDir }),
   }) : null;
