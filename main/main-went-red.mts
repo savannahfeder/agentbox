@@ -33,6 +33,7 @@
 import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { aboutRedMain, type CauseRow } from '../shared/causes.mts';
 
 /** How often to ask GitHub, and how long before giving up on a run. */
 export const POLL_MS = 60 * 1000;
@@ -448,6 +449,7 @@ export interface MainTestsStore {
   fileItem(slug: string, row: object): { id: string };
   fileMainFix(slug: string, row: object): { id: string };
   noteItem(product: string, id: string, text: string): unknown;
+  clearCauses?(which: (row: CauseRow) => boolean, note: string): number;
 }
 
 export interface MainTestsProduct { slug: string; repoPath?: string | null }
@@ -725,6 +727,10 @@ export class MainTests {
 
   /** The green again, on the row that reported the red. */
   wentGreen(product: MainTestsProduct, run: GhRun) {
+    // A thread waiting behind "main is red" carries on now, without anyone's reply.
+    try { this.store.clearCauses?.(aboutRedMain, greenAgain({ sha: run.headSha, subject: run.displayTitle })); } catch (e) {
+      this.log.warn?.(`main-tests: could not clear the causes about main being red: ${(e as Error).message}`);
+    }
     const state = this.read();
     if (!state.red) return null;
     try {

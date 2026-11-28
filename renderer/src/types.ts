@@ -585,7 +585,7 @@ export interface TeamState {
   multiplayer?: boolean | null;
   /** False only when the cloud said this person's team has no Pro and no free days, so it neither invites nor shares. */
   pro?: boolean | null;
-  /** Rooms (alpha), while switched on in Alpha features (main/team/rooms.mts). */
+  /** Rooms, for anyone on a team (main/team/rooms.mts). */
   rooms?: RoomsState | null;
 }
 
@@ -1381,8 +1381,8 @@ export interface Snapshot {
   // cloud, which is the single-person app.
   team?: TeamState | null;
   teammates?: TeammatesView | null;
-  /** Which alpha features are switched on (Settings, Alpha features). */
-  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean; glass?: boolean };
+  /** Rooms (on for anyone on a team), AI teammates and multiplayer (main/settings.mts alphaFeatures). */
+  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean };
   agents?: AgentSession[];
   approvals?: Approval[];
   supervisor: SupervisorStatus;
@@ -1679,6 +1679,8 @@ export interface WorkspaceSettings {
       profile: string; email: string | null; name: string | null;
       plan: string | null; planNamed?: boolean; accountId: string | null;
       signedIn: boolean; chosen: boolean;
+      /** The folder holds an API key and no plan. */
+      apiKey?: boolean;
     }>;
   } | null;
   permission: PermissionMode;
@@ -1700,8 +1702,7 @@ export interface WorkspaceSettings {
   adhdMode?: boolean;
   // New Claude Code and Codex chats come in on their own (w-62228098e6).
   importNew?: boolean;
-  // Settings, Alpha features (w-3d0fa23ffb).
-  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean; glass?: boolean };
+  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean };
   // The corner tag over other apps (w-dafae58a23). On unless she turned it off.
   cornerTag?: boolean;
   outsideAgents: AgentMode;
@@ -1826,7 +1827,6 @@ declare global {
       olderItems?(p: { offset: number; limit: number }): Promise<{ items: WorkItem[]; more: boolean }>;
       crash?(p: { name: string; message: string; stack: string }): Promise<unknown>;
       draftCopy?: { read(): string | null; write(text: string): void };
-      glassTone?(p: { tone: 'light' | 'dark' | 'system' }): Promise<unknown>;
       windowButtons?(p: { dark: boolean }): Promise<unknown>;
       blankCheck?(p: { thread: string; facts: Record<string, unknown>; lateMs: number; longTaskMs: number }): Promise<string | null>;
       // A count. The name is checked against the approved list in the main

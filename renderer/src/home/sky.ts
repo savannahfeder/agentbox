@@ -47,8 +47,8 @@ const AURORA: Palette = { core: [50, 215, 150], hot: [170, 255, 205], halo: [50,
 
 const DARK_BASE = { y0: 1.0, y1: 0.36, bend: -0.1, dim: 0.95, peak: 0.7, coreW: 0.024, haloW: 0.3, grain: 0.1 };
 
-// The same deep black as --surface on the dark skies (home.css), a step off pure black.
-const DARK_CARD = '#131315';
+// The same grey as --surface on the dark skies (home.css).
+const DARK_CARD = '#191919';
 
 const DARK_SKIES: Sky[] = [
   { id: 'dusk', name: 'Dark purple sky', dark: true, art: { ...DARK_BASE, palette: DUSK, bg: DARK_CARD } },

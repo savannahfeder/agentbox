@@ -23,7 +23,7 @@ const claude = page.slice(page.indexOf('<Place'), page.indexOf('{/* SIGNING A SE
 describe('the Claude Code page', () => {
   it('the reported case:one group of tiles, every account in it, with Refresh at its head', () => {
     expect(claude.match(/<Place\b/g)).toHaveLength(1);
-    expect(claude).toMatch(/name="Signed in"[\s\S]*onClick=\{refresh\}[\s\S]*accounts=\{tiles\}/);
+    expect(claude).toMatch(/name=\{accountsHeading\(accounts\)\}[\s\S]*onClick=\{refresh\}[\s\S]*accounts=\{tiles\}/);
     expect(page).toContain("engine === 'codex' ? refreshCodex(true) : readAccounts(true)");
   });
 

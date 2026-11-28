@@ -46,6 +46,8 @@ export interface RepoChange {
   stands: WorkStands;
   knowsYou: boolean | null;
   at?: number;
+  /** A thread's own branch with no difference from main and nothing loose. */
+  nothingLeft?: boolean;
 }
 
 interface HunkStarts { old: number; now: number }
@@ -168,6 +170,16 @@ function wholeBranchBase(root: string): string | null {
   return base && base !== now ? base : null;
 }
 
+function nothingLeftOnTheBranch(root: string): boolean {
+  const here = tryGit(root, ['rev-parse', '--abbrev-ref', 'HEAD'])?.trim();
+  if (!here?.startsWith(TASK_BRANCHES)) return false;
+  const base = cutFrom(root);
+  if (!base) return false;
+  if (tryGit(root, ['diff', '--quiet', base, '--']) === null) return false;
+  const untracked = tryGit(root, ['ls-files', '-z', '--others', '--exclude-standard']);
+  return untracked !== null && !zList(untracked).some((rel) => !NOT_CODE.test(rel));
+}
+
 function isAncestor(root: string, older: string, newer: string): boolean {
   return tryGit(root, ['merge-base', '--is-ancestor', older, newer]) !== null;
 }
@@ -223,8 +235,8 @@ function startOfThisRun(root: string, head: string): { base: string; only: Set<s
  * round's commit is still sitting there unshipped, and a round that discards
  * the work leaves a folder with nothing in it either way.
  *
- * `committed` is whether this branch holds a commit the branch it was cut from
- * does not. `uncommitted` is whether anything is still loose in the tree.
+ * `committed` is whether this branch's commits differ from the branch it was
+ * cut from. `uncommitted` is whether anything is still loose in the tree.
  * Either comes back null where it cannot be read honestly — no repository, a
  * folder already let go, or a checkout on the default branch itself — and null
  * is what makes the offer fall back to the one it made before this existed.
@@ -239,9 +251,11 @@ export function whereTheWorkStands(root: string | null | undefined): WorkStands 
   if (!head) return { committed: false, uncommitted };
   const base = cutFrom(root);
   if (!base) return { committed: null, uncommitted };
-  const ahead = tryGit(root, ['rev-list', '--count', `${base}..HEAD`])?.trim();
-  if (ahead === null || ahead === undefined || ahead === '') return { committed: null, uncommitted };
-  return { committed: Number(ahead) > 0, uncommitted };
+  // What the commits add up to, not how many there are: a change reverted on
+  // its own branch leaves two commits and nothing to ship.
+  const differs = tryGit(root, ['diff', '--name-only', base, 'HEAD']);
+  if (differs === null) return { committed: null, uncommitted };
+  return { committed: differs.trim() !== '', uncommitted };
 }
 
 /**
@@ -489,5 +503,6 @@ export function changeFromRepo(snapshot: RepoSnapshot | null | undefined): RepoC
     // honest answer to "how long did this take" for a run whose conversation
     // carried no edits at all.
     at: snapshot.at,
+    nothingLeft: nothingLeftOnTheBranch(root),
   };
 }

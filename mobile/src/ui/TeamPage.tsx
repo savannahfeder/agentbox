@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { cancelInvite, inviteTo, joinTeam, readTeam, removeFromTeam, type PhoneTeam, type TeamInvite } from '../../../renderer/src/phone-team';
 import { askOwnerForPro, askWords, NOT_LET_IN, PRO_FOR_INVITES } from '../../../renderer/src/team/multiplayer-words';
+import { inviteEach } from '../../../renderer/src/team/invite-list';
 import { useCloud } from '../state/cloud';
 import { Aside, Button, Group, Row } from './SettingsParts';
 import { T } from './parts';
@@ -66,7 +67,7 @@ export function TeamPage() {
                 control={owner && p.id !== me?.id ? <Button title="Remove" disabled={busy} onPress={run(() => removeFromTeam(cloud!, team.id, p.id))} /> : undefined} />
             ))}
             {team.invited.map((e) => (
-              <Row key={e} label={e} desc="Invited. They join when they sign in with this email."
+              <Row key={e} label={e} desc="Invited"
                 control={owner ? <Button title="Cancel" disabled={busy} onPress={run(() => cancelInvite(cloud!, team.id, e))} /> : undefined} />
             ))}
           </Group>
@@ -76,9 +77,15 @@ export function TeamPage() {
             ) : pro === false ? (
               <Row first label={owner ? PRO_FOR_INVITES : askOwnerForPro(team.people.find((p) => p.role === 'owner')?.name)} desc={owner ? 'Start it on your computer, in Settings, Team.' : undefined} />
             ) : <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }}>
-              <TextInput value={email} onChangeText={setEmail} placeholder="Their email" placeholderTextColor={color.faint} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" inputMode="email"
+              <TextInput value={email} onChangeText={setEmail} placeholder="Their emails" placeholderTextColor={color.faint} autoCapitalize="none" autoCorrect={false} keyboardType="email-address" inputMode="email"
                 style={{ flex: 1, height: 36, color: color.text, fontFamily: font.regular, fontSize: 15, paddingHorizontal: 10, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: color.field }} />
-              <Button title="Invite" disabled={busy || !email.trim()} onPress={async () => { if (await run(() => inviteTo(cloud!, team.id, email))()) setEmail(''); }} />
+              <Button title="Invite" disabled={busy || !email.trim()} onPress={run(async () => {
+                const sent = await inviteEach(email, { onTeam: team.people.map((p) => p.email), invited: team.invited }, async (one) => {
+                  try { await inviteTo(cloud!, team.id, one); return null; } catch (err) { return message(err); }
+                });
+                setEmail(sent.left);
+                if (sent.problem) throw new Error(sent.problem);
+              })} />
             </View>}
           </Group>
           <Group label="Leave">

@@ -22,16 +22,6 @@ if (process.platform !== 'darwin') {
   else document.addEventListener('DOMContentLoaded', markFlat);
 }
 
-// A Mac window can put the system's blur behind itself (main/window-glass.mts);
-// the page goes glass only while the Alpha switch is on.
-if ((process.argv ?? []).includes('--agentbox-glass')) {
-  const markGlass = () => {
-    if (document.documentElement) document.documentElement.dataset.glassAble = '';
-  };
-  if (document.documentElement) markGlass();
-  else document.addEventListener('DOMContentLoaded', markGlass);
-}
-
 // EVERY ASK BEFORE A RELOAD IS ANSWERED, held write or not. main waits for
 // this before it reloads (main/write-before-reload.mts), so a page with
 // nothing held, or one that has not set a handler yet, says so at once rather
@@ -196,8 +186,6 @@ contextBridge.exposeInMainWorld('zero', {
   cornerTag: (state) => ipcRenderer.invoke('zero:corner-tag', state),
   // Whether this page came up from ⌘R, and which build it is running.
   bootInfo: () => ipcRenderer.invoke('zero:boot-info'),
-  // Which appearance the window's glass is drawn in (main/window-glass.mts).
-  glassTone: (payload) => ipcRenderer.invoke('zero:glass-tone', payload),
   // The Windows title bar buttons' glyphs, for a light or dark page (main/window-buttons.mts).
   windowButtons: (payload) => ipcRenderer.invoke('zero:window-buttons', payload),
   // KEEPING AGENTBOX CURRENT (main/updater.mts). The state of it rides the

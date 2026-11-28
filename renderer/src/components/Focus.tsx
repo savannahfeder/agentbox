@@ -129,7 +129,8 @@ import type { LiveFacts } from '../live-line';
 import { offersRunNow } from '../run-now';
 import { AttachRow } from './AttachRow';
 import { AgentThread } from './AgentThread';
-import { BRING_IN } from '../outside-agents';
+import { BRING_IN, canMoveIn } from '../outside-agents';
+import { Name } from '../../../shared/product-name.mjs';
 import { chord } from '../this-keyboard';
 import { Live } from './Live';
 import { SidebarIcon } from './SidebarIcon';
@@ -1049,6 +1050,8 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
   const bringIn = agent?.product && agent.sessionId && onBringIn ? onBringIn : null;
   // The bar offers it beside Respond in terminal; only a session without that bar has it in ⋯.
   const barBringsIn = !!bringIn && !update && !trouble && replyBlocked && !codexAtWork && !!onReveal;
+  // A Claude Code session its terminal still holds: a reply from here moves it in.
+  const movesIn = !!bringIn && canMoveIn(agent);
   const respondIn = agent?.app === 'Codex app' ? 'Respond in Codex' : agent?.app === 'Codex in your editor' ? 'Respond in your editor' : 'Respond in terminal';
 
   // A SUMMARISED THREAD is work with a ledger: not a message between two people
@@ -2724,7 +2727,7 @@ export function Focus({ artifactView, previewSample, onOpenArtifact, artifactSlo
                than beside the box: that row is where this card already keeps
                the things you press. It is handed in whole so there is one stop
                button in the app and this card cannot grow a second. */
-            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} onItsWay={pickOnItsWay(sending)} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} outOfUsage={outOfUsage} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} stop={stopButton} />
+            <DockComposer key={`${item.product}:${item.id}`} item={item} runningMode={runningMode} runningEngine={runningEngine} onItsWay={pickOnItsWay(sending)} codexModels={codexModels} codexModelDefault={codexModelDefault} engines={engines} outOfUsage={outOfUsage} items={items} onSend={sendReply} onClose={onReplyClose} onNotice={onNotice} openModel={openModel} talkTo={direct ? talkNames : null} answering={talkAnswer} movesIn={movesIn} stop={stopButton} />
           ) : (
             /*
              * THE FOLDED BOX SHOWS WHAT IS IN IT. A pill saying "Reply…" over
@@ -2914,7 +2917,7 @@ function ModePicker({ value, options, label, onChange, onEscape, chip = false, f
   );
 }
 
-function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codexModels = [], codexModelDefault = null, engines, items = [], onSend, onClose, onNotice, stop, openModel = false, talkTo = null, talkWord = 'Reply to', answering = null, outOfUsage }: {
+function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codexModels = [], codexModelDefault = null, engines, items = [], onSend, onClose, onNotice, stop, openModel = false, talkTo = null, talkWord = 'Reply to', answering = null, outOfUsage, movesIn = false }: {
   item: WorkItem;
   outOfUsage?: Record<string, { tool: string; until: number }>;
   /** The pick of a reply still on its way here, until the row carries it. */
@@ -2965,6 +2968,8 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   /** She opened the box by pressing the model word on the folded box, so the
    *  model drawer opens with it (w-e731ca9376). */
   openModel?: boolean;
+  /** A Claude Code session in a terminal that a reply from here moves into Agentbox. */
+  movesIn?: boolean;
 }) {
   // A CONVERSATION WITH A PERSON ASKS FOR A REPLY TO THEM, not for the
   // agent's next step. Set on the box itself so the one literal sentence the
@@ -3170,7 +3175,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   const [nativeNames, setNativeNames] = useState<string[]>([]);
   // While the box starts with a slash, not only while the menu is open: once
   // she types past /loop the box still has to know /loop is a command.
-  const discoveringCommands = !item.agent && !talkTo?.length && (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE && text.startsWith('/');
+  const discoveringCommands = (!item.agent || movesIn) && !talkTo?.length && (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE && text.startsWith('/');
   useEffect(() => {
     setNativeNames([]);
     if (!discoveringCommands) return;
@@ -3378,7 +3383,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
   const canSetMode = !item.agent && ownControls;
   // Commands are provider-specific; canSetMode still gates every permission path.
   // A reply that goes to people reaches no agent, so it offers none of an agent's commands.
-  const toAgent = !item.agent && !talkTo?.length && ownControls;
+  const toAgent = (!item.agent || movesIn) && !talkTo?.length && ownControls;
   const query = toAgent ? slashQuery(text) : null;
   /*
    * ONE LIST, AND IT IS THE ONE THE MENU DRAWS. This was `modeMatches(query)`
@@ -3395,7 +3400,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
      six modes: `/context` is not a word Codex knows, and `--permission-mode` is
      not a flag it takes. On a Codex row this list is empty and `slashOpen`
      below is therefore false, which is the whole of the behaviour. */
-  const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames);
+  const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames).filter((row) => canSetMode || row.kind === 'command');
   // OPENED BY THE SLASH AND BY NOTHING ELSE, since 2026-08-26. It used to open
   // from the footer chip too; the chip is gone (see the note where it stood)
   // and with it went `chipOpen` and the click-away that shut it.
@@ -3781,7 +3786,7 @@ function DockComposer({ item, onItsWay = null, runningMode, runningEngine, codex
             exactly the footer it had. */}
         {talkTo?.length ? <FormatBar box={ref} onChange={changeText} onAttach={pickFiles} marksAt={marksAt} onFromFiles={(f) => setAttachments((a) => [...a, f])} onVoice={addVoice} onNotice={onNotice}
           voiceKey={`direct:${item.product}:${item.id}`} voice={voiceCtl} onRecording={setRecording} /> : null}
-        {item.agent ? <span className="compose-clauses"><span className="dim">Goes straight into {item.agent.name}.</span></span> : talkTo?.length ? null : <span className="dock-chips" ref={chipsRef}>
+        {item.agent ? <span className="compose-clauses"><span className="dim">{movesIn ? `Moves this session into ${Name} and runs it here.` : `Goes straight into ${item.agent.name}.`}</span></span> : talkTo?.length ? null : <span className="dock-chips" ref={chipsRef}>
             <PriorityPicker variant="chip" value={shown} set={!!prio} onChange={setPrio} title="Priority" />
             {repeat && <WhenPicker value={{ runAt: 0, repeat }} onChange={(v) => setRepeat(v.repeat)} only="repeat" empty="Runs once" />}
             {canSetMode && (

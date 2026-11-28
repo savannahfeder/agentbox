@@ -7,7 +7,7 @@
 // one module both read is the follow-up that retires this file.
 
 import {
-  belongsInInbox, belongsInProgress, hiddenUntil, inProgressTab, isProposal, notStarted, rowTitle, stillAsksYou, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd,
+  belongsInInbox, belongsInProgress, closedByThem, hiddenUntil, inLaterByThem, inProgressTab, isProposal, notStarted, rowTitle, stillAsksYou, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd,
 } from '../../../renderer/src/list-rules';
 import { backWords, boardColumns, DEFAULT_DISPLAY, handedOnWord, keeps, sentAt, sorted, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { waitWords } from '../../../shared/thread-waits.mts';
@@ -128,7 +128,7 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const waitingOn = (i: WorkItem) => waitsThatCanEnd(i, byId);
   const hiddenAt = (i: WorkItem) => hiddenUntil(i);
   const owed = threadsOwedAnAnswer(items, now);
-  const inProgress = (i: WorkItem) => (hiddenAt(i) <= now || live.has(i.id)) && belongsInProgress(i, { deferredUntil: i.runAt ?? 0, now, live: live.has(i.id) });
+  const inProgress = (i: WorkItem) => (hiddenAt(i) <= now || (live.has(i.id) && !inLaterByThem(i, hiddenAt(i), now))) && belongsInProgress(i, { deferredUntil: i.runAt ?? 0, now, live: live.has(i.id) });
   const strandedIds = new Set(view.stranded ?? []);
   const stranded = new Set(items.filter((i) => strandedIds.has(i.id) && inProgress(i)).map((i) => i.id));
 
@@ -141,7 +141,7 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const progress = inProgressTab(items.filter(inProgress), inbox);
   const snoozed = items.filter((i) => (notStarted(i) || isProposal(i) || hiddenAt(i) > now || (waitsInLater(i, waitingOn(i)) && !live.has(i.id)))
     && (i.status !== 'done' || i.wrote?.status?.source !== 'founder'));
-  const done = items.filter((i) => !needsYou.has(i.id) && !live.has(i.id) && i.status === 'done');
+  const done = items.filter((i) => !needsYou.has(i.id) && (!live.has(i.id) || closedByThem(i)) && i.status === 'done');
 
   // Which tab each thread is in, the later lists winning as App.tsx's `tabState` has it.
   const state = new Map<string, ThreadStateWord>();

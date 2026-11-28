@@ -6,6 +6,8 @@
 // every put-off thread. It now leaves out a put-off thread while a session or
 // the ship queue has it, as it already did for one waiting on another thread;
 // it moves to Later when the run ends, where the board already puts it.
+// Since 2026-11-27 a thread you put off yourself goes to Later at once
+// (tests/a-thread-you-close-or-put-in-later-leaves-in-progress-at-once).
 import { it, expect } from 'vitest';
 import fs from 'node:fs';
 
