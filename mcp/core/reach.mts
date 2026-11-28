@@ -8,6 +8,7 @@ import { readOutbox, readTeamView, writeOutbox, newOutId } from '../../main/stor
 import { readItemHistory, readWorkItem, readWorkItems, updateWorkItem } from '../../main/store/work-items.mts';
 import { baseName, carriedNotes, familyOfName, filesInLines, marksOf, nextVersionName, otherFilesInLines, placeWords, reviewKind, shownName, threadFiles } from '../../shared/artifact-marks.mts';
 import { lineGap, mergeThree } from '../../shared/doc-merge.mts';
+import { asWrittenFile } from '../../shared/as-written.mts';
 import { VIEW_FRESH_MS, groupTurn, mayGoNow, saidToSendTo } from '../../shared/teammate-reach.mts';
 import { CHAT_LABEL, tooLongForAChat } from '../../shared/teammates.mts';
 import { PLAIN_AGENT } from '../../shared/agent-voice.mts';
@@ -261,10 +262,6 @@ function namedElsewhere(dir: string, asked: string, ownFolder: string): string |
   const top = (rel: string) => versionsInFolder(dir, rel).length;
   return found.sort((a, b) => top(b) - top(a))[0] ?? null;
 }
-
-// Beside the product's documents, out of every listing (they skip dot folders).
-const AS_WRITTEN = '.as-written';
-const asWrittenFile = (dir: string | null | undefined, rel: string | null | undefined): string | null => (!dir || !rel || path.isAbsolute(rel) || rel.split(/[\\/]/).includes('..') ? null : path.join(dir, AS_WRITTEN, rel));
 
 function asWritten(dir: string | null | undefined, rel: string | null | undefined): string | null {
   const file = asWrittenFile(dir, rel);
