@@ -4196,8 +4196,28 @@ body:has(.artifact-view, .picture-view, .file-sheet) .modal-backdrop.palette-bac
 .palette-k .palette-query svg { width: 18px; height: 18px; flex: none; color: var(--text-faint); }
 .palette-k .palette-input { flex: 1; min-width: 0; width: auto; border: none; padding: 0; font-size: 17px; caret-color: var(--accent); }
 .palette-k .palette-input::placeholder { color: var(--agent-ink); }
+/* Words scrolled out of the bar fade at that edge rather than being cut mid-letter. */
+.palette-k .palette-input.clip-start { mask-image: linear-gradient(to right, transparent, #000 32px); }
+.palette-k .palette-input.clip-end { mask-image: linear-gradient(to left, transparent, #000 32px); }
+.palette-k .palette-input.clip-start.clip-end { mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent); }
 .palette-k .palette-esc { flex: none; cursor: pointer; line-height: 1; }
 .palette-k .palette-esc:hover { color: var(--text); }
+.palette-k .palette-ai-ask {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 4px 0 8px;
+  border: 1px solid var(--line); border-radius: var(--radius); background: none; color: var(--text-dim); font-size: 12.5px; cursor: pointer;
+}
+.palette-k .palette-ai-ask svg { width: 14px; height: 14px; color: currentColor; }
+.palette-k .palette-ai-ask .palette-key { margin-left: 2px; height: 18px; min-width: 0; }
+.palette-k .palette-ai-ask:hover:not(:disabled) { color: var(--text); border-color: var(--line-strong); }
+.palette-k .palette-ai-ask:disabled { opacity: .55; cursor: default; }
+/* The wait for an AI answer: a light sweeps across the row's words. */
+.palette-k .palette-shimmer .palette-label {
+  background: linear-gradient(90deg, var(--text-faint) 0%, var(--text-faint) 35%, var(--text) 50%, var(--text-faint) 65%, var(--text-faint) 100%);
+  background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: palette-shimmer 1.6s linear infinite;
+}
+@keyframes palette-shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+@media (prefers-reduced-motion: reduce) { .palette-k .palette-shimmer .palette-label { animation-duration: 3s; } }
 .palette-k .palette-item { justify-content: flex-start; align-items: center; gap: 12px; height: 38px; padding: 0 18px; font-size: 14.5px; color: var(--text-dim); }
 .palette-k .palette-item.selected { color: var(--text); }
 .palette-k .palette-glyph { flex: none; width: 18px; height: 18px; display: grid; place-items: center; color: var(--text-faint); }

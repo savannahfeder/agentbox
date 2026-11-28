@@ -25,7 +25,7 @@ describe('which pages the web app offers', () => {
     expect([...webSettingsPages(null)]).toEqual(['appearance', 'phone']);
   });
   it('the computer\'s too once it has, Codex only where the computer has Codex', () => {
-    expect([...webSettingsPages(mac)]).toEqual(['general', 'appearance', 'phone', 'alpha', 'claude', 'running', 'projects']);
+    expect([...webSettingsPages(mac)]).toEqual(['general', 'appearance', 'phone', 'claude', 'running', 'projects']);
     const both = { ...mac, settings: { ...mac.settings, workspace: { ...workspace, engines: ['claude', 'codex'] } } };
     expect([...webSettingsPages(both)]).toContain('codex');
   });

@@ -7,9 +7,11 @@
 // one module both read is the follow-up that retires this file.
 
 import {
-  belongsInInbox, belongsInProgress, hiddenUntil, inProgressTab, isProposal, notStarted, rowTitle, stillAsksYou, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd,
+  belongsInInbox, belongsInProgress, closedByThem, hiddenUntil, inLaterByThem, inProgressTab, isProposal, notStarted, rowTitle, stillAsksYou, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd,
 } from '../../../renderer/src/list-rules';
-import { backWords, boardColumns, DEFAULT_DISPLAY, keeps, sentAt, sorted, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
+import { backWords, boardColumns, DEFAULT_DISPLAY, handedOnWord, keeps, sentAt, sorted, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
+import { waitWords } from '../../../shared/thread-waits.mts';
+import { openedLately } from '../../../shared/opened-lately.mts';
 import { searchThreads } from '../../../renderer/src/threads/search';
 import { parseQuery, splitHits } from '../../../renderer/src/search';
 import { stamp } from '../../../renderer/src/format';
@@ -31,7 +33,7 @@ export const TABS: { id: TabId; label: string }[] = [
 ];
 
 // `projectOrder` is your running order of projects (phoneProjectOrder), never the list's own order.
-type View = Pick<ReturnType<typeof phoneView>, 'items' | 'running' | 'products'> & Partial<Pick<ReturnType<typeof phoneView>, 'queued' | 'stranded'>> & { projectOrder?: string[] };
+type View = Pick<ReturnType<typeof phoneView>, 'items' | 'running' | 'products'> & Partial<Pick<ReturnType<typeof phoneView>, 'queued' | 'settingUp' | 'stranded'>> & { projectOrder?: string[] };
 
 /** Each computer's running order of projects (the desktop's `supervisor.productOrder`), from its newest settings copy. */
 export function phoneProjectOrder(rows: readonly { device: string; settings?: { workspace?: { productOrder?: unknown } } | null }[]): string[] {
@@ -117,14 +119,16 @@ export const rowTime = (i: WorkItem): number => (i.status === 'done' ? i.wrote?.
 
 export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const items: WorkItem[] = view.items;
-  const live = new Set(view.running.map((r: { itemId: string }) => r.itemId));
-  const queued = new Set(view.queued ?? []);
+  // A thread whose folder is being made reads as a run (live-line.ts), not as Queued.
+  const settingUp = new Set(view.settingUp ?? []);
+  const live = new Set([...view.running.map((r: { itemId: string }) => r.itemId), ...settingUp]);
+  const queued = new Set((view.queued ?? []).filter((id: string) => !settingUp.has(id)));
   const inCloud = new Set(view.running.filter((r: { where?: string }) => r.where === 'cloud').map((r: { itemId: string }) => r.itemId));
   const byId = new Map(items.map((i) => [i.id, i]));
   const waitingOn = (i: WorkItem) => waitsThatCanEnd(i, byId);
   const hiddenAt = (i: WorkItem) => hiddenUntil(i);
   const owed = threadsOwedAnAnswer(items, now);
-  const inProgress = (i: WorkItem) => (hiddenAt(i) <= now || live.has(i.id)) && belongsInProgress(i, { deferredUntil: i.runAt ?? 0, now, live: live.has(i.id) });
+  const inProgress = (i: WorkItem) => (hiddenAt(i) <= now || (live.has(i.id) && !inLaterByThem(i, hiddenAt(i), now))) && belongsInProgress(i, { deferredUntil: i.runAt ?? 0, now, live: live.has(i.id) });
   const strandedIds = new Set(view.stranded ?? []);
   const stranded = new Set(items.filter((i) => strandedIds.has(i.id) && inProgress(i)).map((i) => i.id));
 
@@ -137,7 +141,7 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const progress = inProgressTab(items.filter(inProgress), inbox);
   const snoozed = items.filter((i) => (notStarted(i) || isProposal(i) || hiddenAt(i) > now || (waitsInLater(i, waitingOn(i)) && !live.has(i.id)))
     && (i.status !== 'done' || i.wrote?.status?.source !== 'founder'));
-  const done = items.filter((i) => !needsYou.has(i.id) && !live.has(i.id) && i.status === 'done');
+  const done = items.filter((i) => !needsYou.has(i.id) && (!live.has(i.id) || closedByThem(i)) && i.status === 'done');
 
   // Which tab each thread is in, the later lists winning as App.tsx's `tabState` has it.
   const state = new Map<string, ThreadStateWord>();
@@ -163,6 +167,10 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   return { inbox: drawn(inbox, 'inbox'), progress: drawn(progress, 'progress'), snoozed: drawn(snoozed, 'snoozed'), done: drawn(done, 'done') };
 }
 
+/** The repeating tasks Later lists under View and filters: a project filter keeps only its projects' ones. */
+export const repeatsKept = <R extends { product: string }>(repeats: R[], display: Display): R[] =>
+  display.projects.length ? repeats.filter((r) => display.projects.includes(r.product)) : repeats;
+
 /** Each tab as View and filters leave it (App.tsx `displayedBox`), and how many it holds before them. */
 export function shownTabs(tabs: Record<TabId, Row[]>, display: Display, now: number, order: string[], agent: Harness | null = null) {
   const pick = (tab: TabId) => {
@@ -177,11 +185,12 @@ export function shownTabs(tabs: Record<TabId, Row[]>, display: Display, now: num
 
 /**
  * View and filters' "Showing N of M": what the screen draws against what it
- * would draw with no filter on. `above` is the rows drawn over the list that no
- * filter hides (mentions, questions, repeating tasks).
+ * would draw with no filter on. `above` is the rows drawn over the list
+ * (mentions, questions, repeating tasks), and `aboveWhole` how many of them
+ * there are with no filter on.
  */
-export function filterCount({ rows, whole, mineOnly = false, above = 0, board = null, wholeBoard = null }: {
-  rows: Pick<Row, 'item'>[]; whole: Pick<Row, 'item'>[]; mineOnly?: boolean; above?: number;
+export function filterCount({ rows, whole, mineOnly = false, above = 0, aboveWhole = above, board = null, wholeBoard = null }: {
+  rows: Pick<Row, 'item'>[]; whole: Pick<Row, 'item'>[]; mineOnly?: boolean; above?: number; aboveWhole?: number;
   board?: { rows: unknown[] }[] | null; wholeBoard?: { rows: unknown[] }[] | null;
 }) {
   if (board && wholeBoard) {
@@ -189,7 +198,7 @@ export function filterCount({ rows, whole, mineOnly = false, above = 0, board = 
     return { shown: cards(board), total: cards(wholeBoard) };
   }
   const counted = (list: Pick<Row, 'item'>[]) => (mineOnly ? list.filter((r) => !teammateIdOf(r.item)) : list).length;
-  return { shown: counted(rows) + above, total: counted(whole) + above };
+  return { shown: counted(rows) + above, total: counted(whole) + aboveWhole };
 }
 
 /** The board, column by column, as the site draws it (page-rules.ts `boardColumns`). */
@@ -207,7 +216,11 @@ export function phoneBoard(view: View, tabs: Record<TabId, Row[]>, display: Disp
   // Your own board says what the tab says (Pages.tsx `InboxBoard`).
   return columns.map((c) => ({
     ...c, label: c.state === 'waiting' ? 'Needs you' : c.label,
-    rows: c.rows.map((e) => ({ ...e, queued: c.state === 'running' && !!e.item && queued.has(e.item.id), agent: (e.item && agentOf.get(e.item.id)) ?? null })),
+    rows: c.rows.map((e) => ({
+      ...e, queued: c.state === 'running' && !!e.item && queued.has(e.item.id), agent: (e.item && agentOf.get(e.item.id)) ?? null,
+      // What the card waits on, where the running mark goes (Pages.tsx `waitWord`); the phone knows no people by id.
+      wait: e.item ? handedOnWord(e.item, null, null) ?? waitWords(e.item, { items: view.items, nameOf: () => 'Someone' })?.word ?? null : null,
+    })),
   }));
 }
 
@@ -226,12 +239,15 @@ export interface Hit {
 }
 
 /** Every thread in every tab, closed ones too, as the site's search finds them (App.tsx `hits`). */
-export function phoneSearch(view: View, query: string, now = Date.now(), tabs?: Record<TabId, Row[]>): Hit[] {
+/** `openedAt`: when this phone last opened each thread, by `product/id` (lib/unread.ts), so what you opened lately leads. */
+export function phoneSearch(view: View, query: string, now = Date.now(), tabs?: Record<TabId, Row[]>, openedAt: Readonly<Record<string, number>> = {}): Hit[] {
   const items: WorkItem[] = view.items;
+  // The desktop keys what it opened by thread id.
+  const byId = Object.fromEntries(Object.entries(openedAt).map(([key, at]) => [key.slice(key.lastIndexOf('/') + 1), at]));
   const asks = new Map(Object.values(tabs ?? {}).flat().map((r) => [r.key, r.toApprove]));
   const { terms, phrase } = parseQuery(query);
   const runs = (text: string) => (terms.length ? splitHits(text, terms, phrase) : [{ text, hit: false }]);
-  return searchThreads(items, query, { products: view.products, people: [], me: null }).map(({ item, summary }: { item: WorkItem; summary: string }) => {
+  return searchThreads(items, query, { products: view.products, people: [], me: null }, { opened: openedLately(byId, now), now }).map(({ item, summary }: { item: WorkItem; summary: string }) => {
     const p = item.priority ?? 5;
     return {
       key: `${item.product}/${item.id}`, id: item.id, product: item.product,

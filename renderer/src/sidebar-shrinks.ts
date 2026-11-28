@@ -10,6 +10,69 @@ export const sidebarFolded = ({ phone, shrinks, pointedAt }: { phone: boolean; s
 /** A sidebar drawn under a resting pointer is told the pointer entered it; only one that moved opens it. */
 export const pointerMoved = (e: { movementX: number; movementY: number }) => e.movementX !== 0 || e.movementY !== 0;
 
+/** How long the pointer rests on the closed sidebar before it opens, and how long after leaving before it closes. */
+export const OPENS_AFTER_MS = 140;
+export const CLOSES_AFTER_MS = 300;
+
+type At = { x: number; y: number; t?: number };
+type Box = { left: number; top: number; right: number; bottom: number };
+const OUT_OF_THE_WINDOW: At = { x: -Infinity, y: -Infinity };
+
+/** Whether the pointer was outside the sidebar before this move. A sidebar that
+ *  slid under the pointer (the walkthrough's column coming or going) gets nudged,
+ *  not entered, and stays shut. Nothing seen yet counts as not crossed. */
+export const crossedIn = (from: At | null, box: Box) =>
+  !!from && (from.x < box.left || from.x >= box.right || from.y < box.top || from.y >= box.bottom);
+
+/** Faster than this, in points a millisecond, the pointer is still on its way and not resting. */
+export const RESTS_BELOW_SPEED = 0.15;
+
+export const stillTravelling = (from: At | null, to: At) => {
+  if (!from || !Number.isFinite(from.x) || from.t === undefined || to.t === undefined) return true;
+  const dt = to.t - from.t;
+  const far = Math.hypot(to.x - from.x, to.y - from.y);
+  return dt > 0 ? far / dt > RESTS_BELOW_SPEED : far > 0;
+};
+
+/** Whether to open the folded sidebar. It opens OPENS_AFTER_MS after the pointer,
+ *  having come in from outside, last stopped travelling; a hand that overshoots
+ *  a tab beside it into the sidebar and swings back never rests there. */
+export function hoverIntent() {
+  let cameIn = false;
+  let waiting = false;
+  return {
+    /** A move over the sidebar: answers whether the wait to open starts (over) now. */
+    move(before: At | null, now: At, box: Box): boolean {
+      cameIn ||= crossedIn(before, box);
+      if (!cameIn) return false;
+      if (waiting && !stillTravelling(before, now)) return false;
+      waiting = true;
+      return true;
+    },
+    left() { cameIn = false; waiting = false; },
+  };
+}
+
+/** Where the pointer was one move ago, and when. */
+export function pointerTrail() {
+  let before: At | null = null;
+  let now: At | null = null;
+  return {
+    moved(x: number, y: number, t?: number) { before = now; now = { x, y, t }; },
+    left() { now = OUT_OF_THE_WINDOW; },
+    before: () => before,
+  };
+}
+
+/** Feeds a trail from the window, ahead of any handler that could stop the event. */
+export function followPointer(win: Window, trail: ReturnType<typeof pointerTrail>) {
+  const moved = (e: MouseEvent) => trail.moved(e.clientX, e.clientY, e.timeStamp);
+  const out = (e: MouseEvent) => { if (!e.relatedTarget) trail.left(); };
+  win.addEventListener('mousemove', moved, true);
+  win.addEventListener('mouseout', out, true);
+  return () => { win.removeEventListener('mousemove', moved, true); win.removeEventListener('mouseout', out, true); };
+}
+
 export const shrinksFrom =(stored: string | null) => stored !== '0';
 
 const heard = new Set<() => void>();
@@ -27,6 +90,14 @@ export function toggleSidebarShrinks(): boolean {
   const next = !read();
   setSidebarShrinks(next);
   return next;
+}
+
+/** The button and ⌘\. The button is inside the sidebar, so a press that shrinks
+ *  it also lets go of the pointer, or it would stay open until the pointer left. */
+export function pressKeepOpen(letGoOfThePointer: () => void): boolean {
+  const folds = toggleSidebarShrinks();
+  if (folds) letGoOfThePointer();
+  return folds;
 }
 
 export function useSidebarShrinks(): boolean {

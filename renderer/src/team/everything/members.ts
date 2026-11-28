@@ -3,6 +3,7 @@
 import { voiceName } from '../../../../shared/agent-voice.mts';
 import { faceSeed } from '../../../../shared/teammate-face.mts';
 import { rowTitle } from '../../list-rules';
+import { rowName } from '../../teammates/chat-lines';
 
 /**
  * The room's copy of you, with the thread your agent is on named as its row
@@ -129,7 +130,7 @@ export function buildMembers({ me, people = [], wall = null, cards = [], tasksHe
     // A run under way outranks Paused, which stops nothing already going.
     const paused = t.paused && !t.running;
     const now = t.status === 'draft' && !t.waiting?.length ? 'Setting up' : paused ? 'Paused' : t.now;
-    out.push({ key: `mate:${t.id}`, kind: 'mate', name: t.name, letter: t.letter || t.name.slice(0, 1), face: faceSeed(t), role: t.role, agents, starting: !!t.running && !agents, now, ...(paused ? { paused: true } : {}) });
+    out.push({ key: `mate:${t.id}`, kind: 'mate', name: rowName(t), letter: t.letter || t.name.slice(0, 1), face: faceSeed(t), role: t.role, agents, starting: !!t.running && !agents, now, ...(paused ? { paused: true } : {}) });
   }
   for (const t of theirMates) {
     const owner = people.find((p) => p.id === t.owner)?.name ?? '';

@@ -1,16 +1,15 @@
-import { useRef, useState, type ReactNode } from 'react';
-import { SettingsIcon } from './SettingsIcon';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { TeamState, View } from '../types';
 import { Face } from '../team/people';
 import { Name } from '../../../shared/product-name.mjs';
-import { SidebarIcon } from './SidebarIcon';
+import { SidebarGlyph } from './SidebarGlyph';
 import { AppMark } from './AppMark';
 import { SidebarMove, SidebarUpdate } from './SidebarUpdate';
 import { changeLines, closedHere, readMoveClosed, readUpdateClosed, writeMoveClosed, writeUpdateClosed } from '../update-row';
 import { AccountMenu } from '../team/account-menu';
 import type { Invisible } from '../team/rooms/GoInvisible';
 import { chord } from '../this-keyboard';
-import { pointerMoved } from '../sidebar-shrinks';
+import { CLOSES_AFTER_MS, OPENS_AFTER_MS, followPointer, hoverIntent, pointerMoved, pointerTrail } from '../sidebar-shrinks';
 import { actsOnPress } from '../press';
 import { foldedSet, toggleFold } from '../teammates/chat-lines';
 
@@ -27,10 +26,6 @@ function SectionHead({ id, label, folds, onFold }: { id: string; label: string; 
   </button>;
 }
 
-// The search glass drawn at the sidebar's stroke, like Feedback's plane.
-function SearchGlyph() {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" aria-hidden="true"><g transform="translate(12 12) scale(.8) translate(-12 -12)" strokeWidth="1.5625"><circle cx="10.8" cy="10.8" r="6.6"/><path d="M15.6 15.6 20 20"/></g></svg>;
-}
 /** ONE NUMBER IN THE SIDEBAR, ON INBOX, AND IT IS DRAWN IN THE TAB'S OWN TYPE.
  *
  *  w-5f02e7b525. Only Inbox shows a number, like a classic email client, and of
@@ -143,9 +138,32 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
   const inboxLit = !homePage && !page && !onGroupsPage && !onTeammatesPage && !filesPage && !connectionsPage && !tasksPage && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view);
   // A pointer passing over on its way somewhere else does not open it.
   const hoverAt = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leaveAt = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navBox = useRef<HTMLElement>(null);
+  const [intent] = useState(hoverIntent);
+  const [pointer] = useState(pointerTrail);
+  useEffect(() => (rail ? followPointer(window, pointer) : undefined), [rail, pointer]);
+  // Shrunk with the pointer on it: it opens again only once the pointer leaves and comes back.
+  useEffect(() => {
+    if (keptOpen) return;
+    intent.left();
+    if (hoverAt.current) { clearTimeout(hoverAt.current); hoverAt.current = null; }
+  }, [keptOpen, intent]);
   const hover = rail && onHover ? {
-    onMouseMove: (e: { movementX: number; movementY: number }) => { if (hoverAt.current || !pointerMoved(e)) return; hoverAt.current = setTimeout(() => onHover(true), 140); },
-    onMouseLeave: () => { if (hoverAt.current) clearTimeout(hoverAt.current); hoverAt.current = null; onHover(false); },
+    onMouseMove: (e: { movementX: number; movementY: number; clientX: number; clientY: number; timeStamp: number }) => {
+      if (leaveAt.current) { clearTimeout(leaveAt.current); leaveAt.current = null; }
+      if (!pointerMoved(e) || !navBox.current) return;
+      if (!intent.move(pointer.before(), { x: e.clientX, y: e.clientY, t: e.timeStamp }, navBox.current.getBoundingClientRect())) return;
+      if (hoverAt.current) clearTimeout(hoverAt.current);
+      hoverAt.current = setTimeout(() => onHover(true), OPENS_AFTER_MS);
+    },
+    onMouseLeave: () => {
+      if (hoverAt.current) clearTimeout(hoverAt.current);
+      hoverAt.current = null;
+      intent.left();
+      if (leaveAt.current) clearTimeout(leaveAt.current);
+      leaveAt.current = setTimeout(() => { leaveAt.current = null; onHover(false); }, CLOSES_AFTER_MS);
+    },
   } : {};
   const me = team?.signedIn ? team.me : null;
   // Your account menu has Settings in it, so the foot does not say it twice.
@@ -197,11 +215,11 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
     onPointerDown: (e: { target: EventTarget }) => { const b = e.target instanceof Element ? e.target.closest('button') : null; if (b) b.dataset.clicked = ''; },
     onBlur: (e: { target: EventTarget }) => { if (e.target instanceof HTMLElement) delete e.target.dataset.clicked; },
   };
-  return <aside className={`workspace-navigation${rail ? ' gt-rail-nav' : ''}`} aria-label="Workspace" {...hover} {...clicked}>
+  return <aside ref={navBox} className={`workspace-navigation${rail ? ' gt-rail-nav' : ''}`} aria-label="Workspace" {...hover} {...clicked}>
     <div className="th-team" title={collapsed ? undefined : teamName}>
       {mark}<span className="th-team-name">{teamName}</span>
       {rail && onCompose && <button type="button" className="ws-new" aria-label="New thread" title="New thread (N)" onClick={onCompose}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h8" /><path d="m4 20 1-4.5L15.5 5a2.1 2.1 0 0 1 3 3L8 18.5 4 20Z" /></svg>
+        <SidebarGlyph name="compose" />
       </button>}
       {rail && onKeepOpen && <button type="button" className="ws-keep" aria-label={keptOpen ? 'Shrink sidebar to icons' : 'Keep sidebar open'} aria-pressed={keptOpen} {...(keptOpen ? { 'data-hint': 'shrink-sidebar' } : { 'data-hint': 'keep-sidebar' })} data-hint-side="above" onClick={onKeepOpen}>
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2.5" y="3.5" width="11" height="9" rx="2" /><path d="M6.5 3.75v8.5" /></svg>
@@ -209,12 +227,12 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
     </div>
     {/* Search is a way to look, not a place to go, so it sits above the tabs
         rather than among them, and its keys are text rather than caps. */}
-    {onPalette && <div className="workspace-find"><button type="button" aria-label="Search" title={`Search · ${chord('⌘K')}`} onClick={onPalette}><SearchGlyph /><span>Search</span><small className="workspace-keys" aria-hidden="true">{chord('⌘K')}</small></button></div>}
+    {onPalette && <div className="workspace-find"><button type="button" aria-label="Search" title={`Search · ${chord('⌘K')}`} onClick={onPalette}><SidebarGlyph name="search" /><span>Search</span><small className="workspace-keys" aria-hidden="true">{chord('⌘K')}</small></button></div>}
     <nav className="workspace-tabs" aria-label="Inbox">
       {onHome && <button data-tab="home" className={`workspace-tab${homePage ? ' active' : ''}`} aria-label="Home" aria-current={homePage ? 'page' : undefined} title={collapsed ? 'Home' : undefined} {...actsOnPress(onHome)}>
-        <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 10.4 12 5l7 5.4v8.6a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z"/><path d="M10 20v-4.6a2 2 0 0 1 4 0V20"/></svg><span>Home</span>
+        <SidebarGlyph name="home" /><span>Home</span>
       </button>}
-      <button data-tab="inbox" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label={inboxLabel} aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `${inboxLabel} · ${waitingDescription}` : collapsed ? inboxLabel : undefined} {...actsOnPress(() => onView('inbox'))}>{onHome ? <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h9"/></svg> : <SidebarIcon view="inbox" />}<span>{inboxLabel}</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
+      <button data-tab="inbox" className={`workspace-tab${inboxLit ? ' active' : ''}${waiting > 0 ? ' has-count' : ''}`} aria-label={inboxLabel} aria-current={inboxLit ? 'page' : undefined} title={waiting > 0 ? `${inboxLabel} · ${waitingDescription}` : collapsed ? inboxLabel : undefined} {...actsOnPress(() => onView('inbox'))}><SidebarGlyph name={onHome ? 'inbox' : 'tray'} /><span>{inboxLabel}</span>{waiting > 0 && <small className="workspace-running" aria-label={waitingDescription}>{waiting}</small>}</button>
       {/* THERE IS NO TEAM TAB (w-05ff3d1438, 2026-10-01). The Team page and
           the Inbox were one question on two pages, so they are one page: the
           faces at the end of the Inbox's tab bar pick whose threads are on
@@ -224,15 +242,15 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
     {workspaceOpen && groups}
     {workspaceOpen && (onConnections || onFiles || onTasks) && <nav className="workspace-tabs workspace-places" aria-label="Places">
       {onTasks && <button data-tab="team" className={`workspace-tab${tasksPage ? ' active' : ''}`} aria-label="Team" aria-current={tasksPage ? 'page' : undefined} title={collapsed ? 'Team' : undefined} {...actsOnPress(onTasks)}>
-        <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="2.5"/><circle cx="6" cy="10" r="2"/><circle cx="18" cy="10" r="2"/><path d="M8 19c0-2.5 1.8-4.5 4-4.5s4 2 4 4.5"/><path d="M3 18c0-2 1.3-3.5 3-3.5 .8 0 1.5.3 2 .8M21 18c0-2-1.3-3.5-3-3.5-.8 0-1.5.3-2 .8"/></svg>
+        <SidebarGlyph name="team" />
         <span>Team</span>
       </button>}
       {onConnections && <button data-tab="connections" className={`workspace-tab${connectionsPage ? ' active' : ''}`} aria-label="Connections" aria-current={connectionsPage ? 'page' : undefined} title={collapsed ? 'Connections' : undefined} {...actsOnPress(onConnections)}>
-        <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10 13.5a4 4 0 0 0 5.66 0l2.5-2.5a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10.5a4 4 0 0 0-5.66 0l-2.5 2.5a4 4 0 0 0 5.66 5.66l1-1"/></svg>
+        <SidebarGlyph name="connections" />
         <span>Connections</span>
       </button>}
       {onFiles && <button data-tab="files" className={`workspace-tab${filesPage ? ' active' : ''}`} aria-label="Files" aria-current={filesPage ? 'page' : undefined} title={collapsed ? 'Files' : undefined} {...actsOnPress(onFiles)}>
-        <svg className="workspace-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 4.5h6.5l4 4V19a.5.5 0 0 1-.5.5H7a.5.5 0 0 1-.5-.5V5a.5.5 0 0 1 .5-.5z"/><path d="M13.5 4.5v4h4"/></svg>
+        <SidebarGlyph name="files" />
         <span>Files</span>
       </button>}
     </nav>}
@@ -274,10 +292,10 @@ export function WorkspaceNavigation({ view, collapsed, onView, onSearch: _onSear
             INVITE PEOPLE LEFT THE SIDEBAR THE SAME DAY: "we're in
             single-player mode for what we're going to launch soon." Inviting
             is still in your account menu and in Settings. */}
-        {onSignIn && <button aria-label="Sign in" title="Sign in" onClick={onSignIn}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><g transform="translate(12 12) scale(.8) translate(-12 -12)" strokeWidth="1.5625"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.2-4 4.3-6 8-6s6.8 2 8 6"/></g></svg><span>Sign in</span></button>}
-        {onFeedback && <button aria-label="Feedback" title="Feedback" onClick={onFeedback}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><g transform="translate(12 12) scale(.8) translate(-12 -12)" strokeWidth="1.5625"><path d="M2.5 11.5 21.5 3l-5 18-5-6.5z"/><path d="M11.5 14.5 21.5 3"/><path d="m11.5 14.5-1.2 6 3-3.6"/></g></svg><span>Feedback</span></button>}
-        {onInstructions && <button aria-label="Instructions" aria-current={page === 'instructions' ? 'page' : undefined} title="Instructions for every agent" onClick={onInstructions}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><path d="M6 3.5h8l4 4V20H6zM14 3.5V8h4M9 12h6M9 16h6"/></svg><span>Instructions</span></button>}
-        {onSettings && <button aria-label="Settings" className={accountHoldsSettings ? 'ws-in-menu' : undefined} aria-current={page === 'settings' ? 'page' : undefined} title="Settings" onClick={onSettings}><SettingsIcon/><span>Settings</span></button>}
+        {onSignIn && <button aria-label="Sign in" title="Sign in" onClick={onSignIn}><SidebarGlyph name="signin" /><span>Sign in</span></button>}
+        {onFeedback && <button aria-label="Feedback" title="Feedback" onClick={onFeedback}><SidebarGlyph name="feedback" /><span>Feedback</span></button>}
+        {onInstructions && <button aria-label="Instructions" aria-current={page === 'instructions' ? 'page' : undefined} title="Instructions for every agent" onClick={onInstructions}><SidebarGlyph name="instructions" /><span>Instructions</span></button>}
+        {onSettings && <button aria-label="Settings" className={accountHoldsSettings ? 'ws-in-menu' : undefined} aria-current={page === 'settings' ? 'page' : undefined} title="Settings" onClick={onSettings}><SidebarGlyph name="settings" /><span>Settings</span></button>}
       </div>
       {usage && <div className="workspace-usage">{usage}</div>}
       {corner && <div className="th-me">{corner}</div>}

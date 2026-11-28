@@ -68,6 +68,7 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   // Lines, files and comments inside threads that a query finds, and the call that reads them ahead.
   findInThreads: 'zero:find-in-threads',
   warmFindInThreads: 'zero:warm-find-in-threads',
+  findByDescription: 'zero:find-by-description',
   teamComment: 'zero:team-comment',
   teamContinueBrief: 'zero:team-continue-brief',
   teamContinued: 'zero:team-continued',
@@ -213,8 +214,6 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   stageAttachmentPart: 'zero:stage-attachment-part',
   crash: 'zero:crash',
   blankCheck: 'zero:blank-check',
-  // The appearance the desktop window's glass is drawn in; a tab has no glass.
-  glassTone: 'zero:glass-tone',
   windowButtons: 'zero:window-buttons',
   track: 'zero:track',
   // How long the window's own thread held (renderer/src/window-holds.ts).

@@ -6,7 +6,7 @@
 // tests/a-stuck-thread-offers-try-again.test.mts
 
 import { liveLine, type LiveFacts } from './live-line';
-import { saysARunGotNowhere, saysTheModelIsForAnotherEngine } from '../../shared/spawn-trouble.mts';
+import { saysARunGotNowhere, saysTheModelIsForAnotherEngine, troubleCause } from '../../shared/spawn-trouble.mts';
 import { FIRST_RUN_LABEL } from './onboarding';
 import type { WorkItem } from './types';
 
@@ -25,8 +25,10 @@ export function offersTryAgain(item: WorkItem, facts: LiveFacts & { practice?: b
   const live = liveLine(item, facts);
   if (live) return STUCK.has(live.state);
   // Out of In progress, the newest word on it is the app's own note that a run
-  // stopped, and no start is queued for it yet.
-  return item.status === 'open' && !facts.queued.includes(item.id)
+  // stopped, and no start is queued for it yet. One queued for a limit's reset
+  // is offered too: a press reads the account at once (Supervisor#resumeItems).
+  const forTheReset = troubleCause(item.result) === 'at-limit';
+  return item.status === 'open' && (forTheReset || !facts.queued.includes(item.id))
     && item.wrote?.result?.source === 'agent' && saysARunGotNowhere(item.result)
     // Another try is refused the same way; a model it can run is the way on.
     && !saysTheModelIsForAnotherEngine(item.result);

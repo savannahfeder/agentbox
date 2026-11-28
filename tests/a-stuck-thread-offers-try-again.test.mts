@@ -54,6 +54,29 @@ describe('offered on a thread nothing will start', () => {
   it('in Needs you with the app’s own note that a run stopped at a limit', () => {
     expect(offersTryAgain(limitNote, fleet())).toBe(true);
   });
+
+  // w-99a2196117: a reset came early and these read Stopped with no button,
+  // because the app had them queued for the reset it guessed.
+  it('stopped at a limit and queued for its reset, which may already have come', () => {
+    const nothingDone = thread({
+      result: "Claude Code is at its usage limit, so nothing has been done on this task. It starts again on its own when your Claude plan's limit resets.",
+      wrote: { title: { ts: NOW - HOUR, source: 'founder' }, result: { ts: NOW - 60_000, source: 'agent' } },
+    });
+    expect(statusCell(nothingDone, fleet({ queued: ['w-1'] })).word).toBe('Stopped');
+    expect(offersTryAgain(nothingDone, fleet({ queued: ['w-1'] }))).toBe(true);
+    expect(offersTryAgain(limitNote, fleet({ queued: ['w-1'] }))).toBe(true);
+  });
+});
+
+describe('a note that is not a limit, queued to start again, is left to start', () => {
+  it('a run cut off in the middle', () => {
+    const cut = thread({
+      result: 'Claude Code was cut off in the middle, so nothing has been done on this task. Agentbox runs it again on its own.',
+      wrote: { title: { ts: NOW - HOUR, source: 'founder' }, result: { ts: NOW - 60_000, source: 'agent' } },
+    });
+    expect(offersTryAgain(cut, fleet())).toBe(true);
+    expect(offersTryAgain(cut, fleet({ queued: ['w-1'] }))).toBe(false);
+  });
 });
 
 describe('not offered where an agent is on it, coming, or waiting on you', () => {

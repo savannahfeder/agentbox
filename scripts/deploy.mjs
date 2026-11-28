@@ -11,14 +11,14 @@
 //   1. the Mac app: built, signed and notarised (about 15 minutes)
 //   2. the download on agentbox.ac, and the feed installed copies update from
 //   3. the cloud machine's image, then the cloud server
-//   4. npm, for `npx agentbox-app`
+//   4. npm, for `npx agentbox-app`, published by GitHub (publish-npm.yml)
 // and ends by reading each one back and saying which has the new version.
 //
 // The Mac build goes first because it is the slow step and the one most likely
 // to fail, and until it is done nothing anybody can see has changed: a failure
-// there is fixed by running this again. npm goes last because its sign-in is
-// the one most often forgotten: missing it leaves npm for the next release
-// and holds nothing else back.
+// there is fixed by running this again. npm goes last so that, when GitHub
+// cannot publish and this Mac has to sign in instead, a missed sign-in holds
+// nothing else back.
 //
 // The Apple password never passes through here. The first run asks Apple's own
 // tool to save it in the Keychain (`notarytool store-credentials`) and every
@@ -171,6 +171,46 @@ function publishToNpm(v, cwd = repo) {
   }
 }
 
+// GITHUB PUBLISHES THE PACKAGE, so nobody signs in to npm: each release used
+// to need an npm login and then a second browser approval for the publish,
+// both at the end of a half-hour run, and either one unanswered left npm
+// behind. npm trusts publish-npm.yml on this repository (trusted publishing,
+// set once on npmjs.com). Answers true when it published, false when GitHub
+// could not and this Mac should publish instead, and null when the run is
+// still going, when publishing here as well would race it.
+const CODE_REPO = 'savannahfeder/agentbox';
+const NPM_WORKFLOW = 'publish-npm.yml';
+function publishThroughGitHub(v, at) {
+  say(`GitHub is publishing ${PACKAGE}@${v} to npm (a few minutes, and nothing for you to do)`);
+  const askedAt = Date.now();
+  const started = quiet('gh', ['workflow', 'run', NPM_WORKFLOW, '--repo', CODE_REPO, '--ref', 'main',
+    '-f', `commit=${at}`, '-f', `version=${v}`, '-f', `posthog=${posthog}`], 60_000);
+  if (!started.ok) {
+    console.log(`  GitHub did not start it: ${started.err || started.out || 'no answer'}`);
+    return false;
+  }
+  for (;;) {
+    spawnSync('sleep', ['15']);
+    const listed = quiet('gh', ['run', 'list', '--repo', CODE_REPO, '--workflow', NPM_WORKFLOW,
+      '--event', 'workflow_dispatch', '--limit', '5', '--json', 'status,conclusion,createdAt,url']);
+    let run;
+    try {
+      run = JSON.parse(listed.out).find((r) => Date.parse(r.createdAt) >= askedAt - 60_000);
+    } catch {
+      console.log(`  Could not read GitHub's answer: ${listed.err || listed.out || 'no answer'}`);
+      return false;
+    }
+    if (run?.status === 'completed') {
+      if (run.conclusion === 'success') { console.log(`  ✓ GitHub published it: ${run.url}`); return true; }
+      console.log(`  GitHub's publish ended "${run.conclusion}". Why: ${run.url}`);
+      return false;
+    }
+    const waited = Date.now() - askedAt;
+    if (!run && waited >= 3 * 60_000) { console.log('  GitHub never started the run.'); return false; }
+    if (waited >= 30 * 60_000) { console.log(`  GitHub's publish is still running after 30 minutes: ${run.url}`); return null; }
+  }
+}
+
 // What npm serves as latest. Just after a publish npm says "being processed",
 // and on 0.1.26 it served the old version for under a minute, so it is read
 // again for up to five minutes before it counts as missing.
@@ -200,16 +240,19 @@ if (npmOnly) {
   try { builtVersion = JSON.parse(quiet('git', ['show', `${built}:package.json`]).out).version; } catch {}
   if (builtVersion !== mainVersion) stop(`The release page says ${mainVersion} was built from ${built.slice(0, 8)}, which says ${builtVersion ?? 'no version'}.`);
   if (!posthog) stop('No "posthogKey" in zero.config.json in this folder, so npx agentbox-app would count nobody.');
-  signIn(npmSignIn);
-  say(`publishing ${PACKAGE}@${mainVersion} from ${built.slice(0, 8)}, the commit its Mac app was built from`);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), `agentbox-npm-${mainVersion}-`));
-  let published = false;
-  if (quiet('git', ['worktree', 'add', '-q', '--detach', dir, built]).ok) {
-    fs.symlinkSync(path.join(repo, 'node_modules'), path.join(dir, 'node_modules'));
-    bakeTheKey(path.join(dir, 'package.json'));
-    published = publishToNpm(mainVersion, dir);
+  let published = publishThroughGitHub(mainVersion, built);
+  if (published === null) stop('GitHub is still publishing; the link is just above.', 'To try again once it ends, run: npm run deploy -- --npm');
+  if (!published) {
+    signIn(npmSignIn);
+    say(`publishing ${PACKAGE}@${mainVersion} from this Mac, from ${built.slice(0, 8)}, the commit its Mac app was built from`);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), `agentbox-npm-${mainVersion}-`));
+    if (quiet('git', ['worktree', 'add', '-q', '--detach', dir, built]).ok) {
+      fs.symlinkSync(path.join(repo, 'node_modules'), path.join(dir, 'node_modules'));
+      bakeTheKey(path.join(dir, 'package.json'));
+      published = publishToNpm(mainVersion, dir);
+    }
+    quiet('git', ['worktree', 'remove', '--force', dir]);
   }
-  quiet('git', ['worktree', 'remove', '--force', dir]);
   const now = npmVersionNow(published ? mainVersion : null).out;
   if (!published || now !== mainVersion) {
     stop(`npm still has ${now || 'an older version'}; the reason is just above.`, 'To try again, run: npm run deploy -- --npm');
@@ -288,7 +331,9 @@ else if (notOnLive.length && /\.sql$/.test(notOnLive[0])) {
 }
 
 if (checkOnly) {
-  signIn(npmSignIn);
+  if (quiet('gh', ['workflow', 'view', NPM_WORKFLOW, '--repo', CODE_REPO, '--yaml'], 30_000).ok) {
+    console.log('  ✓ npm: GitHub publishes it (and this Mac signs in only if GitHub cannot)');
+  } else signIn(npmSignIn);
   console.log(`\nA real run would put out ${version} from ${version === mainVersion ? commit.slice(0, 8) : `a commit on main setting it to ${version}`}${signedOut.length ? `, after signing in to ${signedOut.length === 1 ? 'one thing' : `${signedOut.length} things`}` : ''}.`);
   console.log('Nothing was changed. Run npm run deploy to do it.');
   process.exit(0);
@@ -374,9 +419,10 @@ const serverOk = live('node', ['scripts/cloud-gateway-setup.mjs'], { AGENTBOX_CL
 // 7. NPM. The checks before-publish.mjs makes were made at step 1, against
 // the commit this run pinned; main has moved on since, which is not a reason
 // to publish something else.
-// npm sessions expire, and publishing can require its own approval after login.
-let npmPublished = false;
-if (signIn(npmSignIn, { required: false })) {
+// Publishing from this Mac is the fallback, and it needs an npm login and then
+// a second approval for the publish itself.
+let npmPublished = publishThroughGitHub(version, commit);
+if (npmPublished === false && signIn(npmSignIn, { required: false })) {
   bakeTheKey(pkgPath);
   packageWritten = true;
   say(`publishing ${PACKAGE}@${version} to npm (it may ask for a one-time code)`);

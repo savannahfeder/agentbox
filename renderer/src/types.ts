@@ -585,7 +585,7 @@ export interface TeamState {
   multiplayer?: boolean | null;
   /** False only when the cloud said this person's team has no Pro and no free days, so it neither invites nor shares. */
   pro?: boolean | null;
-  /** Rooms (alpha), while switched on in Alpha features (main/team/rooms.mts). */
+  /** Rooms, for anyone on a team (main/team/rooms.mts). */
   rooms?: RoomsState | null;
 }
 
@@ -1381,8 +1381,8 @@ export interface Snapshot {
   // cloud, which is the single-person app.
   team?: TeamState | null;
   teammates?: TeammatesView | null;
-  /** Which alpha features are switched on (Settings, Alpha features). */
-  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean; glass?: boolean };
+  /** Rooms (on for anyone on a team), AI teammates and multiplayer (main/settings.mts alphaFeatures). */
+  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean };
   agents?: AgentSession[];
   approvals?: Approval[];
   supervisor: SupervisorStatus;
@@ -1702,8 +1702,7 @@ export interface WorkspaceSettings {
   adhdMode?: boolean;
   // New Claude Code and Codex chats come in on their own (w-62228098e6).
   importNew?: boolean;
-  // Settings, Alpha features (w-3d0fa23ffb).
-  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean; glass?: boolean };
+  alpha?: { rooms: boolean; teammates?: boolean; multiplayer?: boolean };
   // The corner tag over other apps (w-dafae58a23). On unless she turned it off.
   cornerTag?: boolean;
   outsideAgents: AgentMode;
@@ -1828,7 +1827,6 @@ declare global {
       olderItems?(p: { offset: number; limit: number }): Promise<{ items: WorkItem[]; more: boolean }>;
       crash?(p: { name: string; message: string; stack: string }): Promise<unknown>;
       draftCopy?: { read(): string | null; write(text: string): void };
-      glassTone?(p: { tone: 'light' | 'dark' | 'system' }): Promise<unknown>;
       windowButtons?(p: { dark: boolean }): Promise<unknown>;
       blankCheck?(p: { thread: string; facts: Record<string, unknown>; lateMs: number; longTaskMs: number }): Promise<string | null>;
       // A count. The name is checked against the approved list in the main
@@ -1887,6 +1885,7 @@ declare global {
       teamThreadWork(p: { personId: string; threadId: string }): Promise<TeammateThreadWork>;
       findInThreads(p: { query: string; limit?: { lines?: number; files?: number; comments?: number }; opened?: Record<string, number> }): Promise<FoundInThreads>;
       warmFindInThreads(): Promise<boolean>;
+      findByDescription?(p: { description: string; candidates: import('../../shared/find-by-description.mts').FindCandidate[] }): Promise<import('../../shared/find-by-description.mts').FindAnswer>;
       fileMark(p: { product: string; id: string; mark: ArtifactMark }): Promise<{ ok: boolean; error?: string }>;
       fileNewVersion?(p: { product: string; id: string; path: string; text: string; since?: string | null }): Promise<{ ok: boolean; path?: string; error?: string }>;
       teamMarkFile(p: { personId: string; threadId: string; mark: ArtifactMark }): Promise<TeamCallResult>;
@@ -2156,6 +2155,7 @@ export interface AddedAccount { ok: boolean; command?: string; home?: string; er
 export interface EngineSetupAnswer {
   ok: boolean; error?: string; phase?: EngineSetupState['phase']; log?: string;
   found?: boolean; signedIn?: boolean; certain?: boolean; bin?: string | null; already?: boolean;
+  tooOld?: boolean; version?: string;
 }
 
 

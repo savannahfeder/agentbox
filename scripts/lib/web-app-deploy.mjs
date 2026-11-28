@@ -10,7 +10,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { teamConfigFile } from '../phone-site-config.mjs';
+import { teamConfigFile, pagesProjectOf } from '../phone-site-config.mjs';
+import { runSandboxed } from './branch-sandbox.mjs';
 
 export const SITE_PATHS = ['renderer/', 'shared/', 'phone-legal/', 'scripts/build-phone-site.mjs', 'cloud/web/', 'main/phone-icon.png'];
 
@@ -56,7 +57,7 @@ export const DEPLOY_NEEDS_MS = 6 * 60_000;
  * any sandbox. Packages come from `trusted` when its lockfile is the same, and
  * from a fresh install of the shipped lockfile when not.
  */
-export function cleanCopy({ root, sha, trusted, into, env = process.env }) {
+export function cleanCopy({ root, sha, trusted, into, env = process.env, sandboxed = runSandboxed }) {
   const copy = path.join(into, 'app');
   execFileSync('git', ['clone', '--quiet', '--shared', '--no-checkout', root, copy], { stdio: 'ignore' });
   execFileSync('git', ['-C', copy, 'checkout', '--quiet', '--detach', sha], { stdio: 'ignore' });
@@ -65,19 +66,36 @@ export function cleanCopy({ root, sha, trusted, into, env = process.env }) {
   if (packages && fs.existsSync(packages) && lockOf(trusted) === lockOf(copy)) {
     execFileSync('cp', [process.platform === 'darwin' ? '-cR' : '-R', packages, path.join(copy, 'node_modules')]);
   } else {
-    execFileSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: copy, env, stdio: 'inherit' });
+    // The shipped lockfile is the branch's, so it installs as the push hook does.
+    for (const [stage, args] of [['download', ['ci', '--no-audit', '--no-fund', '--ignore-scripts']], ['build', ['rebuild']]]) {
+      const status = sandboxed('npm', args, { cwd: copy, env, stage });
+      if (status !== 0) throw new Error(`npm ${args[0]} ended with ${status}`);
+    }
   }
   return copy;
 }
 
+const readJson = (file) => { try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; } };
+
+/** The team settings that name the phone site: `dir`'s own, else the home folder's. */
+export function personsSettings(dir, home = os.homedir()) {
+  const own = readJson(path.join(dir, 'cloud', 'team.config.json'));
+  if (own?.phoneSite) return own;
+  const file = teamConfigFile(path.join(home, '.no-checkout-here'), home);
+  return (file && readJson(file)) ?? own;
+}
+
 /** The same, with this checkout's git, the network and npm, done by `until`. */
-export function deployAfterShip({ root, say, until, trusted }) {
+export function deployAfterShip({ root, say, until, trusted, sandboxed = runSandboxed }) {
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
   // npm and npx run the branch's own code. The push token and the git settings
   // that hand it over are for git alone.
   const branchEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('GIT_')));
   let site = null;
-  try { site = JSON.parse(fs.readFileSync(teamConfigFile(root), 'utf8')).phoneSite ?? null; } catch { /* none here */ }
+  // A task folder's team.config.json is ignored by git, so its tests could write
+  // one; a real ship names the app folder, and its file or the home folder's is read.
+  const settings = personsSettings(trusted ?? root);
+  site = settings?.phoneSite ?? null;
   return deployWebApp({
     site,
     head: () => git('rev-parse', 'HEAD'),
@@ -90,13 +108,25 @@ export function deployAfterShip({ root, say, until, trusted }) {
       const into = fs.mkdtempSync(path.join(os.tmpdir(), 'agentbox-deploy-'));
       try {
         let copy;
-        try { copy = cleanCopy({ root, sha: git('rev-parse', 'HEAD'), trusted, into, env: branchEnv }); } catch (err) { return { ok: false, why: `a clean copy to build it from could not be made (${err?.message ?? err})` }; }
-        const signedIn = spawnSync('npx', ['--yes', 'wrangler@4', 'whoami'], { cwd: copy, env: branchEnv, encoding: 'utf8', timeout: 120_000 });
+        try { copy = cleanCopy({ root, sha: git('rev-parse', 'HEAD'), trusted, into, env: branchEnv, sandboxed }); } catch (err) { return { ok: false, why: `a clean copy to build it from could not be made (${err?.message ?? err})` }; }
+        // The shipped commit is a worker's branch, so it builds where the push
+        // hook ran its tests; only the upload, this file's own, has the sign-in.
+        const built = sandboxed('npm', ['run', 'phone:build'], { cwd: copy, env: branchEnv, timeout: Math.max(60_000, until - Date.now()) });
+        const site = path.join(copy, 'phone-site');
+        if (built !== 0 || !fs.existsSync(path.join(site, 'index.html'))) return { ok: false, why: `the web app did not build (npm run phone:build ended with ${built})` };
+        const project = pagesProjectOf(settings);
+        if (!/^[a-z0-9-]{1,58}$/.test(project)) return { ok: false, why: `not a Pages project name: ${project}` };
+        // From a folder with no node_modules, so npx fetches wrangler rather than run one the branch installed.
+        const away = fs.mkdtempSync(path.join(into, 'upload-'));
+        const wrangler = (args, opts = {}) => spawnSync('npx', ['--yes', 'wrangler@4', ...args], { cwd: away, env: branchEnv, encoding: 'utf8', ...opts });
+        const signedIn = wrangler(['whoami'], { timeout: 120_000 });
         if (signedIn.status !== 0 || /not authenticated|You are not logged in/i.test(`${signedIn.stdout}${signedIn.stderr}`)) {
           return { ok: false, why: 'this computer is not signed in to Cloudflare (npx wrangler login)' };
         }
-        const r = spawnSync('npm', ['run', 'phone:deploy'], { cwd: copy, env: branchEnv, stdio: 'inherit', timeout: Math.max(60_000, until - Date.now()) });
-        return r.status === 0 ? { ok: true } : { ok: false, why: r.error?.message ?? `npm run phone:deploy ended with ${r.status}` };
+        const made = wrangler(['pages', 'project', 'create', project, '--production-branch', 'main'], { timeout: 120_000 });
+        const r = wrangler(['pages', 'deploy', site, '--project-name', project, '--branch', 'main', '--commit-dirty=true'], { stdio: 'inherit', timeout: Math.max(60_000, until - Date.now()) });
+        if (r.status !== 0) say(`${made.stdout ?? ''}${made.stderr ?? ''}`.trim());
+        return r.status === 0 ? { ok: true } : { ok: false, why: r.error?.message ?? `wrangler pages deploy ended with ${r.status}` };
       } finally {
         fs.rmSync(into, { recursive: true, force: true });
       }

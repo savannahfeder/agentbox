@@ -494,14 +494,25 @@ export function writeChangeForRun({ transcript, docsDir, itemId, roots = [], sin
 }): string | null {
   if (!docsDir || !itemId) return null;
   const allRoots = [...roots, ...repos.map((r) => r?.root).filter(Boolean) as string[]];
-  const said = prepared ?? changeFromTranscriptFile(transcript, { roots: allRoots, since });
-  const change = mergeChange(said, repos, { roots: allRoots });
+  const read = prepared ?? changeFromTranscriptFile(transcript, { roots: allRoots, since });
+  // A branch that is main again has nothing pending, however this run got it
+  // there, so neither the disk's removal nor the conversation's edits count.
+  const emptied = repos.filter((r) => r?.nothingLeft && r.root).map((r) => r!.root as string);
+  const spellings = emptied.flatMap((r) => [r, realRoot(r)]).filter(Boolean).map((r) => `${(r as string).replace(/\/$/, '')}/`);
+  const said = emptied.length
+    ? { ...read, files: read.files.filter((f) => !spellings.some((r) => String(f.abs ?? '').startsWith(r))) }
+    : read;
+  const change = mergeChange(said, repos.map((r) => (r?.nothingLeft ? { ...r, files: [] } : r)), { roots: allRoots });
   // THROUGH THE HOME, NOT INTO HER FOLDER. This line used to be
   // `path.join(docsDir, ...)`, which is the one writer the move in
   // main/store/home.mts did not catch. So `runs/` was carried out of her folder
   // once and then re-created in it by the next run that changed any code, which
   // is why files kept reappearing there after the move was supposedly done.
   const out = machineryPath(docsDir, changePath(itemId));
+  if (emptied.length && !change.files.length) {
+    try { fs.rmSync(out, { force: true }); } catch { /* the chip stays as it was */ }
+    return null;
+  }
   if (!change.files.length) return restand(out, change);
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, JSON.stringify({ item: itemId, ...change }, null, 1));
@@ -520,8 +531,8 @@ export function writeChangeForRun({ transcript, docsDir, itemId, roots = [], sin
  * Only the facts the offer reads are rewritten, the identity among them: a
  * round that answers "what name and email" leaves a folder git can commit in,
  * and without this the offer would go on asking for one. The hunks stay as
- * they were, because what a run did is still worth reading after the work it
- * did has gone.
+ * they were. A thread's own branch that is main again never gets here: its
+ * change is removed in writeChangeForRun, so no chip shows discarded code.
  *
  * Returns null either way: nothing was saved for THIS run, which is what the
  * caller reports.

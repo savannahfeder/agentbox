@@ -6,7 +6,7 @@
 // This draws them and keeps the clock moving.
 
 import { useEffect, useId, useState } from 'react';
-import { liveLine, livePlace, runningSince, shortSpan, shortWord, type LiveFacts } from '../live-line';
+import { heldStepWord, liveLine, livePlace, runningSince, shortSpan, shortWord, type LiveFacts } from '../live-line';
 import { keepActivityKeyLocal, LIVE_STEPS_SHOWN, previousActivity, stepsSinceLastSaid } from '../activity-summary';
 import { LiveMark } from './LiveMark';
 import { useEscapePutsAway } from '../escape-steps';
@@ -26,12 +26,7 @@ const TICK_MS = 15_000;
 // Only this lowest status line owns the lattice and shimmer (2026-09-19).
 // The task header repeats status in plain text, never another animation.
 
-/** The step a working run is on, unless the memory gate holds its command: then it waits, and says so. */
-export function heldStepWord(current: { label?: string } | undefined, memoryHeldMs: number | undefined): string {
-  if (memoryHeldMs == null) return current?.label || 'Thinking';
-  const command = /^Running (.+)$/.exec(current?.label ?? '')?.[1];
-  return command ? `Waiting for memory to run ${command}` : 'Waiting for memory';
-}
+export { heldStepWord } from '../live-line';
 
 export function Live({ item, facts, onTryAgain }: { item: WorkItem; facts: LiveFacts; onTryAgain?: () => void }) {
   const [expandedAt, setExpandedAt] = useState<number | null>(null);

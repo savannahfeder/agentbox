@@ -8,7 +8,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useState, type ComponentType } from 'react';
 import { Pressable, View } from 'react-native';
 import { meterPair } from '../../../renderer/src/account-words';
-import { cloudRunsLine, cloudToggleTarget, type CloudMode } from '../../../renderer/src/cloud-menu';
+import { cloudRunsLine, cloudToggleTarget, cloudWhenLine, type CloudMode } from '../../../renderer/src/cloud-menu';
 import { CODEX_CLOUD_WHAT, sameAsHere } from '../../../renderer/src/cloud-permission-words';
 import { CODEX_MODES, CODEX_MODE_ORDER } from '../../../renderer/src/codex-modes';
 import { CUSTOM_MODE_FROM_PHONE, MODE_ORDER, MODE_SENTENCE, MODE_WORDS } from '../../../renderer/src/modes';
@@ -18,7 +18,7 @@ import { publicLinkLine, shareWords } from '../../../renderer/src/public-link-wo
 import { inRunningOrder } from '../lib/palette';
 import { linksShown, type PhoneLink } from '../lib/public-links';
 import { share } from './LinkMenu';
-import { cloudInUseName, cloudOnlyAccounts, computerAccounts, loginLabel, newerUsage, placesOf, withPlaces } from '../lib/cloud-accounts';
+import { agentCloudSlot, cloudCanRun, cloudInUseName, cloudOnlyAccounts, computerAccounts, inUseHere, loginLabel, newerUsage, oneAtATimeLine, placesOf, withPlaces } from '../lib/cloud-accounts';
 import { readMyRoomCard, roomCardGroups, roomCardPatch, roomsPageShown, saveMyRoomCard } from '../lib/rooms-settings';
 import { NAME } from '../../../shared/product-name.mjs';
 import { deleteAccount } from '../../../renderer/src/phone-account';
@@ -123,6 +123,9 @@ function General() {
       </Sheet>
       {w ? (
         <>
+          <Group label="AI teammates">
+            <SettingSwitch first label="Use AI teammates" desc="Agents with a standing job that work on their own, talk in one team chat and reach you only when they need you." k="alphaTeammates" copy={!!w.alpha.teammates} />
+          </Group>
           <Group label={`What ${NAME} sends`}>
             <SettingSwitch first label="Counts and crash reports" desc={`That ${NAME} was opened, that a task was opened, that a reply was sent, and a report when something breaks. Never your code, your prompts, your keys or your paths, and never a title.`} k="diagnostics" copy={w.diagnostics} />
           </Group>
@@ -256,25 +259,28 @@ function Accounts({ engine, list }: { engine: 'claude' | 'codex'; list: Account[
   const chosen = (a: Account) => (mine ? mine.account === a.id : a.chosen);
   const picked = list.some(chosen);
   const w = s.settings!.workspace;
+  const mode = s.reading('workspace', 'cloudRuns', w.cloud?.mode ?? 'mac').value as CloudMode;
   const inCloud = cloudOnlyAccounts(w, engine);
-  if (!list.length && !inCloud.length) return <Row first label="Not signed in" />;
+  const slot = agentCloudSlot(w, engine);
+  if (!list.length && !inCloud.length && !slot) return <Row first label="Not signed in" />;
   return (
     <>
       {list.map((a, i) => {
         const signingIn = a.signedIn === false;
-        const live = picked && chosen(a) && !signingIn;
+        const live = !signingIn && inUseHere(w, engine, mode, { id: a.id, chosen: picked && chosen(a) });
         const line = backAt(a.resetsAt, c.now) ?? a.note ?? (signingIn ? 'Sign in on your computer to use it' : a.plan ?? 'Signed in');
         return (
           <Row key={a.id} first={i === 0} label={loginLabel(a, engine, i, list.length)} badge={live ? 'In use' : undefined}
             desc={signingIn ? line : withPlaces(line, placesOf(w, engine, a.id))}
             below={<Meters meters={meterPair(newerUsage(w, engine, a.id, a.usage ?? null)?.limits, c.now)} />}
-            reading={mine && live ? r : undefined}
-            control={!live && !signingIn && list.length > 1 ? <Button title="Switch" onPress={() => void s.change({ scope: 'workspace', key: 'activeAccount', value: { engine, account: a.id } })} /> : undefined} />
+            reading={mine && picked && chosen(a) ? r : undefined}
+            control={!(picked && chosen(a)) && !signingIn && list.length > 1 ? <Button title="Switch" onPress={() => void s.change({ scope: 'workspace', key: 'activeAccount', value: { engine, account: a.id } })} /> : undefined} />
         );
       })}
       {inCloud.map((a, i) => (
-        <Row key={`cloud-${i}`} first={!list.length && i === 0} label={a.name} desc={a.desc || undefined} below={<Meters meters={meterPair(a.usage?.limits, c.now)} />} />
+        <Row key={`cloud-${i}`} first={!list.length && i === 0} label={a.name} badge={a.inUse && mode !== 'mac' && cloudCanRun(w, engine) ? 'In use' : undefined} desc={a.desc || undefined} below={<Meters meters={meterPair(a.usage?.limits, c.now)} />} />
       ))}
+      {slot && <Row first={!list.length && !inCloud.length} label={slot.title} desc={slot.line} />}
     </>
   );
 }
@@ -292,7 +298,7 @@ function CloudGroup({ engine }: { engine: 'claude' | 'codex' }) {
   if (!cloud) return null;
   return (
     <Group label="Cloud">
-      <Row first label="Use the cloud" desc={cloudRunsLine(mode, cloudInUseName(s.settings!.workspace, engine), COMPUTER)} reading={r}
+      <Row first label="Use the cloud" desc={cloudInUseName(s.settings!.workspace, engine) ? cloudRunsLine(mode, cloudInUseName(s.settings!.workspace, engine), COMPUTER) : cloudWhenLine(mode, COMPUTER)} reading={r}
         control={<Switch label="Use the cloud" on={mode !== 'mac'} onChange={() => void s.change({ scope: 'workspace', key: 'cloudRuns', value: cloudToggleTarget({ mode, whenOn: cloud.whenOn }) })} />} />
     </Group>
   );
@@ -321,8 +327,10 @@ function Missing({ engine }: { engine: 'claude' | 'codex' }) {
   );
 }
 
-const oneAtATime = (w: Parameters<typeof computerAccounts>[0], engine: 'claude' | 'codex') =>
-  computerAccounts(w, engine).length > 1 ? 'Your agents run on one account at a time.' : null;
+const oneAtATime = (s: ReturnType<typeof useSettings>, engine: 'claude' | 'codex') => {
+  const w = s.settings!.workspace;
+  return oneAtATimeLine(computerAccounts(w, engine).length, s.reading('workspace', 'cloudRuns', w.cloud?.mode ?? 'mac').value as CloudMode);
+};
 
 function Claude() {
   const s = useSettings();
@@ -333,8 +341,8 @@ function Claude() {
   if (!w.claude.found) return <Missing engine="claude" />;
   return (
     <>
-      <Group label="Signed in" note={oneAtATime(w, 'claude')}><Accounts engine="claude" list={computerAccounts(w, 'claude')} /></Group>
-      {cloud ? <CloudGroup engine="claude" /> : null}
+      <Group label="Signed in" note={oneAtATime(s, 'claude')}><Accounts engine="claude" list={computerAccounts(w, 'claude')} /></Group>
+      <CloudGroup engine="claude" />
       <Group label="Permissions">
         {w.permission === 'custom'
           ? <Row first label="Permission mode" desc={CUSTOM_MODE_FROM_PHONE} />
@@ -355,8 +363,8 @@ function Codex() {
   if (!w.codex.found) return <Missing engine="codex" />;
   return (
     <>
-      <Group label="Signed in" note={oneAtATime(w, 'codex')}><Accounts engine="codex" list={computerAccounts(w, 'codex')} /></Group>
-      {cloud ? <CloudGroup engine="codex" /> : null}
+      <Group label="Signed in" note={oneAtATime(s, 'codex')}><Accounts engine="codex" list={computerAccounts(w, 'codex')} /></Group>
+      <CloudGroup engine="codex" />
       <Group label="Permissions">
         <Row first label={cloud ? 'On your computer' : 'Permission mode'} desc={CODEX_MODES[r.value as keyof typeof CODEX_MODES]?.what} reading={r}
           control={<Choice label="Permission mode" value={r.value as string} options={CODEX} onChange={(v) => void s.change({ scope: 'workspace', key: 'codexMode', value: v })} />} />
@@ -469,7 +477,7 @@ function OutsideAgents() {
   const r = s.reading('workspace', 'outsideAgents', s.settings!.workspace.outsideAgents);
   return (
     <>
-      <Row first stack label="Show while they run" desc={`Claude Code started in a terminal, not from here. ${AGENT_SENTENCE[r.value as string] ?? ''}`} reading={r}
+      <Row first stack label="Show while they run" desc={`Claude Code and Codex, started in a terminal or the Codex app. ${AGENT_SENTENCE[r.value as string] ?? ''}`} reading={r}
         control={<Choice label="Show while they run" value={r.value as string} options={AGENT_OPTIONS} onChange={(v) => void s.change({ scope: 'workspace', key: 'outsideAgents', value: v })} />} />
       <SettingSwitch label="Bring in new chats" k="importNew" copy={!!s.settings!.workspace.importNew}
         desc="A Claude Code or Codex chat in one of your projects comes in after ten quiet minutes." />
@@ -489,19 +497,6 @@ function Instructions() {
       <Group><SettingSwitch first label="ADHD mode" desc={ADHD_SAYS} k="adhdMode" copy={w.adhdMode} /></Group>
       <Aside>Your instructions are edited on your computer.</Aside>
     </>
-  );
-}
-
-function Alpha() {
-  const s = useSettings();
-  const w = s.settings?.workspace;
-  if (!w) return <Aside>{NOT_YET}</Aside>;
-  return (
-    <Group>
-      <SettingSwitch first label="Rooms" desc="See the people you work with and their agents, with a chat beside them. Needs a team sign-in." k="alphaRooms" copy={w.alpha.rooms} />
-      <SettingSwitch label="Teammates" desc="Agents with a standing job that work on their own, talk in one team chat and reach you only when they need you." k="alphaTeammates" copy={!!w.alpha.teammates} />
-      <SettingSwitch label="Multiplayer" desc="Share projects with your team and see their threads beside yours. Needs a sign-in." k="alphaMultiplayer" copy={!!w.alpha.multiplayer} />
-    </Group>
   );
 }
 
@@ -569,7 +564,7 @@ function Rooms() {
   );
 }
 
-export type PageId = 'general' | 'appearance' | 'phone' | 'alpha' | 'claude' | 'codex' | 'running' | 'instructions' | 'projects' | 'team' | 'rooms';
+export type PageId = 'general' | 'appearance' | 'phone' | 'claude' | 'codex' | 'running' | 'instructions' | 'projects' | 'team' | 'rooms';
 export interface SettingsPageDef { id: PageId; label: string; group: 'Personal' | 'Agents' | 'Workspace'; lede?: string; Body: ComponentType; shown: (s: SettingsState) => boolean }
 
 const hasComputer = (s: SettingsState) => !!s.settings;
@@ -577,7 +572,6 @@ const ALL_PAGES: SettingsPageDef[] = [
   { id: 'general', label: 'General', group: 'Personal', Body: General, shown: () => true },
   { id: 'appearance', label: 'Appearance', group: 'Personal', Body: Appearance, shown: () => true },
   { id: 'phone', label: 'Phone', group: 'Personal', lede: 'Read and reply from your phone, even with your computer closed.', Body: Phone, shown: () => true },
-  { id: 'alpha', label: 'Alpha features', group: 'Personal', lede: 'Early features you can try before they are finished. They may change or go away.', Body: Alpha, shown: hasComputer },
   { id: 'claude', label: 'Claude Code', group: 'Agents', Body: Claude, shown: hasComputer },
   { id: 'codex', label: 'Codex', group: 'Agents', Body: Codex, shown: (s) => !!s.settings && (s.settings.workspace.engines.includes('codex') || s.settings.workspace.codex.found) },
   { id: 'running', label: 'Running', group: 'Agents', Body: Running, shown: hasComputer },
@@ -587,6 +581,6 @@ const ALL_PAGES: SettingsPageDef[] = [
   { id: 'rooms', label: 'Rooms', group: 'Workspace', lede: 'What people in your rooms see of you. Private threads never show.', Body: Rooms, shown: (s) => roomsPageShown(s.settings) },
 ];
 // Left out here, the store build's Settings, Search and page addresses never reach them.
-const NOT_IN_STORE = new Set(['alpha', 'team']);
+const NOT_IN_STORE = new Set(['team']);
 export const SETTINGS_PAGES = STORE_BUILD ? ALL_PAGES.filter((p) => !NOT_IN_STORE.has(p.id)) : ALL_PAGES;
 export const GROUPS = ['Personal', 'Agents', 'Workspace'] as const;

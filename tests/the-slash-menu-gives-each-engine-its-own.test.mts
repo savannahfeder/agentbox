@@ -136,7 +136,7 @@ describe('the menu is told which engine the row runs on', () => {
     // other end of it.
     expect(focus).toContain('const claudeCode = (runningEngine ?? DEFAULT_ENGINE) === DEFAULT_ENGINE;');
     expect(focus.match(/const claudeCode = /g)).toHaveLength(1);
-    expect(focus).toContain('const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames);');
+    expect(focus).toContain("const menuRows = slashRows(query, mode !== null, claudeCode, nativeNames).filter((row) => canSetMode || row.kind === 'command');");
     expect(focus).toContain('const canSetMode = !item.agent && ownControls;');
     expect(focus).toContain('const slashOpen = menuRows.length > 0;');
     // Passed all the way down rather than stopping at Focus, which is where it

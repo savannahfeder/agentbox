@@ -125,9 +125,10 @@ export const CHAT_TAIL = 30;
 // this many hops, so two of them cannot keep each other running.
 export const MAX_HOPS = 8;
 
-// Teammates are an alpha feature (Settings, Alpha features): off unless switched on.
+// On unless turned off in Settings, General. The key keeps its alpha name so a
+// copy that turned them off stays off.
 export function teammatesOn(config: { alphaTeammates?: unknown } | null | undefined): boolean {
-  return config?.alphaTeammates === true;
+  return config?.alphaTeammates !== false;
 }
 export const HOP_LABEL_PREFIX = 'hop:';
 
@@ -1392,7 +1393,7 @@ export const STARTERS: Starter[] = [
     ask: 'Be the one I talk to',
     outcome: 'Takes anything you send, gets it to the right teammate, and checks in with only what needs you',
     sends: 'One check-in a weekday with what needs you',
-    job: 'Be the person\'s main point of contact. Take whatever they send you: hand it to the teammate whose job it is, do it yourself when it is small or nobody\'s, and offer a new teammate when a kind of work keeps coming and nobody owns it. Every weekday morning check in once with what is waiting on them, most urgent first, what finished and what is stuck. When they give a rule for one project, such as when its work ships or what needs their yes, ask whether to keep it for that project, and once they agree add it with add_project_rule so every agent there follows it. Stay quiet when nothing needs them.',
+    job: 'Be the person\'s main point of contact. Take whatever they send you: hand it to the teammate whose job it is, do it yourself when it is small or nobody\'s, and offer a new teammate when a kind of work keeps coming and nobody owns it. Each round, check in once with what is waiting on them, most urgent first, what finished and what is stuck. When they give a rule for one project, such as when its work ships or what needs their yes, ask whether to keep it for that project, and once they agree add it with add_project_rule so every agent there follows it. Stay quiet when nothing needs them.',
     goal: 'You never have to chase a teammate',
     counted: 'Things you had to chase yourself',
     asksFirst: 'Before making a new teammate, or handing on work you did not ask for',
@@ -1403,7 +1404,7 @@ export const STARTERS: Starter[] = [
     ask: 'Find bugs before your users do',
     outcome: 'Finds bugs before your users do',
     sends: 'A bug, with the steps to make it happen',
-    job: 'Find bugs before your users do. Every weekday morning look at what changed, run the project\'s own tests, and use the main flows the way a user would, on a phone-sized window and a slow connection too. File anything broken with the exact steps to make it happen, and pass fixable bugs to whoever fixes things on the team.',
+    job: 'Find bugs before your users do. Each round, look at what changed since the last, run the project\'s own tests, and use the main flows the way a user would, on a phone-sized window and a slow connection too. File anything broken with the exact steps to make it happen, and pass fixable bugs to whoever fixes things on the team.',
     goal: 'Nothing broken reaches a user',
     counted: 'Bugs users report that you did not find first',
     asksFirst: 'Before paying with a real card or signing in as a real person',
@@ -1447,7 +1448,7 @@ export const STARTERS: Starter[] = [
     ask: 'Tell me what moved signups',
     outcome: 'Tells you what moved signups, and what to try next',
     sends: 'What moved signups this week',
-    job: 'Every Friday, look at what changed in signups and usage this week, explain what moved it in plain words, and suggest one thing to try next week.',
+    job: 'Each round, look at what changed in signups and usage since the last, explain what moved it in plain words, and suggest one thing to try next.',
     goal: 'One clear next step for growth every week',
     counted: 'Experiments tried each month',
     asksFirst: 'Before changing anything users can see',

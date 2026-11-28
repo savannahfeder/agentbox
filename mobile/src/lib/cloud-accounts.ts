@@ -2,6 +2,7 @@
 // desktop's tiles say them (renderer/src/accounts-once.ts and Settings.tsx
 // `accountTile`), from the computer's copy (shared/phone-settings.mjs cloudOf).
 import { accountName } from '../../../shared/account-names.mts';
+import { cloudSlotWords, inUseWhere } from '../../../renderer/src/cloud-places';
 import type { UsageLimit } from '../../../renderer/src/types';
 
 type Engine = 'claude' | 'codex';
@@ -52,14 +53,42 @@ export function accountsAside(local: readonly { chosen: boolean; email: string |
 }
 
 /** The cloud's accounts signed in nowhere on this computer, each on a row of its own. */
-export function cloudOnlyAccounts(w: Copy, engine: Engine): { name: string; desc: string; usage: Usage }[] {
+export function cloudOnlyAccounts(w: Copy, engine: Engine): { name: string; desc: string; usage: Usage; inUse: boolean }[] {
   const all = loginsOf(w, engine);
   return all.filter((a) => !a.same).map((a) => ({
     name: labelOf(a, all),
     desc: [a.plan, a.state === 'broken' ? null : 'Cloud'].filter(Boolean).join(' · '),
     usage: a.usage,
+    inUse: a.inUse,
   }));
 }
+
+type Mode = 'mac' | 'full' | 'all';
+
+/** The desktop's empty Cloud card (cloud-places.ts `showsCloudSlot`), in the phone's words for the computer. */
+export function agentCloudSlot(w: Copy, engine: Engine): { title: string; line: string } | null {
+  if (!w.cloud || loginsOf(w, engine).length) return null;
+  const { title, line } = cloudSlotWords(engine === 'claude' ? 'Claude Code' : 'Codex');
+  return { title, line: line.replace('this computer', 'your computer') };
+}
+
+/** The cloud's login in use can take a thread: main/cloud/logins.mts `mayRunOn`. */
+export function cloudCanRun(w: Copy, engine: Engine): boolean {
+  const live = loginsOf(w, engine).find((a) => a.inUse);
+  return !!live && (live.state === 'ready' || live.state === 'stale');
+}
+
+/** Whether a login here wears In use: the desktop's `inUseWhere`, for this login and its cloud twin. */
+export function inUseHere(w: Copy, engine: Engine, mode: Mode, a: { id: string; chosen: boolean }): boolean {
+  const canRun = cloudCanRun(w, engine);
+  const twinInUse = loginsOf(w, engine).some((l) => l.same === a.id && l.inUse);
+  const at = inUseWhere({ chosenHere: a.chosen, isCloudInUse: twinInUse, cloudCanRun: canRun, mode });
+  return at.here || at.cloud;
+}
+
+/** With the cloud on, each place has its own login, so the line is no longer true. */
+export const oneAtATimeLine = (logins: number, mode: Mode): string | null =>
+  logins > 1 && mode === 'mac' ? 'Your agents run on one account at a time.' : null;
 
 /** A login here's reading, or its cloud twin's when that one is newer. */
 export function newerUsage(w: Copy, engine: Engine, localId: string, here: Usage): Usage {

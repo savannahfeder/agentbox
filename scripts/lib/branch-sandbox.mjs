@@ -65,8 +65,8 @@ export function sandboxedEnv(env, tmp, { stage = 'tests', home = os.homedir() } 
     npm_config_logs_dir: path.join(tmp, 'npm-logs'),
     npm_config_cache: path.join(stage === 'tests' ? tmp : branchCaches(home), 'npm'),
     electron_config_cache: stage === 'build' ? electronCache(home) : path.join(tmp, 'electron'),
-    // The branch's own .npmrc can name the program npm runs for git; these beat it.
-    ...(stage === 'download' ? { npm_config_ignore_scripts: 'true', npm_config_git: 'git' } : {}),
+    // The branch's own .npmrc can name programs npm runs; these beat it.
+    ...(stage === 'download' ? { npm_config_ignore_scripts: 'true', npm_config_git: 'git', npm_config_node_options: '', npm_config_script_shell: '/bin/sh' } : {}),
   };
 }
 
@@ -82,8 +82,16 @@ const taken = (names) => names.map((n) => path.join(TMP, n)).map((p) => ` (liter
 // The same for this Mac's own ports: the tests serve and call their own, and
 // what was listening before they started is other programs'. An agent's
 // headless browser or Codex's proxy would carry anything to the internet.
-export function listening() {
-  const out = execFileSync('/usr/sbin/lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fn'], { encoding: 'utf8', timeout: 10_000 });
+// A signal wakes the debugger of any plain Node program the person runs, here,
+// with no key; one opened after the start would not be on the list.
+const NODE_DEBUGGER = 9229;
+
+export function listening(lsof = '/usr/sbin/lsof') {
+  const r = spawnSync(lsof, ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fn'], { encoding: 'utf8', timeout: 10_000 });
+  // lsof exits 1 when nothing matches, as on a fresh CI runner.
+  const nothing = r.status === 1 && !r.stdout?.trim();
+  if (r.status !== 0 && !nothing) throw new Error(`${lsof} failed (${r.error?.message ?? `exit ${r.status}`}): ${r.stderr ?? ''}`.trim());
+  const out = r.stdout;
   return [...new Set(out.split('\n').filter((l) => l.startsWith('n')).map((l) => Number(l.slice(l.lastIndexOf(':') + 1))).filter((p) => p > 0))];
 }
 
@@ -101,7 +109,7 @@ export function profile({ root, commonDir, home, tmp, node, writable = [], stage
 (allow default)
 (deny network-outbound)
 (allow network-outbound (remote tcp "localhost:*") (remote udp "localhost:*"))
-${ports.length ? `(deny network-outbound${ports.map((p) => ` (remote tcp "localhost:${p}")`).join('')})\n` : ''}(allow network-outbound${subpaths([root, tmp, TMP])} (literal "/private/var/run/mDNSResponder"))
+(deny network-outbound${[...new Set([NODE_DEBUGGER, ...ports])].map((p) => ` (remote tcp "localhost:${p}")`).join('')})\n(allow network-outbound${subpaths([root, tmp, TMP])} (literal "/private/var/run/mDNSResponder"))
 (deny network-outbound${others})
 ${stage === 'download' ? '(allow network-outbound)\n' : ''}(deny file-write*)
 (allow file-write*${subpaths([root, tmp, TMP, '/dev', ...writable, ...(stage === 'download' ? [caches] : [])])})

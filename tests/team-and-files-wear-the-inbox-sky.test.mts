@@ -72,6 +72,6 @@ describe('words over any sky', () => {
 describe('the Inbox sky itself', () => {
   it('is the one approved', () => {
     expect(app).toContain('{skyOnInbox && sky && <InboxSky art={sky.art} />}');
-    expect(app).toMatch(/const skyOnInbox = [\s\S]*?!filesShown && !connectionsShown && !chatsPlaceShown && !evPick;/);
+    expect(app).toMatch(/const inboxPageUp = [^;]*?!filesShown && !connectionsShown && !chatsPlaceShown && !evPick;\n  const skyOnInbox = wearsInboxSky\(sky\) && !homeShown && inboxPageUp;/);
   });
 });

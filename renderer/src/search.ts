@@ -15,7 +15,7 @@
 // outranks a prose hit. Nothing is dropped for ranking low.
 
 import { searchText } from './format';
-import { fold, withHumps, wordStart } from '../../shared/word-match.mts';
+import { fold, termEnd, termStart, withHumps, wordStart } from '../../shared/word-match.mts';
 import { rowSummary, SUMMARY_BUDGET } from './list-rules';
 import { ticketQuery } from './ticket-references';
 import { isCause } from '../../shared/causes.mts';
@@ -145,7 +145,7 @@ function haystack(i: Searchable): Hay {
 // Earlier terms must be whole words, so "to" in "how to work" does not light
 // "tonight".
 function termAt(hay: string, terms: string[], i: number, from = 0): number {
-  return wordStart(hay, terms[i], from, i < terms.length - 1);
+  return termStart(hay, terms[i], from, i < terms.length - 1);
 }
 
 function hasEvery(hay: string, terms: string[]): boolean {
@@ -336,15 +336,15 @@ export function splitHits(text: string, terms: string[], phrase = ''): Run[] {
   // Spans for every term and for the phrase, merged so "how to work" lights as
   // one run and overlapping terms do not nest.
   const spans: Array<[number, number]> = [];
-  const push = (needle: string, find: (from: number) => number) => {
+  const push = (find: (from: number) => number, end: (at: number) => number) => {
     let at = find(0);
     while (at >= 0) {
-      spans.push([at, at + needle.length]);
+      spans.push([at, end(at)]);
       at = find(at + 1);
     }
   };
-  wanted.forEach((t, i) => push(t, (from) => termAt(lower, wanted, i, from)));
-  if (phrase) push(phrase, (from) => wordStart(lower, phrase, from));
+  wanted.forEach((t, i) => push((from) => termAt(lower, wanted, i, from), (at) => termEnd(lower, t, at)));
+  if (phrase) push((from) => wordStart(lower, phrase, from), (at) => at + phrase.length);
   if (spans.length === 0) return [{ text, hit: false }];
   spans.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
   const merged: Array<[number, number]> = [];

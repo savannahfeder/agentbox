@@ -32,7 +32,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { DEMO_ACCOUNT, DEMO_DOCS, DEMO_ENV, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, demoLedgerLines } from '../shared/demo-world.mts';
+import { DEMO_ACCOUNT, DEMO_AI_TEAMMATE, DEMO_DOCS, DEMO_ENV, DEMO_ME, DEMO_PRODUCTS, DEMO_TEAM, demoLedgerLines, demoTeammateChat } from '../shared/demo-world.mts';
+import { DEFAULT_LIMIT } from '../shared/teammates.mts';
+import { dateKey, periodKey } from '../shared/repeats.mts';
+import { teamDir, writeChat, writeTeammate } from './store/teammates-files.mts';
 import { writeSeededAt } from './demo-team.mts';
 import { prepareHome } from '../shared/fresh-user-home.mts';
 import { relaunchCommand } from './fresh-user.mts';
@@ -177,9 +180,31 @@ export function seedDemoStore(home: string, { now = Date.now() }: { now?: number
     const ids = new Set((ledgers[product.slug] ?? []).map((line) => line.id));
     written.push({ slug: product.slug, dir, machinery, rows: ids.size });
   }
+  seedDemoTeammate(demoPaths(home).storeRoot, now);
   writeSeededAt(home, now);
 
   return { accountRoot, appHome, products: written };
+}
+
+/**
+ * The AI teammate, as `Teammates.create` writes one, and what it said in the
+ * team chat. Its rounds wait two days, so it does not wake and start an agent
+ * while the demo is on a screen; your words to it still reach it at once.
+ */
+function seedDemoTeammate(storeRoot: string, now: number) {
+  const dir = teamDir(storeRoot, DEMO_ACCOUNT);
+  const t = DEMO_AI_TEAMMATE;
+  const made = now - 6 * 86_400_000;
+  writeTeammate(dir, t.id, {
+    name: t.name, letter: t.name[0], role: t.role, job: t.job, goal: t.goal, counted: t.counted, asksFirst: t.asksFirst,
+    works: t.works, product: t.product, engine: 'claude', model: null, effort: null, limit: DEFAULT_LIMIT,
+    status: 'active', starter: t.starter, voice: t.voice, createdAt: made, paused: false, firstRun: 'served',
+    served: periodKey(t.works, now) ?? '', pausedUntil: dateKey(now + 2 * 86_400_000),
+  }, made);
+  writeChat(dir, { kind: 'act', from: t.id, verb: 'started', ts: made + 60_000 }, made + 60_000);
+  for (const line of demoTeammateChat(now)) {
+    writeChat(dir, { kind: 'msg', from: t.id, to: [], text: line.text, ...(line.run ? { run: line.run } : {}), ts: line.at }, line.at);
+  }
 }
 
 /**

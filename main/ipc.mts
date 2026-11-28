@@ -91,6 +91,8 @@ import { machineryPath } from './store/home.mts';
 import { EVENT_NAMES } from '../shared/analytics-events.mts';
 import { appFinder } from './everything-found.mts';
 import { openedOf } from '../shared/opened-lately.mts';
+import { askSmallModel } from './row-label.mts';
+import { findByDescription, FIND_BUDGET_MS, type FindCandidate } from '../shared/find-by-description.mts';
 import { appFilesPlace } from './files-place.mts';
 import { Name } from '../shared/product-name.mjs';
 import { ghToken, setUpGit, startGhLogin } from './github-browser-sign-in.mts';
@@ -210,8 +212,6 @@ export interface IpcDeps<W extends IpcWindow = IpcWindow> {
   froze?: FreezeCounter | null;
   /** The live relay's address, null when this cloud has none. */
   liveAt?: string | null;
-  /** Turns the window's glass on or off when the Alpha switch flips. */
-  glass?: (on: boolean) => void;
   /** The apps that can open a file (main/open-with.mts). */
   listApps?: (file: string) => Promise<AppThatOpens[]>;
 }
@@ -310,7 +310,7 @@ const TEAMMATE_OPS = new Set(['create', 'describe', 'start', 'update', 'stop', '
 const ROOM_OPS = new Set(['refresh', 'send', 'markRead', 'markDone', 'undoDone', 'later', 'markUnread', 'react', 'decide','edit', 'deleteMessage', 'putFile', 'putFileFrom', 'file', 'fileOnDisk', 'fileText', 'markFile', 'older', 'saveProfile', 'goInvisible', 'comeBack', 'link', 'revokeLink', 'preview', 'listed', 'invitesSent', 'joinByLink', 'joinListed', 'acceptInvite', 'invite', 'create', 'rename', 'leave', 'remove', 'pin', 'mute'] as const);
 type RoomOp = typeof ROOM_OPS extends Set<infer O> ? O : never;
 
-export function registerIpc<W extends IpcWindow>({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, froze = null, liveAt = null, glass = () => {}, listApps = (file) => appsThatOpen(file) }: IpcDeps<W>) {
+export function registerIpc<W extends IpcWindow>({ store, supervisor, config, window, analytics = NO_ANALYTICS, docGrants = null, updater = NO_UPDATER, host, team = null, connections = null, copies = null, onCount = () => {}, froze = null, liveAt = null, listApps = (file) => appsThatOpen(file) }: IpcDeps<W>) {
   // The three Electron things, or a plain Node stand-in for them. There is no
   // default: a caller that forgets says so here rather than throwing eighty
   // lines further down on `ipcMain.handle` of undefined.
@@ -528,7 +528,10 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     },
   });
 
-  ipcMain.handle('zero:refresh-usage', async (event, { engine = DEFAULT_ENGINE, ask = false }: { engine?: string; ask?: boolean } = {}) => {
+  // The cloud's look at the same account can be the newer reading after a reset.
+  supervisor.onCloudReading = (profile, reading) => usage.adopt({ ...reading, profile });
+
+  ipcMain.handle('zero:refresh-usage',async (event, { engine = DEFAULT_ENGINE, ask = false }: { engine?: string; ask?: boolean } = {}) => {
     if (event.senderFrame?.parent || (event.sender && event.sender !== window.webContents)) throw Error('Usage refresh is only available in the main app window.');
     // Codex asks OpenAI only when the person pressed Refresh (`ask`); opening
     // the page reads what this computer already has.
@@ -779,7 +782,6 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       // title-free activity of their private work. Null on a build with no
       // team cloud, which is the single-person app.
       team: team ? teamForWindow(team.state(), alpha.multiplayer) : null,
-      // Which alpha features are on (Settings, Alpha features).
       alpha,
       // TEAMMATES: who they are, what each is on, and the one team chat.
       teammates: alpha.teammates ? (() => { try { return store.teammatesView(items, now); } catch (err) { return { list: [], chat: [], runs: [], error: (err as Error).message }; } })() : null,
@@ -1310,7 +1312,7 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     const mates = store.teammates;
     if (!mates) return { ok: false, error: 'Teammates need a store.' };
     if (!TEAMMATE_OPS.has(op as string)) return { ok: false, error: `no teammates call named ${op}` };
-    if (!alphaFeatures(config).teammates) return { ok: false, error: 'Teammates are an alpha feature. Turn them on in Settings, Alpha features.' };
+    if (!alphaFeatures(config).teammates) return { ok: false, error: 'AI teammates are turned off. Turn them on in Settings, General.' };
     try {
       const a = (args && typeof args === 'object' ? args : {}) as TeammateArgs;
       const kill = (id: string) => supervisor.stopSession(id);
@@ -2569,10 +2571,8 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
       // Before the save: once the switch is off, nothing leaves, not even this.
       if (countsTurnedOff(payload)) { analytics.track('counts_turned_off'); analytics.flush(); }
       setWorkspaceSetting({ config, supervisor, store }, payload ?? {});
-      if (payload?.key === 'alphaRooms' || payload?.key === 'alphaMultiplayer') team?.rooms?.tick().catch(() => {});
       if (cornerTagTurnedOff(payload)) analytics.track('tag_turned_off');
       if (payload?.key === 'filesInCloud' || payload?.key === 'filesOffAfterDays') filesPlaceNow().considerNow();
-      if (payload?.key === 'alphaGlass') glass(alphaFeatures(config).glass);
       push();
       return { ok: true, ...readSettings({ config, supervisor, store, onTeam: onTeamNow }) };
     } catch (err) {
@@ -2799,6 +2799,20 @@ export function registerIpc<W extends IpcWindow>({ store, supervisor, config, wi
     catch (err) { return { ok: false, error: String((err as Error)?.message ?? err), lines: [], files: [], comments: [], total: { lines: 0, files: 0, comments: 0 }, threads: [] }; }
   });
   ipcMain.handle('zero:warm-find-in-threads', () => { finderNow().warm().catch(() => {}); return true; });
+  // A thread found from a description, by a small model on an account with room.
+  // A project tied to one account never goes in the prompt: the walk across
+  // accounts would show its threads to another (`_askSmall`).
+  ipcMain.handle('zero:find-by-description', async (_e, { description, candidates }: { description?: unknown; candidates?: unknown } = {}) => {
+    const all = (Array.isArray(candidates) ? candidates : []).filter((c): c is FindCandidate => !!c && typeof c.key === 'string' && typeof c.product === 'string')
+      .filter((c) => !supervisor._projectProfile(c.product));
+    const until = Date.now() + FIND_BUDGET_MS;
+    const ask = (prompt: string) => supervisor._askSmall((opts) => {
+      const left = until - Date.now();
+      return left < 2000 ? '' : askSmallModel(prompt, (t) => t.trim(), { ...opts, timeoutMs: left });
+    });
+    try { return await findByDescription({ description: String(description ?? '').slice(0, 400), candidates: all, ask, outOfTime: () => until - Date.now() < 2000 }); }
+    catch (err) { return { ok: false, error: String((err as Error)?.message ?? err) }; }
+  });
   const cloudHome = () => ({ home: supervisor.config.home || os.homedir() });
   let keeperMade: FilesKeeper | null = null;
   const keeperNow = (): FilesKeeper | null => (!config.accountRoot ? null : keeperMade ??= filesKeeper({
