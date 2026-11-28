@@ -26,6 +26,8 @@ export function boxPickedIn(root: { contains(node: never): boolean } | null, el:
 
 /** The comment key in code editors. A lone letter would replace the words selected in a document you can edit. */
 export const COMMENT_CHORD = '⌘/';
+/** Copy is the system's own key; the bar only says it. */
+export const COPY_CHORD = '⌘C';
 
 type Press = { code?: string; key?: string; metaKey?: boolean; ctrlKey?: boolean; altKey?: boolean; shiftKey?: boolean };
 
