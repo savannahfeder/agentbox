@@ -127,7 +127,8 @@ describe('the running recorder', () => {
     expect(names).not.toContain(CPU_ASK);
     expect(lines).toHaveLength(1);
     expect(lines[0].under.fn).toMatch(/ busy\.mjs:\d+$/);
-    expect(lines[0].under.share).toBeGreaterThan(0.5);
+    // Loading the recorder's own modules is busy time too, and on a loaded GitHub Mac it reached half.
+    expect(lines[0].under.share).toBeGreaterThan(0.3);
     expect(lines[0].under.calls.length).toBeGreaterThan(0);
   }, 40_000);
 
