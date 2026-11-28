@@ -1,8 +1,7 @@
 import { previewFocus } from './preview-focus';
 import { picturesNamedIn, warmPictures } from './components/FittedImg';
 import { PhoneStatus } from './components/PhoneStatus';
-import { sidebarFolded, toggleSidebarShrinks, useSidebarShrinks } from './sidebar-shrinks';
-import { GlassBand } from './components/GlassBand';
+import { pressKeepOpen, sidebarFolded, useSidebarShrinks } from './sidebar-shrinks';
 import { cloudChord, cloudOffAsks, cloudToggleNote, cloudToggleTarget, threadPlace } from './cloud-menu';
 import { usePhoneBack, onCloudPhone, onPhone } from './phone-screen';
 import { holdsReplies, writeHeldWhenHidden } from './phone-holds';
@@ -63,6 +62,7 @@ import { keyOnAnOpenThread, keyOnTheList, rowKey as actsOnARow, replyingTo, scre
 import { chosenNames, whoSees } from './threads/summary-rules';
 import { shownToPeople } from '../../shared/thread-cards.mts';
 import { SEEN_SENT } from '../../shared/phone-settings.mts';
+import { takenBack } from '../../shared/work-items.mts';
 import { choose, copyText, openTo, seenNow, sentWords, sharedThreadOfDoc, threadLink, type ShareActs } from './threads/share-rules';
 
 const SHARE_LAST = 'agentbox:share-last';
@@ -70,7 +70,7 @@ import { changePathFor } from './code-artifact';
 import { teamRouteChoices } from './team/TeamFocus';
 import { AskSentLine, AsksChip, UnderTheAsk } from './team/AsksLine';
 import { AskBar } from './team/AskBar';
-import { askIGave, askIsOpen, askOf, askOnMe, asksOnThread, handedBackBy, newestAskPerThread, sentAwayByMe, withoutAskLead } from '../../shared/thread-asks.mts';
+import { askIGave, askIsOpen, askOf, askOnMe, asksOnThread, handBackWaits, handedBackBy, newestAskPerThread, sentAwayByMe, withoutAskLead } from '../../shared/thread-asks.mts';
 import { ASK_PERSON_EVENT, HAND_BACK_EVENT, SEE_SAID, askAnswers, byWorkHere, giveRows, threadCommands, type GiveTo, type ThreadCommand } from './thread-commands';
 import { NewProject } from './components/NewProject';
 import { shortFolder } from './project-folder';
@@ -108,7 +108,7 @@ import { approvalAnswered, approvalAsker, approvalView, KEY_CARD_TOOL } from './
 import { sentLine, sendingLine } from './compose-says';
 import { wearJustMade, type JustMade } from './just-made';
 import { newToDraw, useKeptSet, type Drawn } from './shown-snapshot';
-import { agentOnOrComing, askPutOff, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
+import { agentOnOrComing, askPutOff, asideBesides, belongsInInbox, belongsInProgress, belongsOnTheRail, byRunningOrder, clipToSentence, closedByThem, commentsWaitOnYou, deferredUntil,heldRowStarts, hiddenUntil, inLaterByThem, inProgressTab, isProposal, notStarted, parkedByAgent, putOffInLater, waitCameBack, replyClearsSchedule, replyKeyWorksIn, rowTitle, statusForReply, stillAsksYou, stoppable, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd, withdrawReply } from './list-rules';
 import { filedByThePerson, heldForHer, laterHerWordLifts, wordWaits } from '../../shared/answers.mts';
 import { agentKey, agentLayout, agentRow, agentRowId, asksSomething, byRecency, choicesArePressed, listed as agentIsListed, onTheRail, putAway, railLine, reachesInbox, progressAfterReply, replyIsSwallowed, replyReaches, whereItRuns } from '../../shared/agents.mts';
 import { focusAtEnd, focusTheReplyBox } from './focus-at-end';
@@ -276,7 +276,7 @@ import { mentionRows } from './team/rooms/room-rules';
 import { notMarkedDone, useChatsMarkedDone } from './team/rooms/chats-marked-done';
 import { SAYS_UNDO, handedToWhom, othersIn, sendingTo, sentToWhom, toastTitle, oIsTheToasts, oWaitsFor, oWaitsForTheSend, opensTheLastToast, opensTheToast, saysWhereItWent, toastOpens, toastParts, type LastToast, type OWaits, type ToastGoes } from './toast-parts';
 import { SentLine } from './components/SentLine';
-import { BROUGHT_IN, OUTSIDE_SAID } from './outside-agents';
+import { BROUGHT_IN, OUTSIDE_SAID, canMoveIn } from './outside-agents';
 import { movedLabel, movedSessions } from '../../shared/bring-in.mts';
 import { TickedBar } from './components/TickedBar';
 import { AgentSending } from './team/AgentSending';
@@ -285,6 +285,7 @@ import { homeNeedsRows } from './home/home-needs';
 import { needsYouList, openNeedsEntry } from './threads/needs-you-list';
 import { SkyBackdrop } from './home/SkyBackdrop';
 import { InboxSky } from './home/InboxSky';
+import { EmptyScene } from './home/EmptyScene';
 import { SKY_THEME_KEY, setHomeSetting, useDarkWindow, useHomeSettings } from './home/home-settings';
 import { setupLook } from './setup-split';
 import { startProTrial } from './pro-trial';
@@ -1004,6 +1005,7 @@ export default function App() {
   // The sidebar is narrow and wide only while pointed at; nothing pins it open.
   const [railOpen, setRailOpen] = useState(false);
   const sidebarShrinks = useSidebarShrinks();
+  const keepOpenPressed = () => pressKeepOpen(() => setRailOpen(false));
   // Resolved once at mount and applied before the first paint below, so the
   // window never flashes the other theme on the way in.
   // IT HOLDS THE PICK, NOT THE COLOUR. `match` is one of the three things this
@@ -1862,6 +1864,8 @@ export default function App() {
     if (commentsWaitOnYou(i, seenAt[i.id] ?? unreadSince)) return true;
     if (i.linkComments?.length) return true;
     if (fileNewsFor(i, team?.me ?? null, { myName }).length) return true;
+    // A teammate's hand-back waits for you while the run is still open, as in the rule.
+    if (i.status !== 'done' && handBackWaits(i)) return true;
     // An agent is working on it right now: In progress, whatever it says
     // (`live` in list-rules, w-bc976fd247). Ahead of every branch here,
     // the team ones included, because none of them can see a session.
@@ -2039,7 +2043,7 @@ export default function App() {
       if (askedOut.has(i.id) && i.status !== 'done') return true;
       if (handedOut.has(i.id)) return true;
       const deferredUntil = dueAt(i);
-      if (hiddenAt(i) > listNow && !liveIds.has(i.id)) return false;
+      if (hiddenAt(i) > listNow && (!liveIds.has(i.id) || inLaterByThem(i, hiddenAt(i), listNow))) return false;
       // The grace window: the write waits for Z, the signal must not, because a
       // sent thing still sitting in the inbox reads as not sent. A deferred row
       // is the exception, and it has somewhere to be: Scheduled.
@@ -2120,7 +2124,7 @@ export default function App() {
   // In progress until it does (w-bc976fd247).
   const done = useMemo(() => {
     const needsYou = new Set(inbox.map((i) => i.id));
-    return newestAskPerThread(items.filter((i) => !needsYou.has(i.id) && !liveIds.has(i.id) && !shippingIds.has(i.id) && i.status === 'done' && !sentAwayByMe(i, team?.me ?? null) && !handedOut.has(i.id)), items)
+    return newestAskPerThread(items.filter((i) => !needsYou.has(i.id) && (!liveIds.has(i.id) || closedByThem(i)) && !shippingIds.has(i.id) && i.status === 'done' && !sentAwayByMe(i, team?.me ?? null) && !handedOut.has(i.id)), items)
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }, [items, inbox, liveIds, shippingIds, team?.me, handedOut]);
 
@@ -2459,14 +2463,6 @@ export default function App() {
     if (sky?.dark) root.dataset.skyDark = ''; else delete root.dataset.skyDark;
     if (sky?.frame) { root.dataset.skyFrame = sky.id; root.style.setProperty('--sky-frame', sky.frame); }
     else { delete root.dataset.skyFrame; root.style.removeProperty('--sky-frame'); }  }, [sky]);
-  // GLASS (Alpha features): only a window main/window-glass.mts can blur behind goes see-through.
-  const glassOn = !!snap?.alpha?.glass && !onPhone();
-  useEffect(() => {
-    const root = document.documentElement;
-    if (glassOn && 'glassAble' in root.dataset) root.dataset.glass = '';
-    else delete root.dataset.glass;
-    window.zero?.glassTone?.({ tone: glassOn && 'glassAble' in document.documentElement.dataset && theme !== 'match' ? theme : 'system' });
-  }, [glassOn, theme]);
   const [connectionsPage, setConnectionsPage] = useState<{ focus: string | null } | null>(null);
   const sharedFileNews = snap?.team?.sharedFileNews ?? [];
   const theirRows = useMemo(
@@ -3754,15 +3750,16 @@ export default function App() {
     showToast(pin ? 'Pinned to the top of your list' : 'Unpinned');
   };
   // The thread a session was just brought in as, opened the moment it is in the list.
-  const [movedIn, setMovedIn] = useState<{ product: string; id: string; reply: boolean } | null>(null);
+  const [movedIn, setMovedIn] = useState<{ product: string; id: string; reply: boolean; send?: string } | null>(null);
   // R on one of those sessions is its Continue in Agentbox, and lands in the reply box.
-  const bringIn = useCallback(async (item: WorkItem, { reply = false } = {}) => {
+  // `send`: a command typed to the session, which its terminal cannot run, sent once it is here.
+  const bringIn = useCallback(async (item: WorkItem, { reply = false, send }: { reply?: boolean; send?: string } = {}) => {
     const agent = item.agent;
     if (!agent) return;
     const r = await api.bringInSession({ pid: agent.pid, engine: agent.engine, sessionId: agent.sessionId });
-    if (!r.ok) { showToast(r.reason); return; }
+    if (!r.ok) { showToast(send ? `${r.reason} Your message was not sent.` : r.reason); return; }
     showToast(BROUGHT_IN);
-    setMovedIn({ product: r.product, id: r.id, reply });
+    setMovedIn({ product: r.product, id: r.id, reply, send });
   }, [showToast]);
   useEffect(() => {
     if (!movedIn) return;
@@ -3771,7 +3768,8 @@ export default function App() {
     setMovedIn(null);
     setFocused(it);
     markSeen(it);
-    if (movedIn.reply) setModal('reply');
+    if (movedIn.send) void answerWithRef.current?.(it, movedIn.send);
+    else if (movedIn.reply) setModal('reply');
   }, [snap, movedIn, markSeen]);
   // From one of those sessions' ⋯, the inbox's View and filters, or ⌘K. The
   // filters menu shows the list change under it, so it raises no toast.
@@ -4383,7 +4381,7 @@ export default function App() {
   useEffect(() => {
     const token = joinWaiting.current;
     if (!token || !snap) return;
-    if (!roomsUi.live) { if (snap.alpha?.rooms === false || !snap.team?.signedIn) { joinWaiting.current = null; showToast('Turn on Rooms in Settings, Alpha features, to join a room'); } return; }
+    if (!roomsUi.live) { if (snap.alpha?.rooms === false || !snap.team?.signedIn) { joinWaiting.current = null; showToast(snap.team?.signedIn ? 'Join a team to open this room' : 'Sign in to join this room'); } return; }
     joinWaiting.current = null;
     void roomsUi.join(token);
   }, [joinTick, roomsUi.live, snap, showToast]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -4835,7 +4833,7 @@ export default function App() {
     // Claimed is deliberately left alone: a worker is on it right now, and it
     // reads her reply when it exits (deliverMidflightReply). Reopening would
     // put a second worker on the same item.
-    const status = statusForReply(item.status);
+    const status = statusForReply(item.status, takenBack(item));
     // A REPLY SET FOR LATER (w-54cdf7c768) is written now with the row set for
     // its time, so nothing hands it to an agent before then.
     const later = (runAt ?? 0) > Date.now();
@@ -5295,7 +5293,7 @@ export default function App() {
     // which meant a pick was only ever offered on a row still open. Options
     // now come off the result too (format.ts), so a finished row can offer one,
     // and this is the half of the reply path it was missing.
-    const status = statusForReply(item.status);
+    const status = statusForReply(item.status, takenBack(item));
     // The option in the words the thread drew it with when it was picked.
     const undid = [{ product: item.product, id: item.id, words: 'Undid picking', choice: option.text.replace(/\s*\(recommended\)\s*$/i, '').trim() }];
     // On the thread at once, as a typed reply is (w-388be0a968).
@@ -6005,7 +6003,7 @@ export default function App() {
         setModal((m) => (m === 'palette' ? null : 'palette'));
         return;
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === '\\' && !onPhone()) { e.preventDefault(); toggleSidebarShrinks(); return; }
+      if ((e.metaKey || e.ctrlKey) && e.key === '\\' && !onPhone()) { e.preventDefault(); keepOpenPressed(); return; }
       const toastsO = oIsTheToasts(e.key, toast, sentAt.current, Date.now(), lastToast.current);
       // A ROOM OWNS THE KEYBOARD WHILE IT IS OPEN, as Settings does: the list
       // behind it is not on the screen. Escape goes back to the threads and
@@ -7526,8 +7524,6 @@ export default function App() {
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
   const goHome = () => { openView('inbox'); setHomeOpen(true); };
   const inboxCount = inboxBadge({ rows: shownCount(inbox), leads: leadCount, fileNews: sharedFileNews.length, follows: followingNews.length });
-  const inboxHere = !homeShown && view === 'inbox' && search === null && !settingsOpen && !teamShown && !focused && !focusedRepeat
-    && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown;
   const engineFacts = { running: snap?.supervisor?.running, engines: snap?.engines };
   // The sidebar's Recent, which a phone has no sidebar to draw in. A chat with
   // a person is named for them and opens as their chat; a chat this window
@@ -7607,8 +7603,11 @@ export default function App() {
       follow: (n, card) => { changeFollows((was) => markTold(was, n)); openTeammateCard(card); },
     });
   };
-  const skyOnInbox = wearsInboxSky(sky) && !homeShown && (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
+  const inboxPageUp = (['inbox', 'progress', 'snoozed', 'done'] as string[]).includes(view) && !onPhone() && search === null && !settingsOpen && !teamShown && !focusedRepeat && !focused
     && !teammatesShown && !roomShown && !filesShown && !connectionsShown && !chatsPlaceShown && !evPick;
+  const skyOnInbox = wearsInboxSky(sky) && !homeShown && inboxPageUp;
+  // The light mountains have no strip over the list, so only the empty page wears them.
+  const mountainsOnEmpty = !!sky?.art.mountains && !skyOnInbox && !homeShown && inboxPageUp;
   // Team and Files wear the same sky over their header.
   const skyOnPlace = wearsInboxSky(sky) && !onPhone() && (chatsPlaceShown || filesShown);
   // A place is the whole page under the tabs; on the one-list home there are no cards.
@@ -7848,7 +7847,7 @@ export default function App() {
       <WorkspaceNavigation
         onPalette={() => setModal('palette')}
         recent={recentRows}
-        keptOpen={!sidebarShrinks} onKeepOpen={toggleSidebarShrinks}
+        keptOpen={!sidebarShrinks} onKeepOpen={keepOpenPressed}
         update={announcesUpdate(snap?.update, { closed: '' }) ? { installing: !!snap?.update?.installing, version: snap?.update?.newVersion, changes: snap?.update?.changes, behind: snap?.update?.behind, error: snap?.update?.error } : null}
         onUpdate={() => { void api.updateInstall(); }}
         /* AND THE COPY THAT CANNOT UPDATE ITSELF FROM WHERE IT IS
@@ -7888,8 +7887,6 @@ export default function App() {
       {fullScreenDoc && (
         <div className="chrome-reach" style={{ width: CHROME_REACH.width, height: CHROME_REACH.height }} aria-hidden="true" />
       )}
-      {glassOn && <GlassBand homeHere={homeShown} inboxHere={inboxHere} inboxCount={inboxCount}
-        onHome={homeOn ? goHome : undefined} onInbox={() => openView('inbox')} onSearch={openSearch} onCompose={() => setModal('compose')} />}
       <header className="topbar">
         {backForward}
         {/* THE TAB KEY IS THE ONE SHORTCUT THE APP NEVER TOLD ANYONE ABOUT
@@ -8344,7 +8341,12 @@ export default function App() {
                     // row there is no ledger to answer; the text is handed to
                     // the running session itself, and the toast says what came
                     // back rather than assuming it landed.
-                    if (focused.agent) { replyToAgent(focused, text); return; }
+                    if (focused.agent) {
+                      // A reply to a Claude Code terminal session moves it in and runs here.
+                      if (canMoveIn(focused.agent)) void bringIn(focused, { send: text });
+                      else replyToAgent(focused, text);
+                      return;
+                    }
                     // A schedule set on a reply, by the control or by the
                     // words. Applying the rule instead of delivering them would
                     // be the system swallowing something the user wrote, which is the
@@ -8451,7 +8453,7 @@ export default function App() {
                     // "Nothing needs you" is about you alone; with a teammate
                     // on the page the quiet line says it instead.
                     : view === 'inbox' && !withOthers
-                      ? <InboxClear slot={setClearSlot} first={firstTask(tour)} sky={skyOnInbox && sky ? sky.art : null} />
+                      ? <><InboxClear slot={setClearSlot} first={firstTask(tour)} sky={skyOnInbox && sky ? sky.art : null} />{mountainsOnEmpty && sky && <EmptyScene art={sky.home ?? sky.art} />}</>
                       : <EmptyTab view={view} starting={justSent} waiting={needsYouCount.inbox} />
                 ) : <List
                   lead={view === 'inbox' && search === null && (leadCount || sharedFileNews.length || followingNews.length)

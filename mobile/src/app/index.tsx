@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { backWords, emptyTabWords, readDisplay, rowPriorityId, writeDisplay, filteredEmptyWords, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { InboxComposer } from '../ui/NewThreadForm';
-import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, shownTabs, TAB_GAP, TABS, tabsScale, tabsTighten, type Row, type TabId } from '../lib/tabs';
+import { closeWords, COUNT_GAP, filterCount, moreToTheRight, phoneBoard, repeatsKept, shownTabs, TAB_GAP, TABS, tabsScale, tabsTighten, type Row, type TabId } from '../lib/tabs';
 import { evViewOf, keepEvView, myItems, type EvView } from '../lib/everything';
 import { agentChoices, type Harness } from '../lib/agent-filter';
 import { EverythingPlace } from '../ui/Everything';
@@ -22,6 +22,7 @@ import { ChatsPlace, TeammateMark, teammatesWaiting } from '../ui/Teammates';
 import { Face } from '../ui/Groups';
 import { mentionRows } from '../../../renderer/src/team/rooms/room-rules';
 import { mateOf, questionThread, questionsForYou } from '../lib/teammates';
+import { mentionRowWords } from '../lib/mention-row';
 import type { RoomMention as MentionRowData, Teammate, WorkItem } from '../../../renderer/src/types';
 import { appStore } from '../platform/persist';
 import { useCloud } from '../state/cloud';
@@ -74,7 +75,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
           {row.title}{aside ? <Text style={{ color: color.faint }}>{`  ${aside}`}</Text> : null}
         </T>
         {/* Pinned, faint after the title as the desktop draws it (pages.css `.th-pin`); a closed thread keeps no pin. */}
-        {row.item?.pinned && row.item.status !== 'done' && <View accessibilityLabel="Pinned" style={{ marginLeft: 8 }}><Pin /></View>}
+        {row.item?.pinned && row.item.status !== 'done' && <View accessibilityLabel="Pinned" style={{ marginLeft: 8 }}><Pin filled tint={color.dim} /></View>}
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
         {/* Sent from the phone and not yet taken: the web app's status word (status-word.ts). */}
@@ -93,6 +94,7 @@ function ThreadRow({ row, first, unread, mate }: { row: Row; first: boolean; unr
 /** A message in a group that names you, at the top of Needs you until you read the group past it (team/rooms/MentionRows.tsx). */
 function MentionRow({ m, first, now, open }: { m: MentionRowData; first: boolean; now: number; open: () => void }) {
   const small = { fontSize: 11, lineHeight: 20, color: color.faint };
+  const words = mentionRowWords(m);
   return (
     <Pressable onPress={open} accessibilityLabel={`${m.byName || 'Someone'} mentioned you in ${m.roomName}, unread`}
       style={({ pressed }) => ({ minHeight: 64, paddingTop: 14, paddingBottom: 14, paddingLeft: size.inset, paddingRight: 12, backgroundColor: pressed ? color.fill : 'transparent' })}>
@@ -101,8 +103,8 @@ function MentionRow({ m, first, now, open }: { m: MentionRowData; first: boolean
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         <Face name={m.byName || 'Someone'} size={20} />
         <T numberOfLines={2} style={{ flexShrink: 1, fontSize: 16, lineHeight: 21.6, letterSpacing: -0.16 }}>
-          <Text style={{ fontFamily: font.medium }}>{`${m.byName || 'Someone'}  `}</Text>
-          <Text style={{ color: color.dim }}>{m.body}</Text>
+          <Text style={{ fontFamily: font.medium }}>{`${words.who}  `}</Text>
+          <Text style={{ color: color.dim }}>{words.says}</Text>
         </T>
       </View>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 8 }}>
@@ -250,12 +252,12 @@ function FilteredEmpty({ tab, hidden, clear }: { tab: TabId; hidden: number; cle
 }
 
 /** The board: a column a swipe, each scrolling on its own (phone.css `.th-board`). */
-function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phoneBoard>; foot: number; inset?: number }) {
+function Board({ columns, repeats, foot, inset = 12 }: { columns: ReturnType<typeof phoneBoard>; repeats: PhoneRepeat[]; foot: number; inset?: number }) {
   const { width } = useWindowDimensions();
   const c0 = useCloud();
   const room = c0.approvalRoom;
   // Later's column leads with the repeating tasks, as the Later list does.
-  const repeatsIn = (state: string) => (state === 'scheduled' ? c0.repeats : []);
+  const repeatsIn = (state: string) => (state === 'scheduled' ? repeats : []);
   const col = Math.round((width - inset * 2) * 0.86);
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} snapToInterval={col + 12} decelerationRate="fast"
@@ -284,9 +286,12 @@ function Board({ columns, foot, inset = 12 }: { columns: ReturnType<typeof phone
           {c.rows.map((e) => (
             <Pressable key={e.key} onPress={() => e.item && open(e.item.product, e.item.id)}
               style={({ pressed }) => ({ marginBottom: 10, paddingTop: 14, paddingHorizontal: 15, paddingBottom: 13, borderWidth: 1, borderRadius: corner.small, borderColor: color.line, backgroundColor: pressed ? color.picked : color.fill })}>
-              <T numberOfLines={3} style={{ fontSize: 14, lineHeight: 20, marginBottom: 14 }}>{e.title}</T>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 14 }}>
+                <T numberOfLines={3} style={{ flexShrink: 1, fontSize: 14, lineHeight: 20 }}>{e.title}</T>
+                {e.item?.pinned && e.item.status !== 'done' && <View accessibilityLabel="Pinned" style={{ marginLeft: 8, marginTop: 3 }}><Pin filled tint={color.dim} /></View>}
+              </View>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {e.queued ? <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
+                {e.wait ? <T numberOfLines={1} style={{ flexShrink: 1, fontSize: 11, color: color.dim, marginRight: 8 }}>{e.wait}</T> : e.queued ? <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>Queued</T> : e.live && <View style={{ marginRight: 8 }}><RunningMark /></View>}
                 {rowPriorityId(e.priority) && <View style={{ marginRight: 8 }}><PriorityBars level={barsFor(e.priority!)} /></View>}
                 {e.agent && <T style={{ fontSize: 11, color: color.dim, marginRight: 8 }}>{e.agent}</T>}
                 <T numberOfLines={1} style={{ flexShrink: 1, fontFamily: font.mono, fontSize: 11, letterSpacing: 0.55, textTransform: 'uppercase', color: color.faint }}>{e.project}</T>
@@ -376,8 +381,9 @@ export default function Threads() {
     .map((q) => ({ ...q, thread: questionThread(q.question, c.view.items) }))
     .filter((q) => !q.thread || !inNeedsYou.has(`${q.thread.product}/${q.thread.id}`));
   const openMention = (m: MentionRowData) => openGroup(m.roomId);
-  const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + c.repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0), files: 0 };
-  const repeatsShown = tab === 'snoozed' && c.repeats.length > 0;
+  const repeats = repeatsKept(c.repeats, display);
+  const counts = { inbox: shown.rows.inbox.length + mentions.length + asks.length, progress: shown.rows.progress.length, snoozed: shown.rows.snoozed.length + repeats.length, done: shown.rows.done.length, everything: 0, chats: teammatesWaiting(c) + (groups.on ? groups.unread : 0), files: 0 };
+  const repeatsShown = tab === 'snoozed' && repeats.length > 0;
   const mentionsShown = tab === 'inbox' && (mentions.length > 0 || asks.length > 0);
   const hidden = shown.whole[tab] - shown.rows[tab].length;
   const foot = footRoom(inset);
@@ -405,8 +411,9 @@ export default function Threads() {
     const wholeBoard = !drawnBoard ? null : onEverything
       ? phoneBoard({ ...c.view, items: myItems(c.view.items) }, c.tabs, unfiltered, c.now).filter((col) => col.state !== 'waiting')
       : phoneBoard(c.view, c.tabs, unfiltered, c.now);
-    const above = mentionsShown ? mentions.length + asks.length : repeatsShown ? c.repeats.length : 0;
-    return filterCount({ rows: shown.rows[tab], whole: c.tabs[tab], mineOnly: onEverything, above, board: drawnBoard, wholeBoard });
+    const above = mentionsShown ? mentions.length + asks.length : repeatsShown ? repeats.length : 0;
+    const aboveWhole = tab === 'snoozed' ? repeatsKept(c.repeats, unfiltered).length : above;
+    return filterCount({ rows: shown.rows[tab], whole: c.tabs[tab], mineOnly: onEverything, above, aboveWhole, board: drawnBoard, wholeBoard });
   };
   // A permission card sits over the corner the pen is in, so the pen moves up to the bar (8fa6c548).
   const penUp = c.view.approvals.length > 0;
@@ -445,7 +452,7 @@ export default function Threads() {
       renderItem={({ item, index }) => <ThreadRow row={item} first={index === 0 && !repeatsShown && !mentionsShown} unread={c.unread(item.item)} mate={mateOf(item.item, c.team)} />}
       refreshControl={<RefreshControl tintColor={color.dim} refreshing={pulling} onRefresh={async () => { setPulling(true); await c.refresh(); setPulling(false); }} />}
       keyboardShouldPersistTaps="handled"
-      ListHeaderComponent={repeatsShown ? <RepeatRows repeats={c.repeats} items={c.view.items} now={c.now} />
+      ListHeaderComponent={repeatsShown ? <RepeatRows repeats={repeats} items={c.view.items} now={c.now} />
         : mentionsShown ? <View>
           {asks.map((q, i) => <QuestionRow key={q.question.id} mate={q.mate} text={q.question.text ?? ''} at={q.question.ts} first={i === 0} now={c.now} open={() => (q.thread ? router.push({ pathname: '/thread/[product]/[id]', params: q.thread }) : router.push({ pathname: '/teammate/[id]', params: { id: q.mate.id } }))} />)}
           {mentions.map((m, i) => <MentionRow key={m.id} m={m} first={i === 0 && !asks.length} now={c.now} open={() => openMention(m)} />)}
@@ -477,8 +484,8 @@ export default function Threads() {
       </>} below={board ? undefined : <Tabs on={onEverything ? 'everything' : tab} counts={counts} pick={setPlace} team={teamMode} />} />
       <StatusNotice message={notice?.message} next={notice?.next} />
       {onEverything
-        ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
-        : board ? <Board columns={board} foot={foot} /> : list}
+        ? <EverythingPlace mine={mineBoard ? <Board columns={mineBoard} repeats={repeats} foot={foot} inset={size.inset} /> : list} mineTabs={mineTabs} row={threadRow} openGroup={openGroup} />
+        : board ? <Board columns={board} repeats={repeats} foot={foot} /> : list}
       {picked && (
         <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingBottom: foot, paddingTop: 8, paddingHorizontal: size.inset, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: color.bg, borderTopWidth: 1, borderTopColor: color.line }}>
           <T style={{ flex: 1, fontSize: 14, color: color.dim }}>{picked.size ? `${picked.size} selected` : 'Tap threads to select them'}</T>

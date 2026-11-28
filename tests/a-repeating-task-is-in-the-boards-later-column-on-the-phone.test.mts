@@ -16,7 +16,9 @@ describe('the board on the phone', () => {
   const board = src.slice(src.indexOf('function Board('), src.indexOf('export default function Threads'));
 
   it("leads Later's column with the repeating tasks", () => {
-    expect(board).toMatch(/const repeatsIn = \(state: string\) => \(state === 'scheduled' \? c0\.repeats : \[\]\)/);
+    // The repeats it is handed are the ones View and filters keep (a-project-filter-on-the-phone-hides-other-projects-repeating-tasks).
+    expect(board).toMatch(/const repeatsIn = \(state: string\) => \(state === 'scheduled' \? repeats : \[\]\)/);
+    expect(src).toMatch(/<Board columns=\{board\} repeats=\{repeats\}/);
     expect(board).toMatch(/repeatsIn\(c\.state\)\.map\(/);
   });
   it('counts them in the column', () => {

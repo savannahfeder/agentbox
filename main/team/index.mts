@@ -357,8 +357,10 @@ export interface TeamServiceOptions {
   /** Where a file's link opens; the phone site when undefined, no links when null. */
   shareSite?: string | null;
   rooms?: TeamRoomsSetup | null;
-  /** Settings › Alpha features › Multiplayer. Off, no thread of this person's is shared. */
+  /** Off, no thread of this person's is shared. The app always passes on (main/settings.mts alphaFeatures). */
   sharing?: () => boolean;
+  /** True once for someone who had switched multiplayer off: what they made until then stays theirs (main/settings.mts multiplayerWasOff). */
+  sharedFromNow?: () => boolean;
   /** Words from someone you asked for help, to your thread's agent, through your own supervisor. */
   tellThread?: TellThread | null;
 }
@@ -396,8 +398,8 @@ const LINK_EDITS_EVERY_MS = 60_000;
 // page can offer that link again rather than a button that does nothing.
 const EMPTY: TeamState = { configured: false, canSignIn: false, started: false, settling: false, signedIn: false, signingIn: null, me: null, team: null, invites: [], sent: [], people: [], cards: [], lastSyncAt: null, error: null };
 
-// With Alpha features › Multiplayer off the window gets the sign-in the phone
-// needs and no team, so it draws the single-person app.
+// With multiplayer off the window gets the sign-in the phone needs and no
+// team, so it draws the single-person app.
 export function teamForWindow(state: TeamState | null | undefined, multiplayer: boolean) {
   if (multiplayer || !state) return state;
   const { rooms, ...rest } = state;
@@ -424,6 +426,7 @@ export function createTeamService({
   // This person's AI teammates, which the team sees on its board.
   ownMates = () => [],
   sharing = () => true,
+  sharedFromNow = () => false,
   tellThread = null,
 }: TeamServiceOptions) {
   // The phone site's address, only an https one, and its code for Settings.
@@ -662,8 +665,10 @@ export function createTeamService({
     const found = remembered === '' ? null : remembered ? teams.find((t) => t.id === remembered) ?? null : teams[0] ?? null;
     const team = found ? (await readTeamInfo(found)) ?? found : null;
     if (team && !remembered && me) kept().setTeam(me, team.id);
-    // The moment sharing starts on this Mac, kept so it never moves later.
-    if (team && me && !kept().getSince(me)) kept().setSince(me, Date.now());
+    // The moment sharing starts on this Mac, kept so it never moves later, but
+    // once for someone who had multiplayer off: a thread from before it with no
+    // word of its own stays theirs.
+    if (team && me && (sharedFromNow() || !kept().getSince(me))) kept().setSince(me, Date.now());
     const people = team ? teamPeopleShown(await backend!.teamPeople(team.id)) : [];
     const cards = team ? await backend!.listCards() : [];
     // An invite lookup that fails (an older cloud, a dropped request) leaves

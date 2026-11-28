@@ -54,7 +54,7 @@ export function webSettingsPages(computer: SettingsRow | null): Set<string> {
   const w = computer?.settings?.workspace;
   if (!w) return new Set(['appearance', 'phone']);
   const codex = (w.engines ?? []).includes('codex') || !!w.codex?.found;
-  return new Set(['general', 'appearance', 'phone', 'alpha', 'claude', ...(codex ? ['codex'] : []), 'running', 'projects']);
+  return new Set(['general', 'appearance', 'phone', 'claude', ...(codex ? ['codex'] : []), 'running', 'projects']);
 }
 
 /**

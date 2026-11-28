@@ -4,6 +4,8 @@
 import { matchesQuery, rankMatches } from '../../../renderer/src/palette-rows';
 import { cloudCommands, type CloudMode } from '../../../renderer/src/cloud-menu';
 import { moveProduct } from '../../../shared/rank.mts';
+import { outsideCommands } from '../../../renderer/src/outside-agents';
+import type { AgentMode } from '../../../renderer/src/types';
 import type { PlaceId } from './groups';
 import type { PhoneLook } from './look';
 import type { Change } from './settings-view';
@@ -23,6 +25,8 @@ export interface ComputerFacts {
   paused: boolean; projects: readonly { slug: string; name: string }[]; order: readonly string[];
   /** Null when the computer is not set up for the cloud. */
   cloud?: { mode: CloudMode; whenOn?: Exclude<CloudMode, 'mac'> } | null;
+  /** When terminal sessions show; none until the computer has said. */
+  outside?: AgentMode;
 }
 
 /** The desktop's ⌘K rows for the computer (renderer/src/components/Palette.tsx), in its words. */
@@ -36,6 +40,9 @@ function computerCommands(c: ComputerFacts): PhoneCommand[] {
       id: i === 0 ? 'cloud-toggle' : `cloud-${r.mode}`, label: r.label.replace('this Mac', 'your computer'),
       ...(r.hint ? { aside: r.hint } : {}),
       keywords: 'cloud where threads run computer overflow everything move on off', act: set('cloudRuns', r.mode), typed: true as const,
+    })) : []),
+    ...(c.outside ? outsideCommands(c.outside).map((r) => ({
+      id: r.id, label: r.label, ...(r.hint ? { aside: r.hint } : {}), keywords: r.keywords, act: set('outsideAgents', r.to), typed: true as const,
     })) : []),
     { id: 'usage', label: 'Usage and limits', aside: 'Settings', keywords: 'usage limit limits left remaining quota accounts week session', act: { push: '/settings/claude' } },
     ...c.projects.map((p, i) => ({

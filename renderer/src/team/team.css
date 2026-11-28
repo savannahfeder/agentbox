@@ -171,6 +171,7 @@ img.tm-av { background: var(--bg-selected); }
 .tm-logo, .th-mark.tm-logo { width: 40px; height: 40px; flex: none; border-radius: var(--radius); object-fit: contain; }
 .th-mark.tm-logo { font-size: 17px; }
 .tm-pic-note { color: var(--text-faint); font-size: 12.5px; }
+.tm-setup .tm-invite-problem { margin: -14px 0 22px; color: var(--text); }
 .tm-handover { margin: 2px 0 12px 38px; padding: 12px 14px 0; border-left: 2px solid var(--line-strong); }
 .tm-handover-q { font-size: 14px; color: var(--text); margin-bottom: 8px; }
 .tm-handover-note { font-size: 12.5px; color: var(--text-faint); margin: 8px 0 12px; }

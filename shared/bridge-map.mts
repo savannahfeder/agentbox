@@ -214,8 +214,6 @@ export const REQUEST_CHANNELS: Readonly<Record<string, string>> = {
   stageAttachmentPart: 'zero:stage-attachment-part',
   crash: 'zero:crash',
   blankCheck: 'zero:blank-check',
-  // The appearance the desktop window's glass is drawn in; a tab has no glass.
-  glassTone: 'zero:glass-tone',
   windowButtons: 'zero:window-buttons',
   track: 'zero:track',
   // How long the window's own thread held (renderer/src/window-holds.ts).

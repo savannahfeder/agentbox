@@ -17,11 +17,11 @@ const account = (extra = {}) => ({ key: 'default', name: 'Not signed in', plan: 
 const acts = (extra = {}) => ({ many: false, now: Date.now(), onUse: vi.fn(), ...extra });
 
 describe('a login that is not signed in', () => {
-  it('the reported case: the chosen login, not signed in, asks to finish signing in and is not In use', () => {
+  it('the reported case: the chosen login, not signed in, says so and is not In use', () => {
     const tile = accountTile(account(), acts());
     expect(tile.inUse).toBe(false);
     const html = draw([tile]);
-    expect(html).toContain('Finish signing in to use it');
+    expect(html).toContain('Not signed in');
     expect(html).not.toContain('In use');
   });
 

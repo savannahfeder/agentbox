@@ -353,7 +353,7 @@ export function Palette({ products, supervisorPaused, itemCommands = [], batch =
       id: 'settings',
       label: 'Settings…',
       hint: 'workspace and every project',
-      keywords: 'settings preferences options usage limits accounts account sign in theme appearance look phone cloud permissions agents rooms groups alpha codex claude',
+      keywords: 'settings preferences options usage limits accounts account sign in theme appearance look phone cloud permissions agents rooms groups codex claude',
       run: onSettings,
     },
     // Opens the Shortcuts page itself, not Settings' front page. The keywords

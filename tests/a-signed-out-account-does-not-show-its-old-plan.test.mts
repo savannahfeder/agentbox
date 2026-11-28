@@ -22,15 +22,14 @@ const draw = (accounts) => renderToStaticMarkup(React.createElement(PlaceTiles, 
 }));
 
 describe('a plan belongs to a signed-in account', () => {
-  it('shows the sign-in instruction instead of a saved plan', () => {
+  it('says Not signed in instead of a saved plan', () => {
     const html = draw([account()]);
     expect(html).toContain('Not signed in');
-    expect(html).toContain('Finish signing in to use it');
     expect(html).not.toContain('Enterprise');
   });
 
-  it('gives the same instruction when there is no saved plan', () => {
-    expect(draw([account({ plan: null })])).toContain('Finish signing in to use it');
+  it('says the same when there is no saved plan', () => {
+    expect(draw([account({ plan: null })])).toContain('Not signed in');
   });
 
   it('keeps the plan on the signed-in row in the reported pair', () => {
@@ -39,7 +38,7 @@ describe('a plan belongs to a signed-in account', () => {
     })]);
     expect(html.match(/Enterprise/g)).toHaveLength(1);
     expect(html).toContain('In use');
-    expect(html).toContain('Finish signing in to use it');
+    expect(html).toContain('Not signed in');
   });
 
   it('does not ask a signed-in account with no plan reading to sign in', () => {

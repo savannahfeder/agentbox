@@ -13,6 +13,7 @@ import { api } from '../api';
 import { Face } from './people';
 import { handoverAsk, handoverOf } from './handover';
 import { inviteWords } from './invite-words';
+import { inviteEach, pastedInvites } from './invite-list';
 import { AskForMultiplayer, NOT_LET_IN } from './ask-for-multiplayer';
 import { StartPro } from './StartPro';
 import { StartTeam } from './StartTeam';
@@ -148,6 +149,9 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  // Said under the box, where the eye is, rather than at the foot of the page.
+  const [inviteProblem, setInviteProblem] = useState<string | null>(null);
+  const inviteEnd = useRef<HTMLDivElement>(null);
   const owner = team.people.find((p) => p.id === me?.id)?.role === 'owner';
   // You first, from the team's own list so your role comes with you.
   const mine = team.people.find((p) => p.id === me?.id) ?? me;
@@ -201,7 +205,7 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
     {out.map((e) => (
       <div key={e} className="tm-person-line tm-invited">
         <Face name={e} />{e}
-        <small>Invited. They join when they sign in with this email.</small>
+        <small>Invited</small>
         <button type="button" className="tm-line-act" onClick={() => {
           // One you invited on this page is not in `sent` until the next sync.
           const by = team.sent?.find((s) => s.email === e)?.invitedBy ?? me?.id;
@@ -223,10 +227,33 @@ function TeamSettings({ team, me, inviteFocus, invited, setInvited, email, setEm
         <span className="tm-leave-ask">{PRO_FOR_INVITES}</span>
         <StartPro hasTeam name={me?.name} className="tm-btn" autoFocus={inviteFocus} />
       </> : <span className="tm-leave-ask">{askOwnerForPro(team.people.find((p) => p.role === 'owner')?.name)}</span>}
-    </div> : <form className="tm-field-row" onSubmit={async (e) => { e.preventDefault(); const sent = email.trim(); if (await run(() => api.teamInvite(sent))) { setEmail(''); setInvited((was) => [...was.filter((x) => x !== sent), sent]); } }}>
-      <input className="tm-input" placeholder="Their email" value={email} autoFocus={inviteFocus} onChange={(e) => setEmail(e.target.value)} />
+    </div> : <form className="tm-field-row" onSubmit={(e) => {
+      e.preventDefault();
+      void run(async () => {
+        const sent = await inviteEach(email, { onTeam: team.people.map((p) => p.email), invited: out }, async (one) => {
+          const got = await api.teamInvite(one);
+          return got.ok ? null : got.error ?? 'That did not work.';
+        });
+        setEmail(sent.left);
+        if (sent.invited.length) setInvited((was) => [...was.filter((x) => !sent.invited.includes(x)), ...sent.invited]);
+        setInviteProblem(sent.problem);
+        return { ok: true };
+      // The invited rows above push the box down; keep it, and what it says, in view.
+      }).then(() => requestAnimationFrame(() => inviteEnd.current?.scrollIntoView({ block: 'nearest' })));
+    }}>
+      <input className="tm-input" placeholder="Their emails" value={email} spellCheck={false} autoFocus={inviteFocus} onChange={(e) => { setEmail(e.target.value); setInviteProblem(null); }}
+        onPaste={(e) => {
+          const lines = pastedInvites(e.clipboardData.getData('text'));
+          if (lines == null) return;
+          e.preventDefault();
+          const box = e.currentTarget;
+          const at = box.selectionStart ?? email.length;
+          setEmail(email.slice(0, at) + lines + email.slice(box.selectionEnd ?? at));
+        }} />
       <button className="tm-btn" disabled={busy || !email.trim()}>Invite</button>
     </form>}
+    {inviteProblem && <p className="tm-invite-problem">{inviteProblem}</p>}
+    <div ref={inviteEnd} />
 
     <div className="tm-section">Leave</div>
     {confirmLeave ? (

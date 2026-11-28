@@ -1,7 +1,7 @@
 // The app: the agent inbox. Electron shell around a keyboard-first renderer, a
 // file-derived store, and a supervisor of headless sessions.
 
-import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, nativeTheme, net, powerMonitor, protocol, screen as electronScreen, shell, session, safeStorage, systemPreferences } from 'electron';
+import { app, BrowserWindow, Menu, Notification, clipboard, crashReporter, dialog, ipcMain, nativeImage, net, powerMonitor, protocol, screen as electronScreen, shell, session, safeStorage, systemPreferences } from 'electron';
 import './no-default-menu.mts';
 import type { ContextMenuParams, MenuItemConstructorOptions, WebContents } from 'electron';
 import * as workItemsDisk from './store/work-items.mts';
@@ -10,7 +10,7 @@ import type { TeamSession } from './team/index.mts';
 import { startConnections } from './connections/start.mts';
 import { roomsSetup } from './team/room-setup.mts';
 import { matesForTheTeam } from './teammate-reach.mts';
-import { alphaFeatures } from './settings.mts';
+import { alphaFeatures, multiplayerWasOff } from './settings.mts';
 import { loadCloudConfig, supabaseSession } from './team/session.mts';
 import { liveAddress } from './team/live-room.mts';
 // MY WORKSPACE IS NOT A TEAM FEATURE ANY MORE (w-f8d123be62), even though it
@@ -60,7 +60,6 @@ import { dataFolderName, isNewUserBuild } from '../shared/side-build.mts';
 import { runningAsAFreshUser } from '../shared/fresh-user-home.mts';
 import { runningAsADemo } from '../shared/demo-world.mts';
 import { newUserTitle, newUserWindow } from './new-user-window.mts';
-import { applyGlass, glassTone, glassWindow, loadWindowGlass } from './window-glass.mts';
 import { tintWindowButtons, windowFrame } from './window-buttons.mts';
 import { openFreshUser } from './fresh-user.mts';
 import { installCrashReports, report as reportCrash, reportFromRenderer, pending as pendingCrashes, setTransport } from './crash-report.mts';
@@ -568,6 +567,7 @@ async function createWindow() {
     wontStart: () => supervisor.status(),
     ownMates: () => matesForTheTeam(store, config),
     sharing: () => alphaFeatures(config).multiplayer,
+    sharedFromNow: () => multiplayerWasOff(config),
     tellThread: (slug, id, o) => supervisor.tellThread(slug, id, o),
     // HER PHONE WITH THE MAC SHUT (main/phone-inbox.mts). What it left is done
     // through the window's own handlers, filed below once the window exists.
@@ -611,7 +611,7 @@ async function createWindow() {
       takenBack: (c) => supervisor.takenBack(c),
       carriedFinished: (commands) => supervisor.carriedFinished(commands),
     },
-    // ROOMS, while switched on in Alpha features (docs/team/ROOMS-PLAN.md).
+    // ROOMS, for anyone on a team (docs/team/ROOMS-PLAN.md).
     rooms: roomsSetup({ config, store, supervisor, userDir }),
   }) : null;
   if (team) {
@@ -835,8 +835,6 @@ async function createWindow() {
     });
   });
 
-  const liquidGlass = loadWindowGlass();
-  const { additionalArguments, ...glass } = glassWindow(process.platform, alphaFeatures(config).glass, !!liquidGlass);
   const opening = openingSize(electronScreen.getPrimaryDisplay(), config.zoomByScreen);
   window = new BrowserWindow({
     width: opening.width,
@@ -853,18 +851,15 @@ async function createWindow() {
       width: opening.width,
       height: opening.height,
     }),
-    ...glass,
+    backgroundColor: '#1a1a1c',
     ...windowFrame(process.platform),
     webPreferences: {
       preload: path.join(appDir, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       webviewTag: true, // the inbox-zero browser
-      additionalArguments,
     },
   });
-
-  if (alphaFeatures(config).glass) applyGlass(window, process.platform, true, liquidGlass);
 
   // Electron hands the window's title to the page's the moment one loads, and
   // renderer/index.html carries the app's name, so a throwaway copy went back
@@ -1003,7 +998,6 @@ async function createWindow() {
   quitStep(app, 'before-quit', 'connections.stop', () => connected.stop());
   const ipc = registerIpc({
     store, supervisor, config, window, analytics, docGrants, updater, froze,
-    glass: (on) => applyGlass(window, process.platform, on, liquidGlass),
     host: filingHost,
     team,
     connections: connected.connections,
@@ -1245,7 +1239,6 @@ async function createWindow() {
   // Asked for once by the renderer as it mounts, rather than pushed on
   // did-finish-load, which races the first effects and would drop the very
   // message it exists to deliver.
-  ipcMain.handle('zero:glass-tone', (_e, payload) => { nativeTheme.themeSource = glassTone(payload?.tone); });
   ipcMain.handle('zero:window-buttons', (_e, payload) => { tintWindowButtons(window, process.platform, payload?.dark); });
   ipcMain.handle('zero:boot-info', () => {
     const info = {

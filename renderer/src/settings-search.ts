@@ -11,7 +11,7 @@
 // second word narrows rather than widens.
 
 export type SettingsPageId =
-  | 'general' | 'appearance' | 'shortcuts' | 'phone' | 'alpha' | 'rooms'
+  | 'general' | 'appearance' | 'shortcuts' | 'phone' | 'rooms'
   | 'claude' | 'codex' | 'running' | 'cloud' | 'instructions'
   | 'projects' | 'files' | 'team';
 
@@ -22,7 +22,6 @@ export const SETTINGS_PAGES: Array<{ id: SettingsPageId; label: string; group: '
   { id: 'appearance', label: 'Appearance', group: 'Personal' },
   { id: 'shortcuts', label: 'Shortcuts', group: 'Personal' },
   { id: 'phone', label: 'Phone', group: 'Personal' },
-  { id: 'alpha', label: 'Alpha features', group: 'Personal' },
   { id: 'claude', label: 'Claude Code', group: 'Agents' },
   { id: 'codex', label: 'Codex', group: 'Agents' },
   { id: 'running', label: 'Running', group: 'Agents' },
@@ -62,7 +61,6 @@ const ENTRIES: Entry[] = [
   { page: 'shortcuts', label: 'Keyboard shortcuts', words: 'keys hotkeys keybindings' },
   { page: 'phone', label: 'Use it on your phone', anchor: 'phone', words: 'phone mobile qr code scan remote tailscale wifi home screen app' },
   { page: 'general', label: 'Use AI teammates', anchor: 'teammates', words: 'teammate teammates ai agent agents standing job employee hire auto routing' },
-  { page: 'alpha', label: 'Rooms', anchor: 'alpha', words: 'alpha beta early try team friends multiplayer people chat' },
   { page: 'rooms', label: 'Show my full name', anchor: 'rooms-name', words: 'name last surname initial' },
   { page: 'rooms', label: 'What you are working on', anchor: 'rooms-card', words: 'card thread private wall' },
   { page: 'rooms', label: 'Your activity on your page', anchor: 'rooms-card', words: 'activity board inbox profile page hide' },

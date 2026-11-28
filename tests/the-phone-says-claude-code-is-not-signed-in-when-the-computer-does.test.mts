@@ -61,8 +61,8 @@ describe('the Claude Code page on the phone', () => {
 
   it('never marks a login that is not signed in as In use, nor offers to use it', () => {
     const page = fs.readFileSync(new URL('../mobile/src/ui/SettingsPages.tsx', import.meta.url), 'utf8');
-    expect(page).toMatch(/const live = picked && chosen\(a\) && !signingIn;/);
-    expect(page).toMatch(/control=\{!live && !signingIn && list\.length > 1/);
+    expect(page).toMatch(/const live = !signingIn && inUseHere\(/);
+    expect(page).toMatch(/control=\{!\(picked && chosen\(a\)\) && !signingIn && list\.length > 1/);
   });
 
   it('and the phone website, which draws the same copy, does the same', () => {

@@ -104,7 +104,7 @@ describe('the status line', () => {
 
 describe('the page', () => {
   it('draws both agents\' accounts in the one Signed in card', () => {
-    expect(enginePage).toContain('name="Signed in"');
+    expect(enginePage).toContain('name={accountsHeading(accounts)}');
     expect(enginePage).not.toMatch(/engine === 'claude' \? \(\s*<>\s*<Place/);
   });
 

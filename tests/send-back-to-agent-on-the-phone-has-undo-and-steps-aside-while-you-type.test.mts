@@ -27,9 +27,8 @@ describe('send back to agent', () => {
     ]);
     expect(plan.undone()).toBe('Back in your inbox');
   });
-  it('is not offered while the reply box holds something to send', () => {
+  it('is no longer a link beside the reply box, where it was hit for Send', () => {
     const page = fs.readFileSync('mobile/src/app/thread/[product]/[id].tsx', 'utf8');
-    expect(page).toMatch(/offers\.sendBack && !typed \?/);
-    expect(page).toMatch(/onTyped=\{setTyped\}/);
+    expect(page).not.toMatch(/label: 'send back to agent'/);
   });
 });

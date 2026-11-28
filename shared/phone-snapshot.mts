@@ -165,6 +165,8 @@ export interface PhoneWait {
   state: string;
   tool?: string;
   until?: number;
+  /** Queued while its folder is made: it reads as a run. An older phone passes over it and says Queued. */
+  settingUp?: true;
 }
 
 /** What the Mac's own status (Supervisor#status) says about the queue. */
@@ -175,6 +177,7 @@ export interface StatusSeen {
   atLimit?: Record<string, { tool?: unknown; until?: unknown } | null>;
   runNow?: string[];
   queued?: string[];
+  settingUp?: string[];
   paused?: boolean;
 }
 
@@ -591,7 +594,8 @@ export function phoneWaitsOf(status: StatusSeen | null | undefined): { byId: Rec
   for (const [id, tool] of Object.entries(status.signInNeeded ?? {})) set(id, { state: 'signin', tool: String(tool) });
   for (const [id, l] of Object.entries(status.atLimit ?? {})) set(id, { state: 'limit', tool: String(l?.tool ?? ''), until: Number(l?.until) || 0 });
   const next = new Set(status.runNow ?? []);
-  for (const id of status.queued ?? []) set(id, { state: next.has(id) ? 'next' : 'queued' });
+  const settingUp = new Set(status.settingUp ?? []);
+  for (const id of status.queued ?? []) set(id, { state: next.has(id) ? 'next' : 'queued', ...(settingUp.has(id) ? { settingUp: true as const } : {}) });
   return { byId, paused: !!status.paused };
 }
 
