@@ -55,8 +55,9 @@ function checkedCopy(own, trustedConfig) {
 }
 
 // A Mac refuses a link anywhere on the path (O_NOFOLLOW_ANY), so a folder
-// swapped for one after the walk below is not written through either.
-const NO_LINK_ON_THE_WAY = process.platform === 'darwin' ? 0x20000000 : 0;
+// swapped for one after the walk below is not written through either. It
+// answers EINVAL to that flag beside O_NOFOLLOW, which it already covers.
+const NO_LINKS = process.platform === 'darwin' ? 0x20000000 : fs.constants.O_NOFOLLOW;
 
 /** `rel` under `root`, after making sure no folder on the way there is a link. */
 function inside(root, rel) {
@@ -72,8 +73,8 @@ function inside(root, rel) {
 
 function writeInside(root, rel, from) {
   const st = fs.statSync(from);
-  const { O_WRONLY, O_CREAT, O_TRUNC, O_NOFOLLOW } = fs.constants;
-  const fd = fs.openSync(inside(root, rel), O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | NO_LINK_ON_THE_WAY, st.mode & 0o777);
+  const { O_WRONLY, O_CREAT, O_TRUNC } = fs.constants;
+  const fd = fs.openSync(inside(root, rel), O_WRONLY | O_CREAT | O_TRUNC | NO_LINKS, st.mode & 0o777);
   try {
     fs.writeSync(fd, fs.readFileSync(from));
     fs.futimesSync(fd, st.atime, st.mtime);
