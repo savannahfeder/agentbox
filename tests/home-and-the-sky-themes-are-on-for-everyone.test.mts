@@ -24,10 +24,9 @@ describe('Home and the sky themes, out of Alpha features', () => {
     }
   });
 
-  it('are not offered as an alpha feature any more', () => {
-    const alpha = settings.slice(settings.indexOf("pane === 'alpha' && ("), settings.indexOf("pane === 'general' && ("));
-    expect(alpha).toContain('label="Rooms"');
-    expect(alpha).not.toContain('label="Home"');
+  it('are not offered as an alpha feature any more, and there is no Alpha features page', () => {
+    expect(settings).not.toContain("pane === 'alpha'");
+    expect(settings).not.toMatch(/label="Home"/);
   });
 
   it('open the app on Home, and offer Home in the sidebar, on a computer but not on a phone', () => {

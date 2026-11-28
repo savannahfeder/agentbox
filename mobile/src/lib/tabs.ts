@@ -7,7 +7,7 @@
 // one module both read is the follow-up that retires this file.
 
 import {
-  belongsInInbox, belongsInProgress, hiddenUntil, inProgressTab, isProposal, notStarted, rowTitle, stillAsksYou, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd,
+  belongsInInbox, belongsInProgress, closedByThem, hiddenUntil, inLaterByThem, inProgressTab, isProposal, notStarted, rowTitle, stillAsksYou, threadsOwedAnAnswer, waitsInLater, waitsThatCanEnd,
 } from '../../../renderer/src/list-rules';
 import { backWords, boardColumns, DEFAULT_DISPLAY, handedOnWord, keeps, sentAt, sorted, updatedWords, type Display } from '../../../renderer/src/threads/page-rules';
 import { waitWords } from '../../../shared/thread-waits.mts';
@@ -128,7 +128,7 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const waitingOn = (i: WorkItem) => waitsThatCanEnd(i, byId);
   const hiddenAt = (i: WorkItem) => hiddenUntil(i);
   const owed = threadsOwedAnAnswer(items, now);
-  const inProgress = (i: WorkItem) => (hiddenAt(i) <= now || live.has(i.id)) && belongsInProgress(i, { deferredUntil: i.runAt ?? 0, now, live: live.has(i.id) });
+  const inProgress = (i: WorkItem) => (hiddenAt(i) <= now || (live.has(i.id) && !inLaterByThem(i, hiddenAt(i), now))) && belongsInProgress(i, { deferredUntil: i.runAt ?? 0, now, live: live.has(i.id) });
   const strandedIds = new Set(view.stranded ?? []);
   const stranded = new Set(items.filter((i) => strandedIds.has(i.id) && inProgress(i)).map((i) => i.id));
 
@@ -141,7 +141,7 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   const progress = inProgressTab(items.filter(inProgress), inbox);
   const snoozed = items.filter((i) => (notStarted(i) || isProposal(i) || hiddenAt(i) > now || (waitsInLater(i, waitingOn(i)) && !live.has(i.id)))
     && (i.status !== 'done' || i.wrote?.status?.source !== 'founder'));
-  const done = items.filter((i) => !needsYou.has(i.id) && !live.has(i.id) && i.status === 'done');
+  const done = items.filter((i) => !needsYou.has(i.id) && (!live.has(i.id) || closedByThem(i)) && i.status === 'done');
 
   // Which tab each thread is in, the later lists winning as App.tsx's `tabState` has it.
   const state = new Map<string, ThreadStateWord>();
@@ -167,6 +167,10 @@ export function phoneTabs(view: View, now = Date.now()): Record<TabId, Row[]> {
   return { inbox: drawn(inbox, 'inbox'), progress: drawn(progress, 'progress'), snoozed: drawn(snoozed, 'snoozed'), done: drawn(done, 'done') };
 }
 
+/** The repeating tasks Later lists under View and filters: a project filter keeps only its projects' ones. */
+export const repeatsKept = <R extends { product: string }>(repeats: R[], display: Display): R[] =>
+  display.projects.length ? repeats.filter((r) => display.projects.includes(r.product)) : repeats;
+
 /** Each tab as View and filters leave it (App.tsx `displayedBox`), and how many it holds before them. */
 export function shownTabs(tabs: Record<TabId, Row[]>, display: Display, now: number, order: string[], agent: Harness | null = null) {
   const pick = (tab: TabId) => {
@@ -181,11 +185,12 @@ export function shownTabs(tabs: Record<TabId, Row[]>, display: Display, now: num
 
 /**
  * View and filters' "Showing N of M": what the screen draws against what it
- * would draw with no filter on. `above` is the rows drawn over the list that no
- * filter hides (mentions, questions, repeating tasks).
+ * would draw with no filter on. `above` is the rows drawn over the list
+ * (mentions, questions, repeating tasks), and `aboveWhole` how many of them
+ * there are with no filter on.
  */
-export function filterCount({ rows, whole, mineOnly = false, above = 0, board = null, wholeBoard = null }: {
-  rows: Pick<Row, 'item'>[]; whole: Pick<Row, 'item'>[]; mineOnly?: boolean; above?: number;
+export function filterCount({ rows, whole, mineOnly = false, above = 0, aboveWhole = above, board = null, wholeBoard = null }: {
+  rows: Pick<Row, 'item'>[]; whole: Pick<Row, 'item'>[]; mineOnly?: boolean; above?: number; aboveWhole?: number;
   board?: { rows: unknown[] }[] | null; wholeBoard?: { rows: unknown[] }[] | null;
 }) {
   if (board && wholeBoard) {
@@ -193,7 +198,7 @@ export function filterCount({ rows, whole, mineOnly = false, above = 0, board = 
     return { shown: cards(board), total: cards(wholeBoard) };
   }
   const counted = (list: Pick<Row, 'item'>[]) => (mineOnly ? list.filter((r) => !teammateIdOf(r.item)) : list).length;
-  return { shown: counted(rows) + above, total: counted(whole) + above };
+  return { shown: counted(rows) + above, total: counted(whole) + aboveWhole };
 }
 
 /** The board, column by column, as the site draws it (page-rules.ts `boardColumns`). */

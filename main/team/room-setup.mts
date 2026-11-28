@@ -2,7 +2,6 @@
 // desktop (main/main.mts) and the browser copy (main/serve.mts) alike.
 import path from 'node:path';
 import { appHome } from '../store/home.mts';
-import { roomsOnFor } from '../../shared/rooms-on.mts';
 import { readEnv } from '../../shared/product-name.mjs';
 import { readCloudUsage } from '../cloud/usage.mts';
 import { phoneDevice } from '../phone-inbox.mts';
@@ -15,7 +14,7 @@ import { writeTeamLookDocs } from './team-look-doc.mts';
 interface DecisionDocsArgs { teamName: string; rows: RoomDecision[]; nameOf: (id: string | null) => string }
 
 export interface RoomsSetupOptions {
-  config: { alphaRooms?: boolean | null; alphaMultiplayer?: boolean | null; storeRoot: string; accountRoot?: string | null };
+  config: { storeRoot: string; accountRoot?: string | null };
   store: {
     listProducts(opts?: { includeArchived?: boolean }): { dir?: string | null; slug?: string; personal?: boolean; seenBy?: string; seenByPeople?: string[] }[];
     readItem(slug: string, id: string): { id: string; label?: string; title?: string } | null;
@@ -34,7 +33,7 @@ export function roomsSetup({ config, store, supervisor, userDir, log = (line) =>
     log,
   });
   return {
-    enabled: ({ onTeam }: { onTeam: boolean }) => roomsOnFor(config, onTeam),
+    enabled: ({ onTeam }: { onTeam: boolean }) => onTeam,
     device: () => phoneDevice(userDir, config.storeRoot),
     prefsFile: roomPrefsFile(config.storeRoot),
     // Inside the account folder, the one the window may draw a picture or a film from.

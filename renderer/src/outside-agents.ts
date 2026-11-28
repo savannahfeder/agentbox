@@ -33,6 +33,14 @@ export function outsideCommands(mode: AgentMode): { id: string; label: string; h
 export const BRING_IN = `Continue in ${Name}`;
 export const BROUGHT_IN = `Moved to ${Name}. The session in its terminal is left as it was.`;
 
+/**
+ * A Claude Code session in a terminal that can become a thread here, which a
+ * reply from here does. Codex sessions are answered in Codex.
+ */
+export function canMoveIn(agent: { engine?: string | null; product?: string | null; sessionId?: string | null } | null | undefined): boolean {
+  return !!agent?.product && !!agent.sessionId && agent.engine !== 'codex';
+}
+
 /** What a toast says once it is changed from somewhere the inbox is not in view. */
 export const OUTSIDE_SAID: Record<AgentMode, string> = {
   all: 'Terminal sessions show in your inbox now.',

@@ -176,7 +176,7 @@ describe('the workflow npm trusts', () => {
   it('builds on a Mac, so the package carries the glass', () => {
     expect(workflow).toContain('runs-on: macos-latest');
     expect(workflow).toContain('main/native/liquid-glass/build/liquid-glass.node');
-    expect(workflow).toContain('main/native/window-glass/build/window-glass.node');
+    expect(workflow).not.toContain('window-glass');
   });
 
   it('publishes only a commit on main that says the version it was asked for', () => {

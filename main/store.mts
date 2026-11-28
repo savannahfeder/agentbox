@@ -40,7 +40,7 @@ import {
   CODEX_IMPORT_LABEL, NOT_IMPORTED_LABEL, codexIdOf, codexImportRow, codexMirrorPatch, isCodexImportRow, isCodexMirrorRow,
   productsForThread, threadsNeedingRows as codexThreadsNeedingRows,
 } from '../shared/codex-import.mts';
-import { buildClaimLine, buildReleaseLine, GIVEN_TASK, LEASE_MS, type LinkComment } from '../shared/work-items.mts';
+import { buildClaimLine, buildReleaseLine, GIVEN_TASK, LEASE_MS, takenBack, type LinkComment } from '../shared/work-items.mts';
 import { isEffortWord } from '../shared/effort-levels.mts';
 import { shippedNote } from '../shared/shipped-note.mts';
 import { shipClosesIt, shippedButOpen } from '../shared/ship-closes-its-thread.mts';
@@ -636,9 +636,9 @@ export class Store {
     }
     // The pane may still show a running row after Stop or a provider result.
     // Resolve omitted reply status against the ledger that was just written.
-    // Except an ask handed back (shared/thread-asks.mts): a thank-you there is a message, not more work.
+    // Except an ask handed back (shared/thread-asks.mts) or a task taken back: a thank-you there is a message, not more work.
     if (status == null && typeof answer === 'string' && answer.trim() && answer !== '(withdrawn)'
-      && (item?.status === 'blocked' || item?.status === 'done') && !(item?.ask && item?.verdict)) status = 'open';
+      && (item?.status === 'blocked' || item?.status === 'done') && !(item?.ask && item?.verdict) && !(item && takenBack(item))) status = 'open';
     // WHAT THE ANSWER ITSELF MAY DO does not go on the ledger. It is a grant,
     // the ledger is an append-only file every worker writes, and every line on
     // it names its own author with nothing checking the name. It goes in the
@@ -1212,15 +1212,30 @@ export class Store {
 
   // A CLOUD RUN'S WORK KEPT ON A BRANCH OF ITS OWN, because laying it into the
   // task folder would have undone work done there (main/cloud/run.mts
-  // `park`). Said as a note; the row waits for her, and loses `ship`, so the
-  // folder never ships without the run's work.
-  cloudWorkKeptAside(slug: string, id: string, note: string) {
+  // `park`). Said as a note; the row loses `ship`, so the folder never ships
+  // without the run's work, and waits for her unless its agent has been handed
+  // the branch (`waits: false`).
+  cloudWorkKeptAside(slug: string, id: string, note: string, { waits = true }: { waits?: boolean } = {}) {
     const { workItemsDisk } = this.modules;
     const dir = this.productDir(slug);
     const labels = this.readItem(slug, id)?.labels ?? [];
     const kept = labels.filter((l) => l !== 'ship');
     workItemsDisk.updateWorkItem(dir, id, { note, ...(kept.length !== labels.length ? { labels: kept } : {}) }, { source: 'system' });
-    return workItemsDisk.updateWorkItem(dir, id, { status: 'blocked' }, { source: 'system' });
+    return workItemsDisk.updateWorkItem(dir, id, { status: waits ? 'blocked' : 'open' }, { source: 'system' });
+  }
+
+  /** Closes the open causes `which` picks, with a note saying why; the threads behind them carry on (`resumeFinishedWaits`). */
+  clearCauses(which: (row: ListedItem) => boolean, note: string, now = Date.now()): number {
+    let cleared = 0;
+    for (const row of this.listItems(now)) {
+      if (!which(row)) continue;
+      const dir = this.productDir(row.product);
+      if (!dir) continue;
+      this.modules.workItemsDisk.updateWorkItem(dir, row.id, { note }, { source: 'system', now });
+      this.modules.workItemsDisk.updateWorkItem(dir, row.id, { status: 'done' }, { source: 'system', now });
+      cleared++;
+    }
+    return cleared;
   }
 
   // A CLOSED ROW WHOSE WORK NEVER REACHED MAIN, put back in front of the
