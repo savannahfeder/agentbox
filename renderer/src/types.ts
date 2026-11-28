@@ -1679,6 +1679,8 @@ export interface WorkspaceSettings {
       profile: string; email: string | null; name: string | null;
       plan: string | null; planNamed?: boolean; accountId: string | null;
       signedIn: boolean; chosen: boolean;
+      /** The folder holds an API key and no plan. */
+      apiKey?: boolean;
     }>;
   } | null;
   permission: PermissionMode;

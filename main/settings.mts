@@ -34,7 +34,7 @@ import { NAME, Name } from '../shared/product-name.mjs';
 import { autoSlots, memoryGateWorksOn } from './memory-gate.mts';
 import { accountIdentity, claudeLoginCommand, duplicateAccountNote, linkAccountTooling, makeClaudeHome } from './account-tooling.mts';
 import { isEngine } from '../shared/engines.mts';
-import { codexAccount, codexFreePlan, codexLoginCommand, makeCodexHome } from './codex-account.mts';
+import { codexAccount, codexFreePlan, codexLoginCommand, codexLoginMode, makeCodexHome } from './codex-account.mts';
 import { codexDefaultModel, codexModelsAcross } from './codex-models.mts';
 import { CODEX_DEFAULT_MODE, isCodexMode } from '../shared/codex-modes.mts';
 import { CLOUD_SAME, CLOUD_CLAUDE_DEFAULT, CLOUD_CODEX_DEFAULT } from './cloud-permission.mts';
@@ -1111,6 +1111,8 @@ function codexAccountRows(supervisor: SettingsSupervisor) {
       planNamed: id?.planNamed ?? false,
       accountId: id?.accountId ?? null,
       signedIn: !!id,
+      // A key is a login Codex accepts and agents never run on (`codexKeyRefusal`).
+      apiKey: !id && codexLoginMode(home) === 'apikey',
       // WHICH ONE RUNS, and one of them always does (`chosen` above).
       chosen: chosen === profile,
     };

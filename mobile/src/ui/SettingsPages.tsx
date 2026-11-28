@@ -268,7 +268,7 @@ function Accounts({ engine, list }: { engine: 'claude' | 'codex'; list: Account[
       {list.map((a, i) => {
         const signingIn = a.signedIn === false;
         const live = !signingIn && inUseHere(w, engine, mode, { id: a.id, chosen: picked && chosen(a) });
-        const line = backAt(a.resetsAt, c.now) ?? a.note ?? (signingIn ? 'Finish signing in to use it' : a.plan ?? 'Signed in');
+        const line = backAt(a.resetsAt, c.now) ?? a.note ?? (signingIn ? 'Sign in on your computer to use it' : a.plan ?? 'Signed in');
         return (
           <Row key={a.id} first={i === 0} label={loginLabel(a, engine, i, list.length)} badge={live ? 'In use' : undefined}
             desc={signingIn ? line : withPlaces(line, placesOf(w, engine, a.id))}
