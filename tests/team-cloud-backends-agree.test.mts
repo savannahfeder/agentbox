@@ -167,9 +167,9 @@ for (const [where, makeWorld, enabled] of worlds) {
       const seen = (await w.maya.listCards()).filter((c) => c.personId === w.theo.personId).sort((a, b) => a.threadId.localeCompare(b.threadId));
       expect(seen.map((c) => [c.threadId, c.visible, c.title, c.state])).toEqual([['w-1', true, 'Acme renewal terms', 'running']]);
       expect(await w.jun.listCards()).toEqual([]);
-      await w.theo.putCards(team.id, [{ ...card, threadId: 'w-3', visible: false }]);
+      await w.theo.putCards(team.id, [{ ...card, threadId: 'w-3', visible: false }], undefined, ['w-1', 'w-2']);
       expect((await w.maya.listCards()).filter((c) => c.personId === w.theo.personId)).toEqual([]);
-      await w.theo.putCards(team.id, []);
+      await w.theo.putCards(team.id, [], undefined, ['w-3']);
       expect((await w.maya.listCards()).filter((c) => c.personId === w.theo.personId)).toEqual([]);
     });
 
@@ -178,7 +178,7 @@ for (const [where, makeWorld, enabled] of worlds) {
       await w.theo.putCards(team.id, [{ ...card, shippedAt: 1_790_000_000_500 }, { ...card, threadId: 'w-5' }]);
       const seen = (await w.maya.listCards()).filter((c) => c.personId === w.theo.personId).sort((a, b) => a.threadId.localeCompare(b.threadId));
       expect(seen.map((c) => [c.threadId, c.shippedAt])).toEqual([['w-4', 1_790_000_000_500], ['w-5', undefined]]);
-      await w.theo.putCards(team.id, []);
+      await w.theo.putCards(team.id, [], undefined, ['w-4', 'w-5']);
     });
 
     // SHARED WITH CHOSEN PEOPLE (w-41ff964775, 20261001000800). No list is the
@@ -254,7 +254,7 @@ for (const [where, makeWorld, enabled] of worlds) {
       await w.theo.pruneThreadFiles('w-work', []);
       expect(await w.theo.threadFileNames('w-work')).toEqual([]);
 
-      await w.theo.putCards(team.id, []);
+      await w.theo.putCards(team.id, [], undefined, ['w-work']);
       expect(await w.theo.threadWorkHeads()).toEqual([]);
       expect(await w.theo.threadComments()).toEqual([]);
     });

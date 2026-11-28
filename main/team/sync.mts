@@ -104,8 +104,8 @@ export interface SyncBackend {
   listProjects(): Promise<CloudProject[]>;
   pushLines(projectId: string, lines: LedgerLine[]): Promise<number>;
   pullLines(projectId: string, afterSeq: number, limit: number): Promise<{ seq: number; line: LedgerLine | null }[]>;
-  /** Every card still listed, and the ones among them to write; all of them when `changed` is left out. */
-  putCards(teamId: string, cards: SyncCard[], changed?: ReadonlySet<string>): Promise<void>;
+  /** Every card still listed, the ones among them to write (all of them when `changed` is left out), and the threads whose cards to take down. */
+  putCards(teamId: string, cards: SyncCard[], changed?: ReadonlySet<string>, gone?: readonly string[]): Promise<void>;
   hasFiles?(projectId: string, names: string[]): Promise<string[]>;
   getFile?(projectId: string, name: string): Promise<unknown>;
   putFile?(projectId: string, name: string, data: string): Promise<boolean>;
@@ -494,9 +494,11 @@ export function createTeamSync({ backend, disk, state, listShared, joinProject, 
     const now: Record<string, string> = {};
     for (const c of cards) if (c.visible === true) now[c.threadId] = crypto.createHash('sha256').update(JSON.stringify(c)).digest('hex');
     const changed = new Set(Object.keys(now).filter((id) => had?.[id] !== now[id]));
-    const gone = !had || Object.keys(had).some((id) => !(id in now));
-    if (!changed.size && !gone) return false;
-    await backend.putCards(teamId, cards, changed);
+    // Only cards this copy sent: another copy signed in as the same person
+    // lists other threads, and taking theirs down made the two fight.
+    const gone = had ? Object.keys(had).filter((id) => !(id in now)) : [];
+    if (had && !changed.size && !gone.length) return false;
+    await backend.putCards(teamId, cards, changed, gone);
     state.setCardsSent({ teamId, cards: now });
     return true;
   }

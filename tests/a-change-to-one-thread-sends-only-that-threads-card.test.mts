@@ -175,14 +175,14 @@ describe('the real database', () => {
   // A stand-in for supabase-js that keeps what was asked of thread_cards.
   function client() {
     const upserts: Record<string, unknown>[][] = [];
-    const deletes: { eq: [string, unknown][]; not: [string, string, unknown][] }[] = [];
+    const deletes: { eq: [string, unknown][]; in: [string, unknown][] }[] = [];
     const answer = { data: null, error: null };
     const deleting = () => {
-      const d = { eq: [] as [string, unknown][], not: [] as [string, string, unknown][] };
+      const d = { eq: [] as [string, unknown][], in: [] as [string, unknown][] };
       deletes.push(d);
       const chain = {
         eq: (col: string, v: unknown) => { d.eq.push([col, v]); return chain; },
-        not: (col: string, op: string, v: unknown) => { d.not.push([col, op, v]); return chain; },
+        in: (col: string, v: unknown) => { d.in.push([col, v]); return chain; },
         then: (ok: (v: typeof answer) => unknown) => Promise.resolve(answer).then(ok),
       };
       return chain;
@@ -197,20 +197,19 @@ describe('the real database', () => {
     return { backend: supabaseBackend(c as unknown as Parameters<typeof supabaseBackend>[0]), upserts, deletes };
   }
 
-  it('rewrites only the cards it is told changed, and keeps every card still listed', async () => {
+  it('rewrites only the cards it is told changed, and deletes none of them', async () => {
     const { backend, upserts, deletes } = client();
     const cards = Array.from({ length: 5 }, (_, i) => card(i));
-    await backend.putCards('team', cards, new Set([cards[3].threadId]));
+    await backend.putCards('team', cards, new Set([cards[3].threadId]), [cards[1].threadId]);
     expect(upserts.map((rows) => rows.map((r) => r.thread_id))).toEqual([[cards[3].threadId]]);
-    expect(String(deletes[0].not[0][2])).toBe(`(${cards.map((c) => `"${c.threadId}"`).join(',')})`);
+    expect(deletes).toEqual([]);
   });
 
   it('rewrites nothing when nothing changed, and still clears a card no longer listed', async () => {
     const { backend, upserts, deletes } = client();
-    await backend.putCards('team', [card(1)], new Set());
+    await backend.putCards('team', [card(1)], new Set(), [card(2).threadId]);
     expect(upserts).toEqual([]);
-    expect(deletes).toHaveLength(1);
-    expect(deletes[0].eq).toEqual([['person_id', 'me']]);
+    expect(deletes).toEqual([{ eq: [['person_id', 'me']], in: [['thread_id', [card(2).threadId]]] }]);
   });
 
   it('rewrites every card when it is not told which changed', async () => {

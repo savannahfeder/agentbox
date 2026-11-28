@@ -445,7 +445,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
         .slice(0, limit).map((l) => ({ seq: l.seq, line: asPulled(structuredClone(l.body), { by: l.byPerson, at: l.createdAt, me: personId }) }));
     },
 
-    async putCards(teamId: string, cards: { threadId: string; visible?: unknown; people?: string[] | null; [key: string]: unknown }[], changed?: ReadonlySet<string>) {
+    async putCards(teamId: string, cards: { threadId: string; visible?: unknown; people?: string[] | null; [key: string]: unknown }[], changed?: ReadonlySet<string>, gone: readonly string[] = []) {
       if (!myTeams().includes(teamId)) throw new Error('not on that team');
       const had = [...cloud.cards.values()].filter((c) => c.personId === personId).map((c) => c.threadId);
       // A private card never goes up at all, whatever the Mac handed over, as
@@ -462,7 +462,7 @@ export function memoryBackend(cloud: MemoryCloud, personId: string) {
       });
       for (const c of writing) cloud.cards.set(`${personId}:${c.threadId}`, c);
       const listed = new Set(shown.map((c) => c.threadId));
-      for (const threadId of had) if (!listed.has(threadId)) cloud.cards.delete(`${personId}:${threadId}`);
+      for (const threadId of gone) if (!listed.has(threadId)) cloud.cards.delete(`${personId}:${threadId}`);
       // A thread's work goes with its card (the foreign keys in
       // 20261030120000_shared_threads_carry_their_work.sql).
       for (const threadId of had) {
