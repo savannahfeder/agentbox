@@ -32,7 +32,7 @@ describe('which files take the sidebar', () => {
 describe('the pane', () => {
   const pane = read('components/DocPane.tsx');
   it('sets the sidebar beside a page, a table and a script, not only a document', () => {
-    expect(pane.match(/<Beside aside=\{aside\}>/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(pane.match(/<Beside aside=\{aside\}( at=\{words\})?>/g)?.length).toBeGreaterThanOrEqual(4);
   });
   it('lets whatever sits beside the notes take the room', () => {
     expect(read('components/notes-sidebar.css')).toContain('.doc-notes-split > :not(.sb) { flex: 1; min-width: 0; min-height: 0; }');

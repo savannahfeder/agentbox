@@ -141,8 +141,6 @@ export const HINTS: Record<string, HintLine[]> = {
   // The button after the sidebar's pencil, which says what a press does now.
   'keep-sidebar': [{ key: '⌘\\', what: 'Keep sidebar open' }],
   'shrink-sidebar': [{ key: '⌘\\', what: 'Shrink sidebar to icons' }],
-  // Comment on the bar over selected words (SelectionBar.tsx).
-  comment: [{ key: '⌘/', what: 'Comment on selected words' }],
 };
 
 export interface Rect { top: number; left: number; right: number; bottom: number; width: number; height: number }

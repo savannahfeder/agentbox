@@ -66,8 +66,8 @@ describe('a table opened full screen takes notes', () => {
   it('the cell menu opens the sidebar with the cell in it, beside the thread or full screen', () => {
     const app = read('App.tsx');
     expect(app).toContain('const cellsTakeNotes = !!focused && openDoc?.product === focused.product && !openDoc.readOnly && takesNotesSidebar(openDoc.src);');
-    expect(app).toMatch(/onComment=\{cellsTakeNotes \? commentOnTable : undefined\}/);
-    const comment = app.slice(app.indexOf('const commentOnTable = '), app.indexOf('const commentOnTable = ') + 400);
+    expect(app).toMatch(/onComment=\{cellsTakeNotes \? commentOnFile : undefined\}/);
+    const comment = app.slice(app.indexOf('const commentOnFile = '), app.indexOf('const commentOnFile = ') + 400);
     expect(comment).toContain('setNotesOpen(true)');
     expect(comment).toContain("if (artifactMode !== 'focus') { setArtifactReturnBeside(artifactMode === 'beside'); setArtifactMode('focus'); }");
   });

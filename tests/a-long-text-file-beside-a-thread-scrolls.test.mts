@@ -46,7 +46,7 @@ async function measure(markup: string) {
 
 describe('the text view in the file pane', () => {
   it('is still wrapped by Beside, which is what the scroll rule has to survive', () => {
-    expect(read('components/DocPane.tsx')).toContain('<Beside aside={aside}><div className="code-scroll" ref={setCodeBox}>');
+    expect(read('components/DocPane.tsx')).toContain('<Beside aside={aside} at={words}><div className="code-scroll" ref={setCodeBox}>');
   });
 });
 

@@ -599,10 +599,19 @@ export function searchForEngineBin(config: SettingsConfig, engine: string) {
 }
 
 // What the old Alpha features page switched. It is gone (w-11d0017da3), so a
-// saved `alphaRooms` or `alphaMultiplayer` is ignored: nobody could undo it.
+// saved `alphaRooms` is ignored, and `alphaMultiplayer` is read once
+// (`multiplayerWasOff`): nobody could undo either.
 // Rooms is on for anyone on a team, since a team without it gets no Team page;
 // a caller that does not know about the team reads it as no team. AI teammates
 // keep their switch, in General (shared/teammates.mts).
+// Read once, then forgotten: someone who had switched multiplayer off keeps
+// what they made until now to themselves (main/team/index.mts sharedFromNow).
+export function multiplayerWasOff(config: SettingsConfig): boolean {
+  if (config.alphaMultiplayer !== false) return false;
+  saveConfig(config, { alphaMultiplayer: undefined });
+  return true;
+}
+
 export function alphaFeatures(config?: SettingsConfig | null, { onTeam = false }: { onTeam?: boolean } = {}) {
   return {
     rooms: onTeam,
